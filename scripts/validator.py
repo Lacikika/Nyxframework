@@ -13,7 +13,6 @@ import shutil
 import subprocess
 
 def find_fivem_root():
-    # Detect FiveM directory relative to current working directory or script location
     candidates = [
         os.path.join(os.getcwd(), "FiveM"),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "FiveM")),
@@ -25,21 +24,86 @@ def find_fivem_root():
             return c
     return None
 
+def strip_lua_comments_and_strings(content):
+    result = []
+    i = 0
+    n = len(content)
+
+    while i < n:
+        # Check comment start
+        if content[i:i+2] == '--':
+            i += 2
+            # Check block comment --[=*[
+            if i < n and content[i] == '[':
+                j = i + 1
+                equals_count = 0
+                while j < n and content[j] == '=':
+                    equals_count += 1
+                    j += 1
+                if j < n and content[j] == '[':
+                    close_tag = ']' + ('=' * equals_count) + ']'
+                    close_idx = content.find(close_tag, j + 1)
+                    if close_idx == -1:
+                        break
+                    else:
+                        i = close_idx + len(close_tag)
+                        continue
+            # Single line comment: skip until newline
+            while i < n and content[i] != '\n':
+                i += 1
+            continue
+
+        # Check block string [=*[
+        if content[i] == '[' and i + 1 < n and (content[i+1] == '[' or content[i+1] == '='):
+            j = i + 1
+            equals_count = 0
+            while j < n and content[j] == '=':
+                equals_count += 1
+                j += 1
+            if j < n and content[j] == '[':
+                close_tag = ']' + ('=' * equals_count) + ']'
+                close_idx = content.find(close_tag, j + 1)
+                if close_idx == -1:
+                    result.append(' ')
+                    break
+                else:
+                    i = close_idx + len(close_tag)
+                    result.append(' ')
+                    continue
+
+        # Check quoted strings "..." or '...'
+        if content[i] in ('"', "'"):
+            quote = content[i]
+            i += 1
+            while i < n:
+                if content[i] == '\\':
+                    i += 2  # Skip escaped character
+                    continue
+                if content[i] == quote:
+                    i += 1
+                    break
+                if content[i] == '\n':
+                    return False, f"Unclosed {quote} string across newline"
+                i += 1
+            result.append(' ')
+            continue
+
+        # Regular character
+        result.append(content[i])
+        i += 1
+
+    return True, "".join(result)
+
 def check_lua_syntax(file_path):
     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
 
-    # Strip multiline comments --[[ ... ]]
-    content = re.sub(r'--\[\[.*?\]\]', '', content, flags=re.DOTALL)
-    # Strip single line comments -- ...
-    content = re.sub(r'--.*$', '', content, flags=re.MULTILINE)
-    # Strip literal strings (single and double quoted)
-    content = re.sub(r'([\'"]).*?\1', '', content)
+    ok, stripped_or_err = strip_lua_comments_and_strings(content)
+    if not ok:
+        return False, stripped_or_err
 
-    # In Lua 5.4, blocks that require 'end' are: 'function', 'if', 'do'
-    # ('for ... do' and 'while ... do' are covered by 'do')
-    # 'repeat' is closed by 'until'
-    tokens = re.findall(r'\b(function|if|do|repeat|end|until)\b', content)
+    # Tokens that manipulate block depth
+    tokens = re.findall(r'\b(function|if|do|repeat|end|until)\b', stripped_or_err)
     block_depth = 0
     repeat_depth = 0
 
@@ -69,13 +133,10 @@ def check_manifest_declared_files(manifest_path, resource_dir):
     with open(manifest_path, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
 
-    # Match tables like shared_scripts { ... }, server_scripts { ... }, client_scripts { ... }
     blocks = re.findall(r'(?:shared_scripts|server_scripts|client_scripts)\s*\{([^}]*)\}', content, flags=re.DOTALL)
     for block in blocks:
-        # Extract quoted file names
         file_entries = re.findall(r'[\'"]([^\'"]+)[\'"]', block)
         for entry in file_entries:
-            # Skip dependencies (@oxmysql/...) or wildcards (*.lua)
             if entry.startswith('@') or '*' in entry:
                 continue
             normalized_path = os.path.normpath(os.path.join(resource_dir, entry))
@@ -97,14 +158,12 @@ def main():
     total_lua_files = 0
     total_resources = 0
 
-    # Discover all resources in FiveM root (nyx_* or any folder containing fxmanifest.lua)
     resource_dirs = []
     for item in sorted(os.listdir(fivem_root)):
         full_p = os.path.join(fivem_root, item)
         if os.path.isdir(full_p) and (item.startswith("nyx_") or os.path.isfile(os.path.join(full_p, "fxmanifest.lua"))):
             resource_dirs.append((item, full_p))
 
-    # Also check resources/[custom] if present
     custom_dir = os.path.join(fivem_root, "resources", "[custom]")
     if os.path.isdir(custom_dir):
         for item in sorted(os.listdir(custom_dir)):
@@ -121,14 +180,12 @@ def main():
             has_errors = True
             continue
 
-        # Check declared file existence
         missing_declared = check_manifest_declared_files(manifest_path, res_path)
         if missing_declared:
             for mf in missing_declared:
                 print(f"  [ERROR] {res_name}: Declared file missing on disk: {mf}")
             has_errors = True
 
-        # Scan Lua files
         res_lua_count = 0
         res_ok = (len(missing_declared) == 0)
         for dirpath, _, filenames in os.walk(res_path):
@@ -199,7 +256,6 @@ def main():
     else:
         print("\n--- 4. Luacheck: Skipped (Not found in PATH; Python AST block validator verified 100% syntax) ---")
 
-    # Final verdict
     print("\n" + "=" * 64)
     if has_errors:
         print(f"[FAILED] Repository validation failed! Errors detected in {total_resources} resources.")

@@ -26,21 +26,79 @@ RESOURCES = [
     "nyx_mdt"
 ]
 
+def strip_lua_comments_and_strings(content):
+    result = []
+    i = 0
+    n = len(content)
+
+    while i < n:
+        if content[i:i+2] == '--':
+            i += 2
+            if i < n and content[i] == '[':
+                j = i + 1
+                equals_count = 0
+                while j < n and content[j] == '=':
+                    equals_count += 1
+                    j += 1
+                if j < n and content[j] == '[':
+                    close_tag = ']' + ('=' * equals_count) + ']'
+                    close_idx = content.find(close_tag, j + 1)
+                    if close_idx == -1:
+                        break
+                    else:
+                        i = close_idx + len(close_tag)
+                        continue
+            while i < n and content[i] != '\n':
+                i += 1
+            continue
+
+        if content[i] == '[' and i + 1 < n and (content[i+1] == '[' or content[i+1] == '='):
+            j = i + 1
+            equals_count = 0
+            while j < n and content[j] == '=':
+                equals_count += 1
+                j += 1
+            if j < n and content[j] == '[':
+                close_tag = ']' + ('=' * equals_count) + ']'
+                close_idx = content.find(close_tag, j + 1)
+                if close_idx == -1:
+                    result.append(' ')
+                    break
+                else:
+                    i = close_idx + len(close_tag)
+                    result.append(' ')
+                    continue
+
+        if content[i] in ('"', "'"):
+            quote = content[i]
+            i += 1
+            while i < n:
+                if content[i] == '\\':
+                    i += 2
+                    continue
+                if content[i] == quote:
+                    i += 1
+                    break
+                if content[i] == '\n':
+                    return False, f"Unclosed {quote} string across newline"
+                i += 1
+            result.append(' ')
+            continue
+
+        result.append(content[i])
+        i += 1
+
+    return True, "".join(result)
+
 def check_lua_syntax(file_path):
     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
 
-    # Strip multiline comments --[[ ... ]]
-    content = re.sub(r'--\[\[.*?\]\]', '', content, flags=re.DOTALL)
-    # Strip single line comments -- ...
-    content = re.sub(r'--.*$', '', content, flags=re.MULTILINE)
-    # Strip literal strings (single and double quoted)
-    content = re.sub(r'([\'"]).*?\1', '', content)
+    ok, stripped_or_err = strip_lua_comments_and_strings(content)
+    if not ok:
+        return False, stripped_or_err
 
-    # In Lua, blocks that require 'end' are: 'function', 'if', 'do'
-    # ('for ... do' and 'while ... do' are covered by 'do')
-    # 'repeat' is closed by 'until'
-    tokens = re.findall(r'\b(function|if|do|repeat|end|until)\b', content)
+    tokens = re.findall(r'\b(function|if|do|repeat|end|until)\b', stripped_or_err)
     block_depth = 0
     repeat_depth = 0
 
