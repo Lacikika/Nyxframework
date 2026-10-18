@@ -140,9 +140,11 @@ function Nyx.Judiciary.SetDocketStatus(docketId, newStatus)
     local allowed = {
         ['filed'] = true,
         ['scheduled'] = true,
+        ['in_trial'] = true,
         ['deliberation'] = true,
         ['concluded'] = true,
-        ['dismissed'] = true
+        ['dismissed'] = true,
+        ['mistrial'] = true
     }
     if not allowed[newStatus] then
         return false, "INVALID_STATUS"
@@ -175,9 +177,11 @@ function Nyx.Judiciary.GetDocket(docketId)
     ]], { docketId })
 
     local jurors = MySQL.query.await([[
-        SELECT `jury_id`, `citizen_id`, `selection_status`, `assigned_at`
+        SELECT `jury_id`, `citizen_id`, `seat_index`, `selection_status`, `assigned_at`,
+               `summons_expires_at`, `deliberation_entered_at`, `stipend_paid`
         FROM `nyx_judiciary_juries`
         WHERE `docket_id` = ?
+        ORDER BY `seat_index` ASC, `assigned_at` ASC
     ]], { docketId })
 
     return {
@@ -191,8 +195,9 @@ end
 function Nyx.Judiciary.GetActiveDockets()
     local dockets = MySQL.query.await([[
         SELECT * FROM `nyx_judiciary_dockets`
-        WHERE `status` IN ('filed', 'scheduled', 'deliberation')
+        WHERE `status` IN ('filed', 'scheduled', 'in_trial', 'deliberation')
         ORDER BY `created_at` DESC
     ]])
     return dockets or {}
 end
+

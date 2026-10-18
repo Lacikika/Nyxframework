@@ -20,5 +20,6 @@
   "019_logistics_warehouses_and_shelf_matrices.sql",
   "020_expand_player_inventory_capacity.sql",
   "021_substation_failure_and_blackout_simulation.sql",
-  "022_parliament_irv_elections_and_penal_sync.sql"
+  "022_parliament_irv_elections_and_penal_sync.sql",
+  "023_judiciary_jury_dispatcher_and_courtroom_routing.sql"
 ]

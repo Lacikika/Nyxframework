@@ -13,7 +13,8 @@ description 'Decentralized Judiciary, Immutable Forensic Chain-of-Custody & Auto
 version '1.0.0'
 
 shared_scripts {
-    'config.lua'
+    'config.lua',
+    'shared/jury.lua'
 }
 
 server_scripts {

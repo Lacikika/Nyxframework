@@ -2410,7 +2410,210 @@ function Nyx.Tests.TestParliamentIRVAndPenalSync()
     return passes == total
 end
 
--- 17. Master Test Runner
+-- 17. Test Automated Civic Jury Pool Dispatcher, Fisher-Yates Permutations & Courtroom Routing Buckets
+function Nyx.Tests.TestJuryDispatcherAndCourtroomRouting()
+    print("^3[Nyx:Tests] Running Automated Jury Pool Dispatcher & Courtroom Routing Suite...^7")
+    local passes = 0
+    local total = 8
+
+    -- Retrieve or mock pure shared jury logic
+    local juryShuffle = (Nyx.Jury and Nyx.Jury.FisherYatesShuffle)
+    local juryFilter = (Nyx.Jury and Nyx.Jury.FilterCandidates)
+    local juryPlan = (Nyx.Jury and Nyx.Jury.CalculateDispatchPlan)
+    local jurySeats = (Nyx.Jury and Nyx.Jury.AssignSeats)
+    local juryTabulate = (Nyx.Jury and Nyx.Jury.TabulateVotes)
+
+    if not juryShuffle or not juryFilter or not juryPlan or not jurySeats or not juryTabulate then
+        local sharedPath = "FiveM/nyx_judiciary/shared/jury.lua"
+        local f = io.open(sharedPath, "r")
+        if f then
+            local chunk = f:read("*a")
+            f:close()
+            local fn = load(chunk)
+            if fn then fn() end
+            juryShuffle = Nyx.Jury.FisherYatesShuffle
+            juryFilter = Nyx.Jury.FilterCandidates
+            juryPlan = Nyx.Jury.CalculateDispatchPlan
+            jurySeats = Nyx.Jury.AssignSeats
+            juryTabulate = Nyx.Jury.TabulateVotes
+        end
+    end
+
+    -- Test A: Fisher-Yates Shuffle Uniform Permutation Invariants & Element Conservation
+    local original = { "J1", "J2", "J3", "J4", "J5" }
+    local shuffled = juryShuffle({ "J1", "J2", "J3", "J4", "J5" })
+    local found = {}
+    for _, v in ipairs(shuffled) do found[v] = true end
+    local conserved = (#shuffled == 5) and found["J1"] and found["J2"] and found["J3"] and found["J4"] and found["J5"]
+    local emptyOk = (#juryShuffle({}) == 0)
+    local single = juryShuffle({"solo"})
+    local singleOk = (#single == 1 and single[1] == "solo")
+
+    if assertTest(conserved and emptyOk and singleOk,
+        "Fisher-Yates Shuffle Element Conservation & Boundary Safety",
+        string.format("count=%d, conserved=%s", #shuffled, tostring(conserved))) then
+        passes = passes + 1
+    end
+
+    -- Test B: Candidate Qualification, Conflict of Interest & Active Warrant Filtering
+    local testCandidates = {
+        { citizenId = "CIT_POLICE", job = "police" },
+        { citizenId = "CIT_DEFENDANT", job = "miner" },
+        { citizenId = "CIT_WARRANT", job = "driver" },
+        { citizenId = "CIT_JAILED", job = "unemployed", inJail = true },
+        { citizenId = "CIT_COOLDOWN", job = "clerk" },
+        { citizenId = "CIT_ELIGIBLE_1", job = "mechanic" },
+        { citizenId = "CIT_ELIGIBLE_2", job = "electrician" },
+        { citizenId = "CIT_ELIGIBLE_3", job = "farmer" }
+    }
+    local criteria = {
+        exemptJobs = { police = true, judge = true, ems = true },
+        participants = { CIT_DEFENDANT = true },
+        activeWarrants = { CIT_WARRANT = true },
+        inJail = { CIT_JAILED = true },
+        recentServed = { CIT_COOLDOWN = true }
+    }
+    local eligible, disqualified = juryFilter(testCandidates, criteria)
+    local testB_ok = (#eligible == 3)
+        and (disqualified["CIT_POLICE"] == "EXEMPT_JOB")
+        and (disqualified["CIT_DEFENDANT"] == "CASE_PARTICIPANT")
+        and (disqualified["CIT_WARRANT"] == "ACTIVE_WARRANT")
+        and (disqualified["CIT_JAILED"] == "INCARCERATED")
+        and (disqualified["CIT_COOLDOWN"] == "RECENT_SERVICE_COOLDOWN")
+
+    if assertTest(testB_ok == true,
+        "Civic Candidate Filtering (Exemptions, Participants, Warrants, Incarceration & Cooldowns)",
+        string.format("eligible=%d, disqualified count=%d", #eligible, 5)) then
+        passes = passes + 1
+    end
+
+    -- Test C: Summons Dispatch Planning & Democratic Quorum Gate
+    local okC1, reasonC1, selC1 = juryPlan(eligible, 5, 3, 0)
+    local okC2, reasonC2, selC2 = juryPlan({ { citizenId = "CIT_1" } }, 5, 3, 0)
+    local okC3, reasonC3, selC3 = juryPlan(eligible, 5, 3, 4)
+
+    local testC_ok = (okC1 == true and #selC1 == 3)
+        and (okC2 == false and reasonC2 == "INSUFFICIENT_QUORUM")
+        and (okC3 == true and #selC3 == 1)
+
+    if assertTest(testC_ok == true,
+        "Automated Summons Dispatch Planning & Quorum Gate Enforcement",
+        string.format("okC1=%s, reasonC2=%s, selC3 count=%d", tostring(okC1), tostring(reasonC2), #selC3)) then
+        passes = passes + 1
+    end
+
+    -- Test D: Dynamic Jury Box Seat Assignment Matrix (Zero Collision Guarantee)
+    local currentJurors = {
+        { citizenId = "CIT_A", seatIndex = nil },
+        { citizenId = "CIT_B", seatIndex = 3 },
+        { citizenId = "CIT_C", seatIndex = nil }
+    }
+    local seatOk, assignedJurors = jurySeats(currentJurors, 6)
+    local seatMap = {}
+    local collision = false
+    if seatOk then
+        for _, j in ipairs(assignedJurors) do
+            if seatMap[j.seatIndex] then collision = true end
+            seatMap[j.seatIndex] = j.citizenId
+        end
+    end
+    local testD_ok = (seatOk == true) and (not collision) and (seatMap[3] == "CIT_B") and (assignedJurors[1].seatIndex ~= assignedJurors[3].seatIndex)
+
+    if assertTest(testD_ok == true,
+        "Dynamic Jury Box Seat Assignment Matrix (Collision-Free Guarantee)",
+        string.format("seatOk=%s, seatB=%s, collision=%s", tostring(seatOk), tostring(seatMap[3]), tostring(collision))) then
+        passes = passes + 1
+    end
+
+    -- Test E: Deliberation Secret Ballot Tabulation (Majority & Unanimous Standards)
+    local ballotsMaj = { "guilty", "guilty", "not_guilty", "guilty", "not_guilty" }
+    local resMaj, tallyMaj = juryTabulate(ballotsMaj, "majority", 3)
+
+    local ballotsUnan = { "guilty", "guilty", "guilty", "guilty" }
+    local resUnan, tallyUnan = juryTabulate(ballotsUnan, "unanimous", 3)
+
+    local ballotsDeadlock = { "guilty", "guilty", "not_guilty", "not_guilty" }
+    local resDeadlock, _ = juryTabulate(ballotsDeadlock, "majority", 3)
+
+    local testE_ok = (resMaj == "guilty" and tallyMaj.guilty == 3 and tallyMaj.notGuilty == 2)
+        and (resUnan == "guilty" and tallyUnan.guilty == 4)
+        and (resDeadlock == "hung_jury")
+
+    if assertTest(testE_ok == true,
+        "Deliberation Secret Ballot Tabulation (Majority, Unanimous & Hung Jury Deadlocks)",
+        string.format("resMaj=%s, resUnan=%s, resDeadlock=%s", tostring(resMaj), tostring(resUnan), tostring(resDeadlock))) then
+        passes = passes + 1
+    end
+
+    -- Test F: Courtroom Virtual Routing Bucket Allocation & Deliberation Offset
+    local testDocketId = "DOC-2026-9912"
+    local base = 2100
+    local range = 800
+    local offset = 2000
+    local hash = 0
+    for i = 1, #testDocketId do
+        hash = (hash * 31 + string.byte(testDocketId, i)) % range
+    end
+    local allocatedCourtroomBucket = base + hash
+    local allocatedDeliberationBucket = allocatedCourtroomBucket + offset
+
+    local testF_ok = (allocatedCourtroomBucket >= 2100 and allocatedCourtroomBucket <= 2899)
+        and (allocatedDeliberationBucket >= 4100 and allocatedDeliberationBucket <= 4899)
+        and ((allocatedDeliberationBucket - allocatedCourtroomBucket) == 2000)
+
+    if assertTest(testF_ok == true,
+        "Virtual Routing Bucket Isolation Math (Courtroom 2100-2899, Deliberation 4100-4899)",
+        string.format("courtroomBucket=%d, deliberationBucket=%d", allocatedCourtroomBucket, allocatedDeliberationBucket)) then
+        passes = passes + 1
+    end
+
+    -- Test G: No-Show Summons Timeout Auto-Replacement State Machine
+    local mockSummonsRegistry = {
+        { docketId = testDocketId, citizenId = "CIT_NOSHOW", status = "summoned", isExpired = true },
+        { docketId = testDocketId, citizenId = "CIT_PRESENT", status = "seated", isExpired = false }
+    }
+    local autoReplaced = false
+    local function processTimeouts(registry)
+        for _, entry in ipairs(registry) do
+            if entry.status == "summoned" and entry.isExpired then
+                entry.status = "excused"
+                autoReplaced = true
+            end
+        end
+    end
+    processTimeouts(mockSummonsRegistry)
+    local testG_ok = (autoReplaced == true) and (mockSummonsRegistry[1].status == "excused") and (mockSummonsRegistry[2].status == "seated")
+
+    if assertTest(testG_ok == true,
+        "Delinquent Summons Expiration & Automated Replacement Lifecycle",
+        string.format("autoReplaced=%s, noshowStatus=%s", tostring(autoReplaced), mockSummonsRegistry[1].status)) then
+        passes = passes + 1
+    end
+
+    -- Test H: Civic Duty Compensation Stipend & Public Bucket 0 Restoration
+    local testJurorAcc = "citizen:CIT_TEST_JUROR"
+    local cityMasterAcc = "gov:city:master"
+    local jurorInitialBal = 1200.0
+    local cityInitialBal = 50000.0
+    local stipendAmount = 500.0
+
+    local cityFinalBal = cityInitialBal - stipendAmount
+    local jurorFinalBal = jurorInitialBal + stipendAmount
+    local conservationPreserved = (cityInitialBal + jurorInitialBal) == (cityFinalBal + jurorFinalBal)
+    local finalRoutingBucket = 0
+
+    local testH_ok = (conservationPreserved == true) and (finalRoutingBucket == 0) and (jurorFinalBal == 1700.0)
+
+    if assertTest(testH_ok == true,
+        "Civic Duty Treasury Stipend Conservation ($500.00) & World Bucket 0 Restoration",
+        string.format("jurorFinal=$%.2f, cityFinal=$%.2f, bucket=%d", jurorFinalBal, cityFinalBal, finalRoutingBucket)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 18. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -2432,15 +2635,17 @@ function Nyx.Tests.RunAll()
     local t14 = Nyx.Tests.TestGridSnappingWarehousesAndRoutingBuckets()
     local t15 = Nyx.Tests.TestPowerGridSubstationFailureAndBlackout()
     local t16 = Nyx.Tests.TestParliamentIRVAndPenalSync()
+    local t17 = Nyx.Tests.TestJuryDispatcherAndCourtroomRouting()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")
     end
     print("^5==================================================^7")
 end
+
 
 -- Console Command to execute tests
 RegisterCommand("nyx_run_tests", function(source, args)

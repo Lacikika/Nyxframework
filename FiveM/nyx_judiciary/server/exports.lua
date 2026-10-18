@@ -62,13 +62,41 @@ exports("GetActiveWarrants", function(targetCitId)
     return Nyx.Judiciary.GetActiveWarrants(targetCitId)
 end)
 
--- Juries & Civic Summons
+-- Juries, Civic Summons & Courtroom Routing
 exports("SummonJury", function(docketId, requiredCount)
     return Nyx.Judiciary.SummonJury(docketId, requiredCount)
 end)
 
+exports("SeatJuror", function(docketId, citizenId, preferredSeat)
+    return Nyx.Judiciary.SeatJuror(docketId, citizenId, preferredSeat)
+end)
+
+exports("ExcuseJuror", function(docketId, citizenId, reason)
+    return Nyx.Judiciary.ExcuseJuror(docketId, citizenId, reason)
+end)
+
+exports("StartTrial", function(docketId, presidingJudgeCitId)
+    return Nyx.Judiciary.StartTrial(docketId, presidingJudgeCitId)
+end)
+
+exports("StartDeliberation", function(docketId, presidingJudgeCitId)
+    return Nyx.Judiciary.StartDeliberation(docketId, presidingJudgeCitId)
+end)
+
 exports("CastSecretBallot", function(docketId, citizenId, voteOutcome)
     return Nyx.Judiciary.CastSecretBallot(docketId, citizenId, voteOutcome)
+end)
+
+exports("ConcludeTrial", function(docketId, verdictRuling)
+    return Nyx.Judiciary.ConcludeTrial(docketId, verdictRuling)
+end)
+
+exports("GetJuryStatus", function(docketId)
+    return Nyx.Judiciary.GetJuryStatus(docketId)
+end)
+
+exports("AllocateCourtroomBucket", function(docketId)
+    return Nyx.Judiciary.AllocateCourtroomBucket(docketId)
 end)
 
 -- Automated Rulings & Execution

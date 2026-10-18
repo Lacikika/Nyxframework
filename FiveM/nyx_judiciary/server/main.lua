@@ -69,6 +69,80 @@ CreateThread(function()
             return { success = ok, warrant = warrant, error = (not ok and warrant or nil) }
         end)
 
+        -- Start formal trial session in isolated courtroom routing bucket
+        exports['nyx_core']:RegisterRPC("judiciary:startTrial", function(src, docketId)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local job = player:getMetadata("job")
+            if job ~= "judge" and job ~= "doj" and not player:hasPermission("admin") then
+                return { success = false, error = "UNAUTHORIZED_JUDICIAL_ACCESS" }
+            end
+
+            local ok, res = Nyx.Judiciary.StartTrial(docketId, player.citizenId)
+            return { success = ok, result = res, error = (not ok and res or nil) }
+        end)
+
+        -- Transition trial to deliberation chamber bucket
+        exports['nyx_core']:RegisterRPC("judiciary:startDeliberation", function(src, docketId)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local job = player:getMetadata("job")
+            if job ~= "judge" and job ~= "doj" and not player:hasPermission("admin") then
+                return { success = false, error = "UNAUTHORIZED_JUDICIAL_ACCESS" }
+            end
+
+            local ok, res = Nyx.Judiciary.StartDeliberation(docketId, player.citizenId)
+            return { success = ok, result = res, error = (not ok and res or nil) }
+        end)
+
+        -- Seat summoned juror in designated jury box seat
+        exports['nyx_core']:RegisterRPC("judiciary:seatJuror", function(src, payload)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local docketId = (type(payload) == "table" and payload.docketId) or payload
+            local preferredSeat = type(payload) == "table" and payload.seatIndex
+            local ok, res = Nyx.Judiciary.SeatJuror(docketId, player.citizenId, preferredSeat)
+            return { success = ok, result = res, error = (not ok and res or nil) }
+        end)
+
+        -- Excuse juror on case
+        exports['nyx_core']:RegisterRPC("judiciary:excuseJuror", function(src, payload)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            if not payload or not payload.docketId or not payload.citizenId then
+                return { success = false, error = "INVALID_PAYLOAD" }
+            end
+
+            local ok, res = Nyx.Judiciary.ExcuseJuror(payload.docketId, payload.citizenId, payload.reason)
+            return { success = ok, result = res, error = (not ok and res or nil) }
+        end)
+
+        -- Query jury roster for docket
+        exports['nyx_core']:RegisterRPC("judiciary:getJuryStatus", function(src, docketId)
+            local status = Nyx.Judiciary.GetJuryStatus(docketId)
+            return { success = true, jurors = status }
+        end)
+
+        -- Manually dispatch or replenish jury pool for a docket
+        exports['nyx_core']:RegisterRPC("judiciary:summonJury", function(src, payload)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local job = player:getMetadata("job")
+            if job ~= "judge" and job ~= "doj" and not player:hasPermission("admin") then
+                return { success = false, error = "UNAUTHORIZED_JUDICIAL_ACCESS" }
+            end
+
+            local docketId = (type(payload) == "table" and payload.docketId) or payload
+            local count = type(payload) == "table" and payload.requiredCount
+            local ok, res = Nyx.Judiciary.SummonJury(docketId, count)
+            return { success = ok, selected = res, error = (not ok and res or nil) }
+        end)
+
         -- Cast secret ballot by seated juror
         exports['nyx_core']:RegisterRPC("judiciary:castJuryVote", function(src, docketId, voteOutcome)
             local player = Nyx.GetPlayer(src)
@@ -202,8 +276,47 @@ CreateThread(function()
         end
     end)
 
+    -- 4. Jury Summons Timeout & Auto-Replacement Sweeper (every 30 seconds)
+    CreateThread(function()
+        while true do
+            Wait(30000)
+            if Nyx.Judiciary.CheckSummonsTimeouts then
+                Nyx.Judiciary.CheckSummonsTimeouts()
+            end
+        end
+    end)
+
+    -- 5. Jury Deliberation Timeout Sweeper (every 30 seconds)
+    CreateThread(function()
+        while true do
+            Wait(30000)
+            if Nyx.Judiciary.CheckDeliberationTimeouts then
+                Nyx.Judiciary.CheckDeliberationTimeouts()
+            end
+        end
+    end)
+
     print("^2[Nyx:Judiciary]^7 Online and authoritative.^7")
 end)
+
+-- Clean up juror / courtroom state on player disconnect
+AddEventHandler("playerDropped", function(reason)
+    local src = source
+    local docketId = Player and Player(src) and Player(src).state and Player(src).state.courtroomDocket
+    if docketId then
+        local player = Nyx.GetPlayer(src)
+        local citId = player and player.citizenId
+        if citId then
+            local juror = MySQL.single.await([[
+                SELECT `selection_status` FROM `nyx_judiciary_juries` WHERE `docket_id` = ? AND `citizen_id` = ?
+            ]], { docketId, citId })
+            if juror and juror.selection_status == 'summoned' then
+                Nyx.Judiciary.ExcuseJuror(docketId, citId, "disconnect")
+            end
+        end
+    end
+end)
+
 
 -- Network Event Bridges for Client Action Hooks
 RegisterNetEvent("nyx:judiciary:server:weaponFired", function(weaponHash, coords)

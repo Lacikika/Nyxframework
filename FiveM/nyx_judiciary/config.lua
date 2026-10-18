@@ -13,6 +13,13 @@ Config.Jury = {
     DefaultRequiredCount = 5,
     MinimumQuorum = 3,
     DeliberationTimeout = 900, -- 15 minutes to reach a verdict before mistrial flag
+    SummonsTimeoutSeconds = 180, -- 3 minutes to report to courthouse before auto-replacement
+    CivicStipendAmount = 500.0, -- Civic duty stipend awarded upon trial conclusion from city treasury
+    CooldownSeconds = 604800, -- 7 days minimum between jury duties for a citizen
+    CourtroomBucketBase = 2100, -- Base virtual routing bucket for active courtroom trials
+    CourtroomBucketRange = 800, -- Allocates buckets 2100 - 2899
+    DeliberationBucketOffset = 2000, -- Isolates jury in private deliberation bucket (e.g., 4100 - 4899)
+    DeliberationVoteRule = 'majority', -- 'majority' or 'unanimous'
     ExemptJobs = {
         ['police'] = true,
         ['state_police'] = true,
@@ -20,8 +27,7 @@ Config.Jury = {
         ['doj'] = true,
         ['judge'] = true,
         ['ems'] = true
-    },
-    DeliberationBucketOffset = 2000 -- Isolates jury in private instance during voting
+    }
 }
 
 -- Judicial Warrants Configuration

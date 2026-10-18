@@ -201,5 +201,11 @@ function Nyx.Judiciary.ExecuteVerdict(docketId, verdictPayload, presidingJudgeCi
             docketId, ruling, restitution, fine, sentenceMonths))
     end
 
+    -- Conclude trial session: award juror stipends, log civic service, restore public routing bucket
+    if Nyx.Judiciary.ConcludeTrial then
+        Nyx.Judiciary.ConcludeTrial(docketId, ruling)
+    end
+
     return true, finalVerdictRecord
 end
+
