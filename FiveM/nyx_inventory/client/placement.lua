@@ -34,10 +34,16 @@ function Nyx.Placement.Start(data)
     Nyx.Placement.CurrentHeading = 0.0
     Nyx.Placement.OriginalDropEntity = nil
 
-    -- Determine model hash
+    -- Determine model hash (incorporating smart category and weight-tiered fallback)
     local modelHash = nil
     if data.model then
         modelHash = (type(data.model) == "string") and GetHashKey(data.model) or data.model
+    elseif data.dropId and Nyx.Drops and Nyx.Drops[data.dropId] and Nyx.Drops[data.dropId].model then
+        local dropModel = Nyx.Drops[data.dropId].model
+        modelHash = (type(dropModel) == "string") and GetHashKey(dropModel) or dropModel
+    elseif data.itemId and Nyx.Drops and Nyx.Drops.ResolveModel then
+        local resolved = Nyx.Drops.ResolveModel(data.itemId, data.amount)
+        modelHash = (type(resolved) == "string") and GetHashKey(resolved) or resolved
     elseif data.itemId and Nyx.Items and Nyx.Items.Get then
         local itemDef = Nyx.Items.Get(data.itemId)
         if itemDef and itemDef.client and itemDef.client.model then

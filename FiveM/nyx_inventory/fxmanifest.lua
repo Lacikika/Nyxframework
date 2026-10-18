@@ -15,7 +15,8 @@ dependencies {
 shared_scripts {
     '@nyx_core/shared/math.lua',
     'config.lua',
-    'shared/items.lua'
+    'shared/items.lua',
+    'shared/drops.lua'
 }
 
 server_scripts {

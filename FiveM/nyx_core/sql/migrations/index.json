@@ -15,5 +15,6 @@
   "014_logistics_elastic_pricing_zones.sql",
   "015_judiciary_evidence_chain_of_custody.sql",
   "016_factions_vaults_and_signoff_rules.sql",
-  "017_inventory_world_placement_rotation.sql"
+  "017_inventory_world_placement_rotation.sql",
+  "018_inventory_drop_models.sql"
 ]

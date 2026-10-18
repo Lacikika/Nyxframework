@@ -2,13 +2,13 @@
     Nyxframework: nyx_inventory
     File: client/drops.lua
     Description: Client-side spatial ground drop streaming, entity rendering, orientation syncing,
-                 and Third-Eye (LALT) interaction routing (zero-busywait, no-press-E).
+                 smart weight-tiered 3D props, and Third-Eye (LALT) interaction routing (zero-busywait, no-press-E).
 ]]
 
 Nyx = Nyx or {}
-Nyx.Drops = {} -- [dropId] = { id = dropId, coords = vector3, rotation = { x, y, z, heading }, entity = nil }
+Nyx.Drops = {} -- [dropId] = { id = dropId, coords = vector3, rotation = { x, y, z, heading }, model = "...", entity = nil }
 
-local dropModelHash = GetHashKey(Config.DropModel or "prop_paper_bag_small")
+local defaultDropModelHash = GetHashKey(Config.DropModel or "prop_paper_bag_small")
 
 -- Target options generator for world drop entities
 function Nyx.Drops.GetTargetOptions(dropId)
@@ -98,9 +98,17 @@ RegisterNetEvent("nyx:inventory:client:grabTargetDrop", function(args, entity, n
     end
 
     if dropId and drop and Nyx.Placement and Nyx.Placement.Start then
+        local modelToPlace = drop.model
+        if not modelToPlace and drop.entity and DoesEntityExist(drop.entity) then
+            modelToPlace = GetEntityModel(drop.entity)
+        end
+        if not modelToPlace then
+            modelToPlace = defaultDropModelHash
+        end
+
         Nyx.Placement.Start({
             dropId = dropId,
-            model = drop.entity and DoesEntityExist(drop.entity) and GetEntityModel(drop.entity) or dropModelHash,
+            model = modelToPlace,
             label = "Ground Container"
         })
     end
@@ -114,6 +122,7 @@ RegisterNetEvent("nyx:inventory:client:syncDrops", function(dropList)
                 id = d.id,
                 coords = vector3(d.coords.x, d.coords.y, d.coords.z),
                 rotation = d.rotation or { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 },
+                model = d.model or Config.DropModel or "prop_paper_bag_small",
                 entity = nil
             }
         end
@@ -121,11 +130,12 @@ RegisterNetEvent("nyx:inventory:client:syncDrops", function(dropList)
 end)
 
 -- Receive single newly created drop
-RegisterNetEvent("nyx:inventory:client:dropCreated", function(dropId, coords, rotation)
+RegisterNetEvent("nyx:inventory:client:dropCreated", function(dropId, coords, rotation, model)
     Nyx.Drops[dropId] = {
         id = dropId,
         coords = vector3(coords.x, coords.y, coords.z),
         rotation = rotation or { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 },
+        model = model or Config.DropModel or "prop_paper_bag_small",
         entity = nil
     }
 end)
@@ -146,8 +156,25 @@ RegisterNetEvent("nyx:inventory:client:dropMoved", function(dropId, coords, rota
             id = dropId,
             coords = vector3(coords.x, coords.y, coords.z),
             rotation = rotation or { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 },
+            model = Config.DropModel or "prop_paper_bag_small",
             entity = nil
         }
+    end
+end)
+
+-- Receive model update when items merge or change weight
+RegisterNetEvent("nyx:inventory:client:dropModelUpdated", function(dropId, newModel)
+    local drop = Nyx.Drops[dropId]
+    if drop then
+        drop.model = newModel
+        -- If entity is spawned, despawn old entity so spatial thread spawns updated 3D prop
+        if drop.entity and DoesEntityExist(drop.entity) then
+            if exports['nyx_interact'] and exports['nyx_interact'].RemoveTargetEntity then
+                exports['nyx_interact']:RemoveTargetEntity(drop.entity)
+            end
+            DeleteEntity(drop.entity)
+            drop.entity = nil
+        end
     end
 end)
 
@@ -165,13 +192,24 @@ RegisterNetEvent("nyx:inventory:client:dropRemoved", function(dropId)
     end
 end)
 
--- Register drop model target with nyx_interact
+-- Register all fallback drop models with nyx_interact
 CreateThread(function()
     while not exports['nyx_interact'] do
         Wait(200)
     end
 
-    exports['nyx_interact']:AddTargetModel({ dropModelHash, `prop_cs_cardbox_01`, `prop_boxpile_06a` }, {
+    local fallbackNames = (Nyx.Drops and Nyx.Drops.GetAllFallbackModels) and Nyx.Drops.GetAllFallbackModels() or {
+        Config.DropModel or "prop_paper_bag_small",
+        "prop_cs_cardbox_01",
+        "prop_boxpile_06a"
+    }
+
+    local targetModelHashes = {}
+    for _, name in ipairs(fallbackNames) do
+        targetModelHashes[#targetModelHashes + 1] = (type(name) == "number") and name or GetHashKey(name)
+    end
+
+    exports['nyx_interact']:AddTargetModel(targetModelHashes, {
         options = {
             {
                 icon = "fa-solid fa-box-open",
@@ -196,11 +234,6 @@ end)
 
 -- Spatial Streaming & Model Management Thread (Runs at 1-second interval - Zero busy wait)
 CreateThread(function()
-    RequestModel(dropModelHash)
-    while not HasModelLoaded(dropModelHash) do
-        Wait(50)
-    end
-
     while true do
         local ped = PlayerPedId()
         local playerCoords = GetEntityCoords(ped)
@@ -211,21 +244,42 @@ CreateThread(function()
 
             -- In range: spawn visual prop
             if dist <= cullDist then
-                if not drop.entity or not DoesEntityExist(drop.entity) then
-                    local obj = CreateObject(dropModelHash, drop.coords.x, drop.coords.y, drop.coords.z, false, false, false)
-                    SetEntityAsMissionEntity(obj, true, true)
-                    FreezeEntityPosition(obj, true)
-                    SetEntityCollision(obj, true, true)
-                    SetEntityCoords(obj, drop.coords.x, drop.coords.y, drop.coords.z, false, false, false, true)
-                    SetEntityHeading(obj, drop.rotation and drop.rotation.heading or 0.0)
-                    drop.entity = obj
+                local targetModel = drop.model or Config.DropModel or "prop_paper_bag_small"
+                local modelHash = (type(targetModel) == "number") and targetModel or GetHashKey(targetModel)
 
-                    -- Register entity with Third-Eye interact
-                    if exports['nyx_interact'] and exports['nyx_interact'].AddTargetEntity then
-                        exports['nyx_interact']:AddTargetEntity(obj, {
-                            options = Nyx.Drops.GetTargetOptions(dropId),
-                            distance = Config.DropInteractDistance or 2.5
-                        })
+                -- If existing entity has outdated model hash (e.g. upgraded box after merge), despawn it
+                if drop.entity and DoesEntityExist(drop.entity) and GetEntityModel(drop.entity) ~= modelHash then
+                    if exports['nyx_interact'] and exports['nyx_interact'].RemoveTargetEntity then
+                        exports['nyx_interact']:RemoveTargetEntity(drop.entity)
+                    end
+                    DeleteEntity(drop.entity)
+                    drop.entity = nil
+                end
+
+                if not drop.entity or not DoesEntityExist(drop.entity) then
+                    RequestModel(modelHash)
+                    local loadTimeout = 0
+                    while not HasModelLoaded(modelHash) and loadTimeout < 25 do
+                        Wait(20)
+                        loadTimeout = loadTimeout + 1
+                    end
+
+                    if HasModelLoaded(modelHash) then
+                        local obj = CreateObject(modelHash, drop.coords.x, drop.coords.y, drop.coords.z, false, false, false)
+                        SetEntityAsMissionEntity(obj, true, true)
+                        FreezeEntityPosition(obj, true)
+                        SetEntityCollision(obj, true, true)
+                        SetEntityCoords(obj, drop.coords.x, drop.coords.y, drop.coords.z, false, false, false, true)
+                        SetEntityHeading(obj, drop.rotation and drop.rotation.heading or 0.0)
+                        drop.entity = obj
+
+                        -- Register entity with Third-Eye interact
+                        if exports['nyx_interact'] and exports['nyx_interact'].AddTargetEntity then
+                            exports['nyx_interact']:AddTargetEntity(obj, {
+                                options = Nyx.Drops.GetTargetOptions(dropId),
+                                distance = Config.DropInteractDistance or 2.5
+                            })
+                        end
                     end
                 end
             -- Out of range: despawn prop

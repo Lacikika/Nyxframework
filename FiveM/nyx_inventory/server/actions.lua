@@ -307,6 +307,7 @@ Nyx.RPC.Register("inventory:dropItem", function(src, payload)
     local ped = GetPlayerPed(tostring(src))
     local coords = GetEntityCoords(ped)
 
+    local isMerged = false
     local outcome, res = Nyx.Inventory.WithLock(fromInv, function()
         local container = Nyx.Inventory.Get(fromInv)
         if not container then return false, "CONTAINER_NOT_FOUND" end
@@ -331,6 +332,19 @@ Nyx.RPC.Register("inventory:dropItem", function(src, payload)
             container:setItem(slot, item)
         end
 
+        -- Proximity Auto-Merge Check (within 1.5m)
+        local mergeDropId = Nyx.Drops.FindAutoMergeTarget(coords, droppedItemData)
+        if mergeDropId then
+            if Nyx.Inventory.AcquireLock(mergeDropId) then
+                local mergeOk, mergeRes = Nyx.Drops.MergeItem(mergeDropId, droppedItemData)
+                Nyx.Inventory.ReleaseLock(mergeDropId)
+                if mergeOk then
+                    isMerged = true
+                    return true, mergeDropId
+                end
+            end
+        end
+
         local dropId = Nyx.Drops.Create(coords, droppedItemData)
         return true, dropId
     end)
@@ -341,7 +355,7 @@ Nyx.RPC.Register("inventory:dropItem", function(src, payload)
         return { success = false, error = res or "DROP_FAILED" }
     end
 
-    return { success = true, dropId = res }
+    return { success = true, dropId = res, merged = isMerged }
 end)
 
 -- Single Authoritative RPC for Client-Side Hologram Placement (Zero-Packet Placement Release)
@@ -401,6 +415,18 @@ Nyx.RPC.Register("inventory:commitWorldPlacement", function(src, payload)
             return { success = false, error = "DROP_OUT_OF_RANGE" }
         end
 
+        -- Check for Proximity Auto-Merge into another nearby drop container (within 1.5m)
+        local mergeTargetDropId = Nyx.Drops.FindAutoMergeTarget(safeCoords, nil, Config.DropAutoMergeDistance or 1.5, dropId)
+        if mergeTargetDropId then
+            if Nyx.Inventory.AcquireDualLock(dropId, mergeTargetDropId) then
+                local merged, mergeRes = Nyx.Drops.TryAutoMergeContainers(dropId, mergeTargetDropId)
+                Nyx.Inventory.ReleaseDualLock(dropId, mergeTargetDropId)
+                if merged then
+                    return { success = true, dropId = mergeTargetDropId, merged = true, coords = safeCoords, rotation = safeRotation }
+                end
+            end
+        end
+
         if not Nyx.Inventory.AcquireLock(dropId) then
             return { success = false, error = "CONTAINER_BUSY" }
         end
@@ -433,6 +459,7 @@ Nyx.RPC.Register("inventory:commitWorldPlacement", function(src, payload)
         return { success = false, error = "CONTAINER_BUSY" }
     end
 
+    local isPlacementMerged = false
     local outcome, res = Nyx.Inventory.WithLock(fromInv, function()
         local container = Nyx.Inventory.Get(fromInv)
         if not container then return false, "CONTAINER_NOT_FOUND" end
@@ -461,6 +488,19 @@ Nyx.RPC.Register("inventory:commitWorldPlacement", function(src, payload)
             container:setItem(slot, item)
         end
 
+        -- Check for Proximity Auto-Merge into nearby container (within 1.5m)
+        local mergeDropId = Nyx.Drops.FindAutoMergeTarget(safeCoords, droppedItemData)
+        if mergeDropId then
+            if Nyx.Inventory.AcquireLock(mergeDropId) then
+                local mergeOk, mergeRes = Nyx.Drops.MergeItem(mergeDropId, droppedItemData)
+                Nyx.Inventory.ReleaseLock(mergeDropId)
+                if mergeOk then
+                    isPlacementMerged = true
+                    return true, mergeDropId
+                end
+            end
+        end
+
         local newDropId = Nyx.Drops.Create(safeCoords, droppedItemData, safeRotation)
         return true, newDropId
     end)
@@ -471,7 +511,7 @@ Nyx.RPC.Register("inventory:commitWorldPlacement", function(src, payload)
         return { success = false, error = res or "PLACEMENT_FAILED" }
     end
 
-    return { success = true, dropId = res, coords = safeCoords, rotation = safeRotation }
+    return { success = true, dropId = res, merged = isPlacementMerged, coords = safeCoords, rotation = safeRotation }
 end)
 
 -- Authoritative Item Consumption & Activation RPC

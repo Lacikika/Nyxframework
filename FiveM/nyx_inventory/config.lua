@@ -33,11 +33,51 @@ Config.MutexTimeout = 2000 -- 2000 ms lock duration before auto-expiry fail-safe
 -- State Persistence & Debouncing
 Config.AutoSaveInterval = 60 -- Sync dirty in-memory containers every 60 seconds
 
--- Spatial World Drops
+-- Spatial World Drops & Auto-Merge Engine
 Config.DropCullDistance = 25.0     -- Maximum range to stream ground drop entities to client
 Config.DropInteractDistance = 2.0  -- Interaction range to open or pickup ground loot
 Config.DropModel = "prop_paper_bag_small"
 Config.DropZOffset = -0.95         -- Vertical placement correction to sit flush on terrain
+Config.DropAutoMergeDistance = 1.5 -- Maximum radius (meters) to auto-merge dropped items or containers
+
+-- Weight-Tiered & Category-Aware Smart Fallback Models
+Config.DropFallbackModels = {
+    categories = {
+        medical = {
+            { maxWeight = 2000, model = "prop_ld_health_pack" },
+            { maxWeight = math.huge, model = "prop_med_box_01b" }
+        },
+        ammo = {
+            { maxWeight = 5000, model = "prop_box_ammo04a" },
+            { maxWeight = math.huge, model = "prop_box_ammo03a" }
+        },
+        weapon = {
+            { maxWeight = 5000, model = "prop_box_ammo03a" },
+            { maxWeight = math.huge, model = "prop_box_wood02a" }
+        },
+        food = {
+            { maxWeight = 2500, model = "prop_paper_bag_small" },
+            { maxWeight = 10000, model = "prop_cs_cardbox_01" },
+            { maxWeight = math.huge, model = "prop_box_wood02a" }
+        },
+        drink = {
+            { maxWeight = 2500, model = "prop_paper_bag_small" },
+            { maxWeight = 10000, model = "prop_cs_cardbox_01" },
+            { maxWeight = math.huge, model = "prop_box_wood02a" }
+        },
+        freight = {
+            { maxWeight = 25000, model = "prop_wooden_crate_01" },
+            { maxWeight = math.huge, model = "prop_boxpile_06a" }
+        }
+    },
+    tiers = {
+        { maxWeight = 2500,  model = "prop_paper_bag_small" }, -- < 2.5 kg: small paper sack
+        { maxWeight = 10000, model = "prop_cs_cardbox_01" },   -- 2.5 - 10 kg: small cardboard box
+        { maxWeight = 35000, model = "prop_box_wood02a" },     -- 10 - 35 kg: wooden supply crate
+        { maxWeight = 80000, model = "prop_wooden_crate_01" }, -- 35 - 80 kg: heavy wooden freight crate
+        { maxWeight = math.huge, model = "prop_boxpile_06a" }  -- > 80 kg: industrial cargo stack
+    }
+}
 
 -- Degradation & Decay Engine
 Config.DecayInterval = 300 -- 5 minutes per decay evaluation tick

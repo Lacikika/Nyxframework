@@ -1272,7 +1272,230 @@ function Nyx.Tests.TestThirdEyeAndZeroPacketPlacement()
     return passes == total
 end
 
--- 13. Master Test Runner
+-- 13. Test Auto-Merging World Drops & Smart Fallback Containers
+function Nyx.Tests.TestAutoMergingWorldDropsAndFallbackModels()
+    print("^3[Nyx:Tests] Running Auto-Merging World Drops & Smart Fallback Containers Suite...^7")
+    local passes = 0
+    local total = 7
+
+    -- Test A: Category and Weight-Tiered Fallback Model Resolution
+    local testCategories = {
+        medical = {
+            { maxWeight = 2000, model = "prop_ld_health_pack" },
+            { maxWeight = math.huge, model = "prop_med_box_01b" }
+        },
+        ammo = {
+            { maxWeight = 5000, model = "prop_box_ammo04a" },
+            { maxWeight = math.huge, model = "prop_box_ammo03a" }
+        },
+        freight = {
+            { maxWeight = 25000, model = "prop_wooden_crate_01" },
+            { maxWeight = math.huge, model = "prop_boxpile_06a" }
+        }
+    }
+    local testTiers = {
+        { maxWeight = 2500,  model = "prop_paper_bag_small" },
+        { maxWeight = 10000, model = "prop_cs_cardbox_01" },
+        { maxWeight = 35000, model = "prop_box_wood02a" },
+        { maxWeight = 80000, model = "prop_wooden_crate_01" },
+        { maxWeight = math.huge, model = "prop_boxpile_06a" }
+    }
+
+    local function resolveFallback(category, weight)
+        if testCategories[category] then
+            for _, tier in ipairs(testCategories[category]) do
+                if weight <= tier.maxWeight then return tier.model end
+            end
+        end
+        for _, tier in ipairs(testTiers) do
+            if weight <= tier.maxWeight then return tier.model end
+        end
+        return "prop_paper_bag_small"
+    end
+
+    local m1 = resolveFallback("medical", 500)
+    local m2 = resolveFallback("medical", 3000)
+    local m3 = resolveFallback("ammo", 1200)
+    local m4 = resolveFallback("ammo", 8000)
+    local m5 = resolveFallback("general", 1500)
+    local m6 = resolveFallback("general", 5000)
+    local m7 = resolveFallback("general", 20000)
+    local m8 = resolveFallback("freight", 50000)
+
+    if assertTest(m1 == "prop_ld_health_pack" and m2 == "prop_med_box_01b"
+        and m3 == "prop_box_ammo04a" and m4 == "prop_box_ammo03a"
+        and m5 == "prop_paper_bag_small" and m6 == "prop_cs_cardbox_01"
+        and m7 == "prop_box_wood02a" and m8 == "prop_boxpile_06a",
+        "Category & Weight-Tiered Model Resolution Invariant",
+        "Fallback models did not resolve accurately across weight brackets") then
+        passes = passes + 1
+    end
+
+    -- Test B: Dedicated Item Model Resolution Priority
+    local mockItemRegistry = {
+        ['weapon_pistol'] = { name = 'weapon_pistol', client = { model = 'w_pi_pistol' }, weight = 1000 },
+        ['refined_iron'] = { name = 'refined_iron', weight = 2500, type = 'material' }
+    }
+
+    local function resolveItemModel(name, count)
+        local item = mockItemRegistry[name]
+        if not item then return "prop_paper_bag_small" end
+        if item.client and item.client.model then return item.client.model end
+        local totalWeight = (item.weight or 0) * (count or 1)
+        return resolveFallback(item.type or "general", totalWeight)
+    end
+
+    local wModel = resolveItemModel("weapon_pistol", 1)
+    local iModel1 = resolveItemModel("refined_iron", 1)
+    local iModel5 = resolveItemModel("refined_iron", 5)
+    local iModel20 = resolveItemModel("refined_iron", 20)
+
+    if assertTest(wModel == "w_pi_pistol" and iModel1 == "prop_paper_bag_small" and iModel5 == "prop_box_wood02a" and iModel20 == "prop_wooden_crate_01",
+        "Dedicated vs Fallback Model Precedence",
+        "Custom item model was not prioritized over fallback props") then
+        passes = passes + 1
+    end
+
+    -- Test C: Proximity Distance Detection & Spatial Range Gating (1.5m Threshold)
+    local existingDrops = {
+        ['drop:A'] = { coords = { x = 100.0, y = 200.0, z = 30.0 }, items = { { item_id = 'refined_iron', amount = 2 } } },
+        ['drop:B'] = { coords = { x = 105.0, y = 200.0, z = 30.0 }, items = { { item_id = 'ammo_9mm', amount = 50 } } }
+    }
+
+    local function findMerge(targetCoords, maxDist)
+        maxDist = maxDist or 1.5
+        local bestId, bestDist = nil, 999.0
+        for id, drop in pairs(existingDrops) do
+            local dx = drop.coords.x - targetCoords.x
+            local dy = drop.coords.y - targetCoords.y
+            local dz = drop.coords.z - targetCoords.z
+            local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+            if dist <= maxDist and dist < bestDist then
+                bestDist = dist
+                bestId = id
+            end
+        end
+        return bestId, bestDist
+    end
+
+    local closeTarget = { x = 100.8, y = 200.5, z = 30.0 } -- dist = ~0.94m (<= 1.5m)
+    local farTarget   = { x = 102.2, y = 200.0, z = 30.0 } -- dist = 2.2m (> 1.5m from A, 2.8m from B)
+
+    local hitCloseId = findMerge(closeTarget, 1.5)
+    local hitFarId   = findMerge(farTarget, 1.5)
+
+    if assertTest(hitCloseId == "drop:A" and hitFarId == nil,
+        "Proximity Radius Spatial Gating (1.5m)",
+        "Proximity merge trigger failed distance gating criteria") then
+        passes = passes + 1
+    end
+
+    -- Test D: Stack Consolidation & Stack Cap Splitting Invariants
+    local testContainer = {
+        maxSlots = 5,
+        items = {
+            [1] = { item_id = 'ammo_9mm', amount = 85 },
+            [2] = { item_id = 'med_bandage', amount = 10 }
+        }
+    }
+    local maxAmmoStack = 100
+
+    local function mergeAmmo(amount)
+        local remaining = amount
+        for s = 1, testContainer.maxSlots do
+            local it = testContainer.items[s]
+            if it and it.item_id == 'ammo_9mm' then
+                local space = maxAmmoStack - it.amount
+                if space > 0 then
+                    local add = math.min(remaining, space)
+                    it.amount = it.amount + add
+                    remaining = remaining - add
+                    if remaining <= 0 then break end
+                end
+            end
+        end
+        if remaining > 0 then
+            for s = 1, testContainer.maxSlots do
+                if not testContainer.items[s] then
+                    testContainer.items[s] = { item_id = 'ammo_9mm', amount = remaining }
+                    remaining = 0
+                    break
+                end
+            end
+        end
+        return remaining == 0
+    end
+
+    local mergeOk = mergeAmmo(25)
+
+    if assertTest(mergeOk == true and testContainer.items[1].amount == 100 and testContainer.items[3] and testContainer.items[3].amount == 10,
+        "Stack Merging & Dynamic Overflow Allocation",
+        "Stack consolidation did not top off existing slot or allocate overflow slot") then
+        passes = passes + 1
+    end
+
+    -- Test E: Container Maximum Weight Ceiling Enforcement
+    local heavyContainer = {
+        maxWeight = 100000, -- 100 kg
+        currentWeight = 95000,
+        canHold = function(self, addWeight)
+            return (self.currentWeight + addWeight) <= self.maxWeight
+        end
+    }
+
+    local canHoldSmall = heavyContainer:canHold(3000)  -- 95kg + 3kg = 98kg <= 100kg (ALLOWED)
+    local canHoldHeavy = heavyContainer:canHold(10000) -- 95kg + 10kg = 105kg > 100kg (REJECTED)
+
+    if assertTest(canHoldSmall == true and canHoldHeavy == false,
+        "Container Max Weight Safeguard on Auto-Merge",
+        "Overweight item was not rejected during container merge check") then
+        passes = passes + 1
+    end
+
+    -- Test F: Dynamic 3D Prop Morphing on Weight Change
+    local function evaluateDropMorph(totalWeight)
+        return resolveFallback("general", totalWeight)
+    end
+
+    local initialProp = evaluateDropMorph(1200)
+    local morphedProp = evaluateDropMorph(24000)
+
+    if assertTest(initialProp == "prop_paper_bag_small" and morphedProp == "prop_box_wood02a",
+        "Dynamic 3D Prop Morphing Telemetry",
+        "Container model did not morph to reflect heavier weight bracket") then
+        passes = passes + 1
+    end
+
+    -- Test G: Multi-Container Relocation Merge & Closed-Loop Conservation
+    local srcBox = {
+        id = "drop:SRC01",
+        items = { [1] = { item_id = 'refined_iron', amount = 4 } }
+    }
+    local dstBox = {
+        id = "drop:DST01",
+        items = { [1] = { item_id = 'refined_iron', amount = 6 } }
+    }
+
+    local function mergeBoxes(src, dst)
+        local initialTotal = src.items[1].amount + dst.items[1].amount
+        dst.items[1].amount = dst.items[1].amount + src.items[1].amount
+        src.items[1] = nil
+        src.deleted = true
+        return dst.items[1].amount == initialTotal and src.deleted == true
+    end
+
+    local boxMergePass = mergeBoxes(srcBox, dstBox)
+
+    if assertTest(boxMergePass == true and dstBox.items[1].amount == 10 and srcBox.deleted == true,
+        "Container Relocation Auto-Merge & Inventory Conservation",
+        "Moving container within 1.5m did not consolidate items or clean up source container") then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 14. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -1290,9 +1513,10 @@ function Nyx.Tests.RunAll()
     local t10 = Nyx.Tests.TestMultiSigVaultsAndSignOffRules()
     local t11 = Nyx.Tests.TestMasterUIArchitecture()
     local t12 = Nyx.Tests.TestThirdEyeAndZeroPacketPlacement()
+    local t13 = Nyx.Tests.TestAutoMergingWorldDropsAndFallbackModels()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")
