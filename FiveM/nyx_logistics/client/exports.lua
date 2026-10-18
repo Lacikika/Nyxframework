@@ -21,3 +21,16 @@ end)
 exports("GetZoneForCoords", function(coords)
     return Nyx.Logistics.ResolveZoneFromCoords and Nyx.Logistics.ResolveZoneFromCoords(coords, Nyx.Logistics.DefaultZones)
 end)
+
+exports("SpawnPallet", function(coords, heading)
+    return Nyx.Logistics.SpawnPallet and Nyx.Logistics.SpawnPallet(coords, heading)
+end)
+
+exports("AttachPalletToVehicle", function(palletObj, vehicle, boneIndex, offset)
+    return Nyx.Logistics.AttachPalletToVehicle and Nyx.Logistics.AttachPalletToVehicle(palletObj, vehicle, boneIndex, offset)
+end)
+
+exports("DetachPallet", function(palletObj)
+    return Nyx.Logistics.DetachPallet and Nyx.Logistics.DetachPallet(palletObj)
+end)
+

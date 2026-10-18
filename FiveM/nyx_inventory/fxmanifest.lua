@@ -14,6 +14,7 @@ dependencies {
 
 shared_scripts {
     '@nyx_core/shared/math.lua',
+    '@nyx_core/shared/weights.lua',
     'config.lua',
     'shared/items.lua',
     'shared/drops.lua'
@@ -24,6 +25,7 @@ server_scripts {
     'server/mutex.lua',
     'server/state.lua',
     'server/drops.lua',
+    'server/freight.lua',
     'server/actions.lua',
     'server/main.lua',
     'server/exports.lua'
@@ -32,6 +34,7 @@ server_scripts {
 client_scripts {
     'client/placement.lua',
     'client/drops.lua',
+    'client/freight.lua',
     'client/main.lua',
     'client/exports.lua'
 }

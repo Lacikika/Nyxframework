@@ -52,60 +52,107 @@ Config.DefaultPermissions = {
     "player"
 }
 
--- Dynamic Inventory Weight Penalties on Movement
+-- Dynamic Inventory Weight Penalties & Heavy Freight Physics
 Config.WeightPenalties = {
     enabled = true,
-    staminaTickIntervalMs = 250,    -- Evaluation interval for extra sprint/run stamina consumption
-    -- Tiers defined by weightRatio (currentWeight / maxWeight)
+    defaultPlayerCapacity = 60000,          -- 60 kg baseline player carry capacity (50kg–60kg limit)
+    heavyFreightThresholdGrams = 50000,     -- 50 kg threshold: industrial crates > 50kg cannot enter player backpack
+    staminaTickIntervalMs = 250,            -- Evaluation interval for extra sprint/run stamina consumption
     tiers = {
+        tier_0 = {
+            id = 0,
+            minRatio = 0.0,
+            maxRatio = 0.70,        -- 0% - 70% capacity: unencumbered load
+            moveRate = 1.0,         -- Normal movement, zero speed penalty
+            sprintAllowed = true,   -- Sprinting permitted
+            jumpAllowed = true,     -- Jumping permitted
+            climbAllowed = true,    -- Mantling permitted
+            staminaDrainMult = 1.0, -- Zero extra stamina drain
+            label = "TIER_0"
+        },
+        tier_1 = {
+            id = 1,
+            minRatio = 0.70,
+            maxRatio = 0.95,        -- 71% - 95% capacity: moderate load
+            moveRate = 0.90,        -- -10% sprint speed and movement rate
+            sprintAllowed = true,   -- Sprinting permitted with penalty
+            jumpAllowed = true,     -- Jumping permitted
+            climbAllowed = true,    -- Mantling permitted
+            staminaDrainMult = 1.30, -- Slightly increased stamina drain
+            label = "TIER_1"
+        },
+        tier_2 = {
+            id = 2,
+            minRatio = 0.95,
+            maxRatio = math.huge,   -- 96% - 100%+ capacity: overencumbered
+            moveRate = 0.80,        -- Fast walking allowed
+            sprintAllowed = false,  -- Sprinting disabled
+            jumpAllowed = false,    -- Jumping disabled
+            climbAllowed = false,   -- Climbing disabled
+            staminaDrainMult = 2.00, -- Overencumbered stamina drain
+            label = "TIER_2"
+        },
+        tier_3 = {
+            id = 3,
+            isHeavyFreight = true,  -- Heavy Industrial Crates (> 50kg)
+            moveRate = 0.65,        -- Physical two-handed carry / ground drag rate
+            sprintAllowed = false,  -- Sprinting disabled
+            jumpAllowed = false,    -- Jumping disabled
+            climbAllowed = false,   -- Climbing disabled
+            staminaDrainMult = 2.50, -- Heavy crate fatigue
+            label = "TIER_3"
+        },
+
+        -- Backward compatibility aliases
         normal = {
-            maxRatio = 0.70,        -- 0% - 70% capacity
-            moveRate = 1.0,         -- 100% standard speed
+            maxRatio = 0.70,
+            moveRate = 1.0,
             sprintAllowed = true,
             jumpAllowed = true,
             climbAllowed = true,
-            staminaDrainMult = 1.0, -- Normal stamina consumption
-            label = "NORMAL"
+            staminaDrainMult = 1.0,
+            label = "TIER_0"
         },
         encumbered = {
-            minRatio = 0.70,        -- 70% - 85% capacity
-            maxRatio = 0.85,
-            moveRate = 0.90,        -- 90% speed
+            minRatio = 0.70,
+            maxRatio = 0.95,
+            moveRate = 0.90,
             sprintAllowed = true,
             jumpAllowed = true,
             climbAllowed = true,
-            staminaDrainMult = 1.35, -- 35% faster stamina burn
-            label = "ENCUMBERED"
+            staminaDrainMult = 1.30,
+            label = "TIER_1"
         },
         heavy = {
-            minRatio = 0.85,        -- 85% - 100% capacity
-            maxRatio = 1.00,
-            moveRate = 0.78,        -- 78% speed
+            minRatio = 0.70,
+            maxRatio = 0.95,
+            moveRate = 0.90,
             sprintAllowed = true,
             jumpAllowed = true,
             climbAllowed = true,
-            staminaDrainMult = 1.85, -- 85% faster stamina burn
-            label = "HEAVY"
+            staminaDrainMult = 1.30,
+            label = "TIER_1"
         },
         overburdened = {
-            minRatio = 1.00,        -- 100% - 120% capacity (Exceeding max capacity)
-            maxRatio = 1.20,
-            moveRate = 0.60,        -- 60% speed
-            sprintAllowed = false,  -- Sprinting disabled
-            jumpAllowed = false,    -- Jumping disabled
-            climbAllowed = true,
-            staminaDrainMult = 2.50,
-            label = "OVERBURDENED"
+            minRatio = 0.95,
+            maxRatio = math.huge,
+            moveRate = 0.80,
+            sprintAllowed = false,
+            jumpAllowed = false,
+            climbAllowed = false,
+            staminaDrainMult = 2.00,
+            label = "TIER_2"
         },
         critical = {
-            minRatio = 1.20,        -- > 120% capacity (Critical overload)
-            moveRate = 0.40,        -- 40% speed (Slow crawl)
-            sprintAllowed = false,  -- Sprinting disabled
-            jumpAllowed = false,    -- Jumping disabled
-            climbAllowed = false,   -- Mantle/climbing disabled
-            staminaDrainMult = 3.50,
-            cameraShake = true,     -- Heavy load screen sway
-            label = "CRITICAL_OVERWEIGHT"
+            minRatio = 0.95,
+            maxRatio = math.huge,
+            moveRate = 0.80,
+            sprintAllowed = false,
+            jumpAllowed = false,
+            climbAllowed = false,
+            staminaDrainMult = 2.00,
+            label = "TIER_2"
         }
     }
 }
+

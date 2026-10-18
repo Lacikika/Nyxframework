@@ -54,7 +54,7 @@ exports("GetEntityRoutingBucket", function(entity)
 end)
 
 
--- Player Inventory Weight Management
+-- Player Inventory Weight Management & Heavy Freight Physics
 exports("UpdatePlayerWeight", function(src, currentWeight, maxWeight, ratio)
     local player = Nyx.GetPlayer(src)
     if not player then return nil end
@@ -62,8 +62,43 @@ exports("UpdatePlayerWeight", function(src, currentWeight, maxWeight, ratio)
 end)
 
 exports("GetPlayerWeight", function(src)
+    local defaultMax = (Config.WeightPenalties and Config.WeightPenalties.defaultPlayerCapacity) or 60000
     local player = Nyx.GetPlayer(src)
-    if not player then return 0, 30000, 0.0 end
+    if not player then return 0, defaultMax, 0.0 end
     local w = player:getWeight()
-    return w.current or 0, w.max or 30000, w.ratio or 0.0
+    return w.current or 0, w.max or defaultMax, w.ratio or 0.0
 end)
+
+exports("SetPlayerHeavyFreight", function(src, isCarrying, dropId, model)
+    local player = Nyx.GetPlayer(src)
+    if not player then return false end
+    return player:setHeavyFreight(isCarrying, dropId, model)
+end)
+
+exports("IsPlayerCarryingHeavyFreight", function(src)
+    local player = Nyx.GetPlayer(src)
+    if not player then return false end
+    return player.isCarryingHeavyFreight == true
+end)
+
+exports("CalculateWeightTier", function(ratio, isHeavyFreight)
+    if Nyx.Weights and Nyx.Weights.CalculateTier then
+        return Nyx.Weights.CalculateTier(ratio, isHeavyFreight)
+    end
+    return "tier_0", { label = "TIER_0", moveRate = 1.0, sprintAllowed = true, jumpAllowed = true, climbAllowed = true }
+end)
+
+exports("GetWeightTierData", function(tierKey)
+    if Nyx.Weights and Nyx.Weights.GetTier then
+        return Nyx.Weights.GetTier(tierKey)
+    end
+    return nil
+end)
+
+exports("IsHeavyFreightWeight", function(grams)
+    if Nyx.Weights and Nyx.Weights.IsHeavyFreight then
+        return Nyx.Weights.IsHeavyFreight(grams)
+    end
+    return (tonumber(grams) or 0) > 50000
+end)
+

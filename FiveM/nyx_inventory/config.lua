@@ -6,7 +6,7 @@ Config.Debug = false
 -- Default Container Constraints (Weights in grams: 1000g = 1kg)
 Config.Containers = {
     ['player'] = {
-        maxWeight = 30000, -- 30 kg
+        maxWeight = 60000, -- 60 kg expanded baseline carry capacity (50kg-60kg limit)
         maxSlots = 40,
     },
     ['drop'] = {
@@ -14,7 +14,7 @@ Config.Containers = {
         maxSlots = 50,
     },
     ['trunk'] = {
-        maxWeight = 60000, -- 60 kg
+        maxWeight = 120000, -- 120 kg
         maxSlots = 50,
     },
     ['glovebox'] = {
@@ -25,6 +25,20 @@ Config.Containers = {
         maxWeight = 250000, -- 250 kg
         maxSlots = 100,
     }
+}
+
+-- Heavy Freight Threshold & Two-Handed Physical Carry Settings
+Config.HeavyFreightThreshold = 50000 -- 50 kg: industrial crates > 50kg cannot enter player backpack
+Config.HeavyCarry = {
+    Enabled = true,
+    AnimDict = "anim@heists@box_carry@",
+    AnimName = "idle",
+    BoneIndex = 60309,
+    AttachOffset = { x = 0.0, y = 0.40, z = -0.15 },
+    AttachRot = { x = 0.0, y = 0.0, z = 0.0 },
+    InteractDistance = 2.5,
+    DropPlaceDistance = 3.5,
+    VehicleTrunkDistance = 4.0
 }
 
 -- Mutex Lock Manager

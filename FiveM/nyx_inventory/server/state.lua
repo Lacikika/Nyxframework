@@ -21,7 +21,7 @@ function Nyx.Inventory.NewContainer(id, invType, maxWeight, maxSlots, coords)
     self.type = tostring(invType or "player")
 
     local defaults = Config.Containers[self.type] or Config.Containers['player']
-    self.maxWeight = tonumber(maxWeight) or defaults.maxWeight or 30000
+    self.maxWeight = tonumber(maxWeight) or defaults.maxWeight or 60000
     self.maxSlots = tonumber(maxSlots) or defaults.maxSlots or 40
     self.coords = coords or nil
     self.items = {}      -- [slotNumber] = itemData
@@ -46,6 +46,22 @@ end
 -- Check if container can accommodate additional weight in grams
 function Container:canHoldWeight(additionalWeight)
     return (self:getWeight() + (tonumber(additionalWeight) or 0)) <= self.maxWeight
+end
+
+-- Check if container can hold item considering weight and heavy freight backpack constraints
+function Container:canHoldItem(item_id, amount)
+    amount = tonumber(amount) or 1
+    -- Tier 3 Heavy Freight constraint: Heavy Industrial Crates (> 50kg) cannot enter player backpack
+    if self.type == "player" and Nyx.Items.IsHeavyFreight(item_id, amount) then
+        return false, "HEAVY_FREIGHT_BACKPACK_PROHIBITED"
+    end
+
+    local itemWeight = Nyx.Items.GetWeight(item_id, amount)
+    if not self:canHoldWeight(itemWeight) then
+        return false, "CONTAINER_OVERWEIGHT"
+    end
+
+    return true
 end
 
 -- Retrieve item at specified slot

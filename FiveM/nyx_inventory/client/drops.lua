@@ -14,7 +14,7 @@ local defaultDropModelHash = GetHashKey(Config.DropModel or "prop_paper_bag_smal
 function Nyx.Drops.GetTargetOptions(dropId)
     local drop = Nyx.Drops[dropId]
     local openLabel = (drop and drop.shelfNodeId) and "Open Shelf Storage" or "Open Ground Loot"
-    local moveLabel = (drop and drop.shelfNodeId) and "Reposition / Pick Up Box" or "Reposition / Move"
+    local moveLabel = (drop and drop.shelfNodeId) and "Reposition / Move on Shelf" or "Reposition / Drag on Ground (LALT)"
 
     return {
         {
@@ -33,6 +33,18 @@ function Nyx.Drops.GetTargetOptions(dropId)
             args = { dropId = dropId },
             canInteract = function(entity, dist)
                 return dist <= ((Config.Placement and Config.Placement.MaxDistance) or 6.0) and not (Nyx.Placement and Nyx.Placement.IsPlacing and Nyx.Placement.IsPlacing())
+            end
+        },
+        {
+            icon = "fa-solid fa-hands-holding",
+            label = "Pick Up & Carry (Two-Handed)",
+            event = "nyx:inventory:client:pickupHeavyFreight",
+            args = { dropId = dropId },
+            canInteract = function(entity, dist)
+                local isPlacing = (Nyx.Placement and Nyx.Placement.IsPlacing and Nyx.Placement.IsPlacing())
+                local isCarrying = (Nyx.Freight and Nyx.Freight.IsCarryingFreight and Nyx.Freight.IsCarryingFreight())
+                local maxDist = (Config.HeavyCarry and Config.HeavyCarry.InteractDistance) or 2.5
+                return dist <= maxDist and not isPlacing and not isCarrying
             end
         }
     }

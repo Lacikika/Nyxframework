@@ -174,6 +174,10 @@ Nyx.RPC.Register("inventory:moveSlot", function(src, payload)
 
         -- CASE 1: Target slot is empty
         if not dstItem then
+            if fromInv ~= toInv and dstContainer.type == "player" and Nyx.Items.IsHeavyFreight(srcItem.item_id, amount) then
+                return false, "HEAVY_FREIGHT_BACKPACK_PROHIBITED"
+            end
+
             local movedWeight = Nyx.Items.GetWeight(srcItem.item_id, amount)
             if fromInv ~= toInv and not dstContainer:canHoldWeight(movedWeight) then
                 return false, "CONTAINER_OVERWEIGHT"
@@ -217,6 +221,10 @@ Nyx.RPC.Register("inventory:moveSlot", function(src, payload)
             local transferAmount = math.min(amount, spaceAvailable)
             local movedWeight = Nyx.Items.GetWeight(srcItem.item_id, transferAmount)
 
+            if fromInv ~= toInv and dstContainer.type == "player" and Nyx.Items.IsHeavyFreight(srcItem.item_id, transferAmount) then
+                return false, "HEAVY_FREIGHT_BACKPACK_PROHIBITED"
+            end
+
             if fromInv ~= toInv and not dstContainer:canHoldWeight(movedWeight) then
                 return false, "CONTAINER_OVERWEIGHT"
             end
@@ -239,8 +247,15 @@ Nyx.RPC.Register("inventory:moveSlot", function(src, payload)
                 return false, "CANNOT_SPLIT_AND_SWAP"
             end
 
-            -- Weight check for cross-container swap
+            -- Heavy freight backpack and weight checks for cross-container swap
             if fromInv ~= toInv then
+                if dstContainer.type == "player" and Nyx.Items.IsHeavyFreight(srcItem.item_id, srcItem.amount) then
+                    return false, "HEAVY_FREIGHT_BACKPACK_PROHIBITED"
+                end
+                if srcContainer.type == "player" and Nyx.Items.IsHeavyFreight(dstItem.item_id, dstItem.amount) then
+                    return false, "HEAVY_FREIGHT_BACKPACK_PROHIBITED"
+                end
+
                 local srcWeight = Nyx.Items.GetWeight(srcItem.item_id, srcItem.amount)
                 local dstWeight = Nyx.Items.GetWeight(dstItem.item_id, dstItem.amount)
 

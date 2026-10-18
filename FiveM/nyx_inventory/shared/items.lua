@@ -342,12 +342,79 @@ Nyx.Items.Registry = {
         maxSlots = 1,
         type = 'tool',
         description = 'Electronic proximity key fob encoding encrypted vehicle VIN & plate data.'
+    },
+
+    -- Heavy Freight & Industrial Crates (> 50kg, cannot be stored in player backpack)
+    ['crate_industrial_heavy'] = {
+        name = 'crate_industrial_heavy',
+        label = 'Heavy Industrial Freight Crate',
+        weight = 65000, -- 65 kg > 50kg limit
+        stackable = false,
+        maxSlots = 1,
+        type = 'freight',
+        isHeavyFreight = true,
+        decayRate = 0.00,
+        description = 'Reinforced heavy industrial cargo crate. Prohibited from personal backpacks; requires two-handed carry or freight transport.',
+        client = {
+            model = `prop_box_wood02a`,
+            animDict = 'anim@heists@box_carry@',
+            anim = 'idle',
+            attachOffset = { x = 0.0, y = 0.40, z = -0.15 },
+            attachRot = { x = 0.0, y = 0.0, z = 0.0 }
+        }
+    },
+    ['pallet_freight_steel'] = {
+        name = 'pallet_freight_steel',
+        label = 'Heavy Steel Structural Pallet',
+        weight = 85000, -- 85 kg > 50kg limit
+        stackable = false,
+        maxSlots = 1,
+        type = 'freight',
+        isHeavyFreight = true,
+        decayRate = 0.00,
+        description = 'Industrial structural steel freight pallet. Requires two-handed carry, ground dragging, or forklift transport.',
+        client = {
+            model = `prop_boxpile_06a`,
+            animDict = 'anim@heists@box_carry@',
+            anim = 'idle',
+            attachOffset = { x = 0.0, y = 0.48, z = -0.20 },
+            attachRot = { x = 0.0, y = 0.0, z = 0.0 }
+        }
+    },
+    ['crate_machinery_parts'] = {
+        name = 'crate_machinery_parts',
+        label = 'Machinery Spare Parts Crate',
+        weight = 55000, -- 55 kg > 50kg limit
+        stackable = false,
+        maxSlots = 1,
+        type = 'freight',
+        isHeavyFreight = true,
+        decayRate = 0.00,
+        description = 'Dense crate carrying heavy mechanical machinery replacement parts.',
+        client = {
+            model = `prop_wooden_crate_01`,
+            animDict = 'anim@heists@box_carry@',
+            anim = 'idle',
+            attachOffset = { x = 0.0, y = 0.42, z = -0.15 },
+            attachRot = { x = 0.0, y = 0.0, z = 0.0 }
+        }
     }
 }
 
 -- Lookup item definition
 function Nyx.Items.Get(name)
     return Nyx.Items.Registry[name]
+end
+
+-- Check if item or stack constitutes heavy freight (> 50kg or isHeavyFreight flag)
+function Nyx.Items.IsHeavyFreight(name, amount)
+    local item = Nyx.Items.Registry[name]
+    if not item then return false end
+    if item.isHeavyFreight then return true end
+
+    local totalWeight = (item.weight or 0) * (tonumber(amount) or 1)
+    local threshold = (Config and Config.HeavyFreightThreshold) or 50000
+    return totalWeight > threshold
 end
 
 -- Calculate cumulative weight in grams

@@ -77,6 +77,9 @@ function Nyx.CreatePlayerObject(src, accountData, charData)
 
     self.isDead = (tonumber(charData.is_dead) == 1)
     self.isDirty = false
+    self.isCarryingHeavyFreight = false
+    self.carriedDropId = nil
+    self.carriedModel = nil
 
     -- Register in global fast-lookup tables
     Nyx.Players[self.source] = self
@@ -165,17 +168,19 @@ function PlayerObject:setMetadata(key, value)
     TriggerClientEvent("nyx:core:client:metadataUpdated", self.source, key, value)
 end
 
--- Inventory Weight Tracking
+-- Inventory Weight Tracking with Server-Authoritative State Bag Synchronization
 function PlayerObject:getWeight()
+    local defaultMax = (Config.WeightPenalties and Config.WeightPenalties.defaultPlayerCapacity) or 60000
     if not self.metadata.inventory_weight then
-        return { current = 0, max = 30000, ratio = 0.0 }
+        return { current = 0, max = defaultMax, ratio = 0.0 }
     end
     return self.metadata.inventory_weight
 end
 
 function PlayerObject:setWeight(current, max)
     local cur = math.max(0, tonumber(current) or 0)
-    local maxW = math.max(1, tonumber(max) or 30000)
+    local defaultMax = (Config.WeightPenalties and Config.WeightPenalties.defaultPlayerCapacity) or 60000
+    local maxW = math.max(1, tonumber(max) or defaultMax)
     local ratio = cur / maxW
 
     local weightData = {
@@ -187,11 +192,52 @@ function PlayerObject:setWeight(current, max)
     self.metadata.inventory_weight = weightData
     self:markDirty()
 
+    -- Calculate server-authoritative tier
+    local tierKey, tierData
+    if Nyx.Weights and Nyx.Weights.CalculateTier then
+        tierKey, tierData = Nyx.Weights.CalculateTier(ratio, self.isCarryingHeavyFreight)
+    elseif Nyx.CalculateWeightTier then
+        tierKey, tierData = Nyx.CalculateWeightTier(ratio, self.isCarryingHeavyFreight)
+    else
+        tierKey, tierData = "tier_0", { label = "TIER_0", moveRate = 1.0, sprintAllowed = true, jumpAllowed = true, climbAllowed = true }
+    end
+
+    -- Synchronize via Server-Authoritative State Bags (replicated = true)
+    pcall(function()
+        if Player then
+            local plyEntity = Player(self.source)
+            if plyEntity and plyEntity.state then
+                local pState = plyEntity.state
+                pState:set("weightTier", tierData.label, true)
+                pState:set("weightTierKey", tierKey, true)
+                pState:set("weightRatio", ratio, true)
+                pState:set("weightCurrent", cur, true)
+                pState:set("weightMax", maxW, true)
+                pState:set("moveRateOverride", tierData.moveRate, true)
+                pState:set("sprintAllowed", tierData.sprintAllowed, true)
+                pState:set("jumpAllowed", tierData.jumpAllowed, true)
+                pState:set("climbAllowed", tierData.climbAllowed, true)
+                pState:set("isCarryingHeavyFreight", self.isCarryingHeavyFreight or false, true)
+                pState:set("carriedDropId", self.carriedDropId or false, true)
+                pState:set("carriedModel", self.carriedModel or false, true)
+            end
+        end
+    end)
+
     TriggerClientEvent("nyx:core:client:updateWeight", self.source, weightData)
     TriggerClientEvent("nyx:core:client:metadataUpdated", self.source, "inventory_weight", weightData)
-    TriggerEvent("nyx:core:server:playerWeightUpdated", self.source, cur, maxW, ratio)
+    TriggerEvent("nyx:core:server:playerWeightUpdated", self.source, cur, maxW, ratio, tierKey, tierData)
 
     return weightData
+end
+
+function PlayerObject:setHeavyFreight(isCarrying, dropId, model)
+    self.isCarryingHeavyFreight = (isCarrying == true)
+    self.carriedDropId = isCarrying and dropId or nil
+    self.carriedModel = isCarrying and model or nil
+
+    local curWeight = self:getWeight()
+    return self:setWeight(curWeight.current, curWeight.max)
 end
 
 -- Position & Coordinates

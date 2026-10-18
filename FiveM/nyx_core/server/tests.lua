@@ -275,109 +275,153 @@ function Nyx.Tests.TestVehicleMileageAndWear()
     return passes == total
 end
 
--- 6. Test Dynamic Inventory Weight Penalties & Locomotion Restraints
+-- 6. Test Forgiving Tiered Inventory Weight Penalties & Heavy Freight Physics
 function Nyx.Tests.TestWeightPenalties()
-    print("^3[Nyx:Tests] Running Dynamic Inventory Weight Penalties Suite...^7")
+    print("^3[Nyx:Tests] Running Forgiving Tiered Weight Penalties & Heavy Freight Suite...^7")
     local passes = 0
-    local total = 4
+    local total = 5
 
-    local cfg = Config.WeightPenalties or {
-        enabled = true,
-        tiers = {
-            normal = { maxRatio = 0.70, moveRate = 1.0, sprintAllowed = true, jumpAllowed = true, climbAllowed = true },
-            encumbered = { minRatio = 0.70, maxRatio = 0.85, moveRate = 0.90, sprintAllowed = true, jumpAllowed = true, climbAllowed = true },
-            heavy = { minRatio = 0.85, maxRatio = 1.00, moveRate = 0.78, sprintAllowed = true, jumpAllowed = true, climbAllowed = true },
-            overburdened = { minRatio = 1.00, maxRatio = 1.20, moveRate = 0.60, sprintAllowed = false, jumpAllowed = false, climbAllowed = true },
-            critical = { minRatio = 1.20, moveRate = 0.40, sprintAllowed = false, jumpAllowed = false, climbAllowed = false }
-        }
-    }
-
-    local function computeTier(ratio)
-        local tiers = cfg.tiers
-        if tiers.critical and ratio >= tiers.critical.minRatio then
-            return "critical", tiers.critical
-        elseif tiers.overburdened and ratio >= tiers.overburdened.minRatio then
-            return "overburdened", tiers.overburdened
-        elseif tiers.heavy and ratio >= tiers.heavy.minRatio then
-            return "heavy", tiers.heavy
-        elseif tiers.encumbered and ratio >= tiers.encumbered.minRatio then
-            return "encumbered", tiers.encumbered
+    local function computeTier(ratio, isHeavy)
+        if Nyx.Weights and Nyx.Weights.CalculateTier then
+            return Nyx.Weights.CalculateTier(ratio, isHeavy)
+        end
+        if isHeavy then
+            return "tier_3", { label = "TIER_3", moveRate = 0.65, sprintAllowed = false, jumpAllowed = false, climbAllowed = false, staminaDrainMult = 2.50 }
+        elseif ratio > 0.95 then
+            return "tier_2", { label = "TIER_2", moveRate = 0.80, sprintAllowed = false, jumpAllowed = false, climbAllowed = false, staminaDrainMult = 2.00 }
+        elseif ratio > 0.70 then
+            return "tier_1", { label = "TIER_1", moveRate = 0.90, sprintAllowed = true, jumpAllowed = true, climbAllowed = true, staminaDrainMult = 1.30 }
         else
-            return "normal", tiers.normal
+            return "tier_0", { label = "TIER_0", moveRate = 1.00, sprintAllowed = true, jumpAllowed = true, climbAllowed = true, staminaDrainMult = 1.00 }
         end
     end
 
-    -- Test A: Tier Evaluation Across Complete Weight Spectrum
-    local tNormKey, tNorm = computeTier(0.40) -- 40% capacity
-    local tEncKey, tEnc = computeTier(0.75)   -- 75% capacity
-    local tHvyKey, tHvy = computeTier(0.92)   -- 92% capacity
-    local tOvrKey, tOvr = computeTier(1.08)   -- 108% capacity
-    local tCrtKey, tCrt = computeTier(1.35)   -- 135% capacity
+    -- Test A: Forgiving Tier Evaluation Across Complete Weight Spectrum & Heavy Freight
+    local t0Key, t0 = computeTier(0.50, false) -- 50% capacity: unencumbered
+    local t1Key, t1 = computeTier(0.85, false) -- 85% capacity: moderate load (-10% sprint speed)
+    local t2Key, t2 = computeTier(0.98, false) -- 98% capacity: overencumbered (fast walk allowed)
+    local t3Key, t3 = computeTier(0.30, true)  -- Heavy freight crate (> 50kg physical carry)
 
-    if assertTest(tNormKey == "normal" and tEncKey == "encumbered" and tHvyKey == "heavy" and tOvrKey == "overburdened" and tCrtKey == "critical",
-        "Weight Penalty Tier Boundary Transitions",
-        string.format("Tier classification error: %s, %s, %s, %s, %s", tNormKey, tEncKey, tHvyKey, tOvrKey, tCrtKey)) then
+    local a1 = (t0Key == "tier_0" and t0.moveRate == 1.00 and t0.sprintAllowed == true and t0.jumpAllowed == true)
+    local a2 = (t1Key == "tier_1" and t1.moveRate == 0.90 and t1.sprintAllowed == true and t1.staminaDrainMult == 1.30)
+    local a3 = (t2Key == "tier_2" and t2.moveRate == 0.80 and t2.sprintAllowed == false and t2.jumpAllowed == false)
+    local a4 = (t3Key == "tier_3" and t3.moveRate == 0.65 and t3.sprintAllowed == false and t3.jumpAllowed == false and t3.climbAllowed == false)
+
+    if assertTest(a1 and a2 and a3 and a4,
+        "Forgiving Weight Penalty Tier Boundary Transitions (Tiers 0-3)",
+        string.format("Tier classification error: T0=%s, T1=%s, T2=%s, T3=%s", t0Key, t1Key, t2Key, t3Key)) then
         passes = passes + 1
     end
 
-    -- Test B: Authoritative PlayerObject Weight Mutation & Metadata Sync
+    -- Test B: Authoritative PlayerObject Weight Mutation & State Bag Serialization
+    local mockState = {}
     local mockPlayer = {
         source = 999,
         citizenId = "TEST_CITIZEN_01",
         metadata = {},
         isDirty = false,
+        isCarryingHeavyFreight = false,
         setWeight = function(self, current, maxW)
             local cur = math.max(0, tonumber(current) or 0)
-            local maxWeight = math.max(1, tonumber(maxW) or 30000)
+            local defaultMax = (Config.WeightPenalties and Config.WeightPenalties.defaultPlayerCapacity) or 60000
+            local maxWeight = math.max(1, tonumber(maxW) or defaultMax)
             local ratio = cur / maxWeight
             self.metadata.inventory_weight = { current = cur, max = maxWeight, ratio = ratio }
             self.isDirty = true
+
+            local tierKey, tierData = computeTier(ratio, self.isCarryingHeavyFreight)
+            mockState.weightTier = tierData.label
+            mockState.weightTierKey = tierKey
+            mockState.weightRatio = ratio
+            mockState.moveRateOverride = tierData.moveRate
+            mockState.sprintAllowed = tierData.sprintAllowed
+            mockState.jumpAllowed = tierData.jumpAllowed
+            mockState.isCarryingHeavyFreight = self.isCarryingHeavyFreight or false
+
             return self.metadata.inventory_weight
         end,
         getWeight = function(self)
-            return self.metadata.inventory_weight or { current = 0, max = 30000, ratio = 0.0 }
+            local defaultMax = (Config.WeightPenalties and Config.WeightPenalties.defaultPlayerCapacity) or 60000
+            return self.metadata.inventory_weight or { current = 0, max = defaultMax, ratio = 0.0 }
         end
     }
 
-    mockPlayer:setWeight(27000, 30000)
+    mockPlayer:setWeight(51000, 60000) -- 51kg / 60kg = 85% (Tier 1)
     local w = mockPlayer:getWeight()
-    if assertTest(w.current == 27000 and w.max == 30000 and math.abs(w.ratio - 0.90) < 0.001 and mockPlayer.isDirty == true,
-        "PlayerObject Weight Mutation & State Serialization",
-        string.format("Weight state corrupt: cur=%s, max=%s, ratio=%s", tostring(w.current), tostring(w.max), tostring(w.ratio))) then
+    local bPass = (w.current == 51000 and w.max == 60000 and math.abs(w.ratio - 0.85) < 0.001
+        and mockPlayer.isDirty == true
+        and mockState.weightTier == "TIER_1"
+        and mockState.moveRateOverride == 0.90
+        and mockState.sprintAllowed == true)
+
+    if assertTest(bPass,
+        "PlayerObject 60kg Baseline Capacity & State Bag Sync",
+        string.format("State sync error: cur=%s, max=%s, ratio=%s, tier=%s", tostring(w.current), tostring(w.max), tostring(w.ratio), tostring(mockState.weightTier))) then
         passes = passes + 1
     end
 
-    -- Test C: Multi-Item Weight Aggregation & Load Tier Mapping
+    -- Test C: Heavy Freight Threshold & Backpack Storage Rejection
+    local isHeavyCrate = false
+    local isNormalItem = true
+    if Nyx.Weights and Nyx.Weights.IsHeavyFreight then
+        isHeavyCrate = Nyx.Weights.IsHeavyFreight(65000) -- 65kg heavy crate
+        isNormalItem = not Nyx.Weights.IsHeavyFreight(15000) -- 15kg item
+    else
+        isHeavyCrate = (65000 > 50000)
+        isNormalItem = (15000 <= 50000)
+    end
+
+    local mockPlayerContainer = {
+        type = "player",
+        maxWeight = 60000,
+        canHoldItem = function(self, itemId, amount)
+            local itemWeight = 65000
+            if self.type == "player" and itemWeight > 50000 then
+                return false, "HEAVY_FREIGHT_BACKPACK_PROHIBITED"
+            end
+            return true
+        end
+    }
+
+    local allowedInBackpack, rejReason = mockPlayerContainer:canHoldItem("crate_industrial_heavy", 1)
+    if assertTest(isHeavyCrate and isNormalItem and (allowedInBackpack == false) and (rejReason == "HEAVY_FREIGHT_BACKPACK_PROHIBITED"),
+        "Heavy Freight Backpack Prohibition (> 50kg threshold)",
+        "Failed to reject heavy freight item from player personal backpack") then
+        passes = passes + 1
+    end
+
+    -- Test D: Multi-Item Weight Summation on 60kg Baseline Capacity
     local sampleItems = {
-        { item_id = "gold_bar", amount = 5, unitWeight = 5000 },    -- 25,000g
-        { item_id = "water_bottle", amount = 10, unitWeight = 350 }, -- 3,500g
+        { item_id = "gold_bar", amount = 3, unitWeight = 15000 },    -- 45,000g
+        { item_id = "ammo_rifle", amount = 200, unitWeight = 30 },   -- 6,000g
+        { item_id = "water_bottle", amount = 5, unitWeight = 350 },  -- 1,750g
     }
     local calculatedTotalWeight = 0
     for _, item in ipairs(sampleItems) do
         calculatedTotalWeight = calculatedTotalWeight + (item.amount * item.unitWeight)
     end
-    local maxCapacity = 30000
-    local ratio = calculatedTotalWeight / maxCapacity
-    local sampleTierKey, sampleTier = computeTier(ratio)
+    local maxCapacity = 60000
+    local ratio = calculatedTotalWeight / maxCapacity -- 52,750 / 60,000 = 0.8791 (Tier 1)
+    local sampleTierKey, sampleTier = computeTier(ratio, false)
 
-    if assertTest(calculatedTotalWeight == 28500 and math.abs(ratio - 0.95) < 0.001 and sampleTierKey == "heavy" and sampleTier.moveRate == 0.78,
-        "Multi-Item Weight Summation & Movement Rate Invariant",
-        string.format("Calculated weight %.2f (ratio %.2f) yielded unexpected tier %s", calculatedTotalWeight, ratio, sampleTierKey)) then
+    if assertTest(calculatedTotalWeight == 52750 and math.abs(ratio - 0.8791) < 0.001 and sampleTierKey == "tier_1" and sampleTier.moveRate == 0.90,
+        "Multi-Item Weight Summation & Moderate Tier Invariant",
+        string.format("Calculated weight %.2f (ratio %.4f) yielded unexpected tier %s", calculatedTotalWeight, ratio, sampleTierKey)) then
         passes = passes + 1
     end
 
-    -- Test D: Overburdened & Critical Locomotion Invariant (Sprint/Jump Lockouts)
-    local _, ovrData = computeTier(1.10)
-    local _, crtData = computeTier(1.25)
+    -- Test E: Locomotion Restraints (Overencumbered Fast Walk vs Heavy Carry)
+    local _, ovrData = computeTier(0.98, false) -- Tier 2: overencumbered
+    local _, hvyData = computeTier(0.40, true)  -- Tier 3: heavy freight carry
 
-    local sprintLocked = (ovrData.sprintAllowed == false and crtData.sprintAllowed == false)
-    local jumpLocked = (ovrData.jumpAllowed == false and crtData.jumpAllowed == false)
-    local climbLocked = (ovrData.climbAllowed == true and crtData.climbAllowed == false)
-    local severelySlowed = (crtData.moveRate == 0.40)
+    local t2SprintLocked = (ovrData.sprintAllowed == false and ovrData.jumpAllowed == false)
+    local t2FastWalk = (ovrData.moveRate == 0.80)
+    local t3HeavySpeed = (hvyData.moveRate == 0.65)
+    local t3AllLocked = (hvyData.sprintAllowed == false and hvyData.jumpAllowed == false and hvyData.climbAllowed == false)
 
-    if assertTest(sprintLocked and jumpLocked and climbLocked and severelySlowed,
-        "Overburdened Locomotion Control Inhibition Invariants",
-        "Failed to inhibit sprint, jump, or climb on overburdened/critical tiers") then
+    if assertTest(t2SprintLocked and t2FastWalk and t3HeavySpeed and t3AllLocked,
+        "Locomotion Invariants: Tier 2 Fast Walk & Tier 3 Freight Hold",
+        "Failed to enforce fast walk on Tier 2 or physical carry lockouts on Tier 3") then
         passes = passes + 1
     end
 
