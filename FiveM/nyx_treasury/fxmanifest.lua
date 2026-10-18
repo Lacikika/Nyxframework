@@ -17,6 +17,7 @@ shared_scripts {
     'shared/circuit.lua',
     'shared/degradation.lua',
     '@nyx_factions/shared/laundering.lua',
+    '@nyx_factions/shared/equity.lua',
     'shared/subpoena_audit.lua'
 }
 

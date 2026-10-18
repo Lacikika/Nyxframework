@@ -279,7 +279,7 @@ class TestCommercialMoneyLaunderingAndSubpoenaAuditing(unittest.TestCase):
 
         self.assertIn("TestCommercialMoneyLaunderingAndSubpoenaAuditing", content)
         self.assertIn("local t46 = Nyx.Tests.TestCommercialMoneyLaunderingAndSubpoenaAuditing()", content)
-        self.assertIn("and t46 then", content)
+        self.assertIn("and t46", content)
 
 
 if __name__ == "__main__":

@@ -18,7 +18,8 @@ shared_scripts {
     'shared/corporate_rbac.lua',
     'shared/unions.lua',
     'shared/succession.lua',
-    'shared/laundering.lua'
+    'shared/laundering.lua',
+    'shared/equity.lua'
 }
 
 server_scripts {
@@ -27,6 +28,7 @@ server_scripts {
     'server/charter.lua',
     'server/vaults.lua',
     'server/multisig.lua',
+    'server/equity.lua',
     'server/dividends.lua',
     'server/unions.lua',
     'server/cba.lua',
@@ -42,6 +44,7 @@ client_scripts {
     'client/fleet_depot.lua',
     'client/unions.lua',
     'client/laundering.lua',
+    'client/equity.lua',
     'client/main.lua',
     'client/exports.lua'
 }

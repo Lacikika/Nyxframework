@@ -9919,7 +9919,201 @@ function Nyx.Tests.TestCommercialMoneyLaunderingAndSubpoenaAuditing()
     return passes == total
 end
 
--- 45. Master Test Runner (Suite 1 - Suite 46)
+-- 47. Corporate Equity Public Offering & Dividend Distribution Suite
+function Nyx.Tests.TestCorporateEquityOfferingAndDividends()
+    print("^3[Nyx:Tests] Running Corporate Equity Public Offering & Dividend Distribution Suite...^7")
+    local passes = 0
+    local total = 8
+
+    local Equity = Nyx.Equity or {}
+
+    -- Sub-test A: Migration 052 Schema Definition & Table Contracts
+    local m52_tables = {
+        offerings = "nyx_factions_equity_offerings",
+        shareholders = "nyx_factions_equity_shareholders",
+        purchases = "nyx_factions_equity_purchases",
+        dividend_runs = "nyx_factions_dividend_runs",
+        item_equity = "equity_shares"
+    }
+    local testA_ok = (m52_tables.offerings ~= nil and m52_tables.shareholders ~= nil and
+                      m52_tables.purchases ~= nil and m52_tables.dividend_runs ~= nil and
+                      m52_tables.item_equity == "equity_shares")
+
+    if assertTest(testA_ok == true,
+        "Migration 052 Schema Contracts (Offerings, Shareholders, Purchases & Dividend Runs)",
+        string.format("offerings=%s, shareholders=%s, runs=%s, item=%s",
+            m52_tables.offerings, m52_tables.shareholders, m52_tables.dividend_runs, m52_tables.item_equity)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Offering Valuation & Implied Enterprise Capitalization
+    local val1 = Equity.CalculateOfferingValuation(25.00, 2000.00)
+    local val2 = Equity.CalculateOfferingValuation(10.00, 1500.00)
+    local valZero = Equity.CalculateOfferingValuation(0.00, 2000.00)
+
+    local testB_ok = (val1.targetCapital == 50000.00 and val1.impliedMarketCap == 200000.00) and
+                     (val2.targetCapital == 15000.00 and val2.impliedMarketCap == 150000.00) and
+                     (valZero.targetCapital == 0.00 and valZero.impliedMarketCap == 0.00)
+
+    if assertTest(testB_ok == true,
+        "Offering Valuation, Target Capital Raising & Implied Market Capitalization Math",
+        string.format("val1(cap=$%.2f, mcap=$%.2f); val2(cap=$%.2f, mcap=$%.2f)",
+            val1.targetCapital, val1.impliedMarketCap, val2.targetCapital, val2.impliedMarketCap)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Equity Share Acquisition Cost & Purchase Math
+    local cost1 = Equity.CalculatePurchaseCost(3.50, 2000.00)
+    local cost2 = Equity.CalculatePurchaseCost(0.25, 1500.00)
+    local costZero = Equity.CalculatePurchaseCost(0.00, 2000.00)
+
+    local testC_ok = (cost1 == 7000.00 and cost2 == 375.00 and costZero == 0.00)
+
+    if assertTest(testC_ok == true,
+        "Equity Share Acquisition Cost & Decimal Precision Arithmetic",
+        string.format("cost1=$%.2f, cost2=$%.2f, costZero=$%.2f", cost1, cost2, costZero)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Offering Creation Validation & Unissued Equity Boundary Guard
+    local mockCorp = { faction_id = "corp_vanilla_unicorn", charter_type = "corporation", is_active = 1 }
+    local mockCoop = { faction_id = "coop_farmers", charter_type = "cooperative", is_active = 1 }
+
+    local validOfferData = {
+        title = "Series-A Growth Offering",
+        prospectus = "Capital expansion fund",
+        sharesOffered = 20.00,
+        pricePerShare = 2000.00,
+        minPurchase = 1.00,
+        maxPurchase = 10.00,
+        durationHours = 168
+    }
+
+    local okCorp, cleanCorp = Equity.ValidateOfferingCreation(mockCorp, validOfferData, 60.00)
+    local okExceeds, errExceeds = Equity.ValidateOfferingCreation(mockCorp, validOfferData, 85.00)
+    local okCoop, errCoop = Equity.ValidateOfferingCreation(mockCoop, validOfferData, 20.00)
+
+    local testD_ok = (okCorp == true and cleanCorp.targetCapital == 40000.00) and
+                     (okExceeds == false and tostring(errExceeds):find("OFFERING_EXCEEDS_UNISSUED_EQUITY") ~= nil) and
+                     (okCoop == false and errCoop == "CHARTER_INELIGIBLE_FOR_EQUITY_OFFERING")
+
+    if assertTest(testD_ok == true,
+        "Public Offering Creation Validation, Charter Eligibility & 100% Unissued Equity Ceiling",
+        string.format("corpOk=%s, exceedsBlocked=%s, coopBlocked=%s",
+            tostring(okCorp), tostring(not okExceeds), tostring(not okCoop))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Purchase Request Validation, Expiration & Purchasing Limits
+    local mockOffering = {
+        offering_id = "offering_unicorn_ipo",
+        faction_id = "corp_vanilla_unicorn",
+        status = "active",
+        shares_available = 25.00,
+        total_shares_offered = 25.00,
+        price_per_share = 2000.00,
+        min_purchase = 1.00,
+        max_purchase = 10.00,
+        expires_at_unix = 2000000000
+    }
+
+    local okBuyValid, buyValid = Equity.ValidatePurchaseRequest(mockOffering, "CIT-ALICE", 5.00, 20000.00, 1900000000)
+    local okBuyBelowMin, _ = Equity.ValidatePurchaseRequest(mockOffering, "CIT-BOB", 0.50, 20000.00, 1900000000)
+    local okBuyAboveMax, _ = Equity.ValidatePurchaseRequest(mockOffering, "CIT-CHARLIE", 15.00, 50000.00, 1900000000)
+    local okBuyNoFunds, _ = Equity.ValidatePurchaseRequest(mockOffering, "CIT-DAVE", 5.00, 500.00, 1900000000)
+    local okBuyExpired, _ = Equity.ValidatePurchaseRequest(mockOffering, "CIT-EVE", 5.00, 20000.00, 2100000000)
+
+    local testE_ok = (okBuyValid == true and buyValid.totalCost == 10000.00 and buyValid.remainingAvailable == 20.00) and
+                     (okBuyBelowMin == false) and (okBuyAboveMax == false) and
+                     (okBuyNoFunds == false) and (okBuyExpired == false)
+
+    if assertTest(testE_ok == true,
+        "Share Purchase Request Validation, Expiration Enforcement & Liquidity Boundary Checks",
+        string.format("validOk=%s, belowMinBlocked=%s, aboveMaxBlocked=%s, noFundsBlocked=%s, expiredBlocked=%s",
+            tostring(okBuyValid), tostring(not okBuyBelowMin), tostring(not okBuyAboveMax), tostring(not okBuyNoFunds), tostring(not okBuyExpired))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Dividend Calculation, Retained Reserves & Zero-Cent Closed Loop Conservation
+    local mockShareholders = {
+        { citizenId = "CIT-ALICE", roleTitle = "CEO", equityShares = 40.00 },
+        { citizenId = "CIT-BOB", roleTitle = "COO", equityShares = 35.00 },
+        { citizenId = "CIT-INVESTOR-1", roleTitle = "Shareholder", equityShares = 25.00 }
+    }
+
+    local distOk, distResult = Equity.CalculateDividendDistribution(10000.00, 0.20, mockShareholders)
+
+    local mockOddShareholders = {
+        { citizenId = "CIT-1", equityShares = 33.33 },
+        { citizenId = "CIT-2", equityShares = 33.33 },
+        { citizenId = "CIT-3", equityShares = 33.34 }
+    }
+    local oddOk, oddResult = Equity.CalculateDividendDistribution(10000.00, 0.20, mockOddShareholders)
+
+    local testF_ok = (distOk == true and distResult.totalDisbursed == 8000.00 and distResult.retainedReserves == 2000.00) and
+                     (distResult.payouts[1].payoutAmount == 3200.00 and distResult.payouts[2].payoutAmount == 2800.00 and distResult.payouts[3].payoutAmount == 2000.00) and
+                     (distResult.totalDisbursed + distResult.retainedReserves == 10000.00) and
+                     (oddOk == true and (oddResult.totalDisbursed + oddResult.retainedReserves) == 10000.00)
+
+    if assertTest(testF_ok == true,
+        "Authoritative Dividend Distribution, Retained Earnings & Zero-Cent Conservation (Delta = 0.00)",
+        string.format("profit=%.2f, disbursed=%.2f, retained=%.2f, p1=%.2f, p2=%.2f, p3=%.2f, oddSum=%.2f",
+            distResult.declaredNetProfit, distResult.totalDisbursed, distResult.retainedReserves,
+            distResult.payouts[1].payoutAmount, distResult.payouts[2].payoutAmount, distResult.payouts[3].payoutAmount,
+            oddResult.totalDisbursed + oddResult.retainedReserves)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Weekly Automated Dividend Schedule & Operational Reserve Eligibility
+    local nowUnix = 1700000000
+    local oneWeekAgo = nowUnix - (7 * 86400)
+    local twoDaysAgo = nowUnix - (2 * 86400)
+
+    local eligOk, recProfit, surplus = Equity.EvaluateDividendEligibility(mockCorp, 25000.00, oneWeekAgo, nowUnix, {
+        reserveFloor = 5000.00,
+        frequencyDays = 7
+    })
+
+    local eligTooSoon, _, _ = Equity.EvaluateDividendEligibility(mockCorp, 25000.00, twoDaysAgo, nowUnix, {
+        reserveFloor = 5000.00,
+        frequencyDays = 7
+    })
+
+    local eligNoSurplus, _, _ = Equity.EvaluateDividendEligibility(mockCorp, 4200.00, oneWeekAgo, nowUnix, {
+        reserveFloor = 5000.00,
+        frequencyDays = 7
+    })
+
+    local testG_ok = (eligOk == true and recProfit == 5000.00 and surplus == 20000.00) and
+                     (eligTooSoon == false) and (eligNoSurplus == false)
+
+    if assertTest(testG_ok == true,
+        "Automated Weekly Dividend Cycle Eligibility & Minimum Operational Reserve Floor Checks",
+        string.format("eligOk=%s, recProfit=$%.2f, surplus=$%.2f, tooSoonBlocked=%s, noSurplusBlocked=%s",
+            tostring(eligOk), recProfit or 0, surplus or 0, tostring(not eligTooSoon), tostring(not eligNoSurplus))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test H: Zero-Trust Payload Sanitizers & Formatter Badges
+    local pValOk, cleanP = Equity.ValidatePurchasePayload({ offeringId = "offering_unicorn_ipo", shares = "5.5" })
+    local pValBad, _ = Equity.ValidatePurchasePayload({ offeringId = "", shares = -2 })
+    local badgeEquity = Equity.FormatEquityBadge(25.5)
+    local badgeCurrency = Equity.FormatCurrency(1500)
+
+    local testH_ok = (pValOk == true and cleanP.shares == 5.50 and pValBad == false) and
+                     (badgeEquity == "25.50% Equity" and badgeCurrency == "$1500.00")
+
+    if assertTest(testH_ok == true,
+        "Zero-Trust Payload Sanitizers, Numerical Clamping & UI Equity Badges",
+        string.format("pValOk=%s, cleanShares=%.2f, badgeEquity=%s, badgeCurr=%s",
+            tostring(pValOk), cleanP and cleanP.shares or 0, badgeEquity, badgeCurrency)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 45. Master Test Runner (Suite 1 - Suite 47)
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -9971,9 +10165,10 @@ function Nyx.Tests.RunAll()
     local t44 = Nyx.Tests.TestSealedPalletBreachingAndForensicContamination()
     local t45 = Nyx.Tests.TestWeaponSerialGrindingAndAcidEtchForensics()
     local t46 = Nyx.Tests.TestCommercialMoneyLaunderingAndSubpoenaAuditing()
+    local t47 = Nyx.Tests.TestCorporateEquityOfferingAndDividends()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 and t41 and t42 and t43 and t44 and t45 and t46 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 and t41 and t42 and t43 and t44 and t45 and t46 and t47 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

@@ -563,6 +563,16 @@ Nyx.Items.Registry = {
         type = 'valuable',
         description = 'Official state-issued biometric identity card.'
     },
+    ['equity_shares'] = {
+        name = 'equity_shares',
+        label = 'Corporate Equity Share Certificate',
+        weight = 50,
+        stackable = false,
+        maxSlots = 1,
+        type = 'document',
+        decayRate = 0.0,
+        description = 'Certified bearer share certificate representing fractional equity ownership in a registered corporation.'
+    },
     ['evidence_bag'] = {
         name = 'evidence_bag',
         label = 'Forensic Evidence Bag',
@@ -819,6 +829,14 @@ function Nyx.Items.CreateDefaultMetadata(name, extra)
             meta.bundleValue = (type(extra) == "table" and extra.bundleValue) or 5000.00
             meta.dyeColor = (type(extra) == "table" and extra.dyeColor) or "chemical_red"
             meta.forensicRisk = (type(extra) == "table" and extra.forensicRisk) or 0.85
+        elseif item.name == 'equity_shares' then
+            meta.factionId = (type(extra) == "table" and extra.factionId) or "corp_vanilla_unicorn"
+            meta.companyName = (type(extra) == "table" and extra.companyName) or "Vanilla Unicorn Entertainment Corp"
+            meta.shares = (type(extra) == "table" and extra.shares) or 1.00
+            meta.sharePrice = (type(extra) == "table" and extra.sharePrice) or 2000.00
+            meta.offeringId = (type(extra) == "table" and extra.offeringId) or "offering_unicorn_ipo"
+            meta.issuedAt = os.time()
+            meta.certificateUuid = (type(extra) == "table" and extra.certificateUuid) or string.format("EQ-%s-%06d", string.upper(string.sub(meta.factionId, 1, 4)), math.random(100000, 999999))
         end
     end
 

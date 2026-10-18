@@ -38,6 +38,17 @@ Config.Dividends = {
     MaxReinvestmentRate = 0.50      -- Constitutional ceiling
 }
 
+-- Corporate Equity Public Offerings & Automated Weekly Dividends
+Config.EquityOfferings = {
+    MinPurchaseShares = 0.10,
+    MaxPurchaseShares = 49.00,
+    DefaultDurationHours = 168,          -- 7 days default IPO window
+    MinPricePerShare = 100.00,
+    OperationalLiquidityFloor = 5000.00, -- minimum treasury reserves required before dividends disburse
+    DefaultDividendFrequencyDays = 7,    -- weekly automated dividends
+    AutoDividendSweeperInterval = 300    -- check eligible dividends every 5 minutes
+}
+
 -- Corporate Treasury Vaults & Sub-Accounts Configuration
 Config.Vaults = {
     DefaultDailyLimit = 100000.00, -- Default 24h rolling withdrawal limit per vault
@@ -64,7 +75,9 @@ Config.PermissionNodes = {
     "roster:invite",
     "roster:promote",
     "roster:terminate",
-    "governance:call_vote"
+    "governance:call_vote",
+    "equity:manage_offerings",
+    "equity:distribute_dividends"
 }
 
 -- City Hall & Commercial Terminals

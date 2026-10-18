@@ -96,7 +96,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Commercial Money Laundering & Subpoena Ledger Auditing (`nyx_factions` & `nyx_treasury`)**
   - **Implementation:** System allowing enterprises to inject illicit cash into legitimate registers over time, creating audit trail anomalies detectable via judicial subpoenas.
 
-- [ ] **Feature: Corporate Equity Public Offering & Dividend Distribution Engine (`nyx_factions` & `nyx_treasury`)**
+- [x] **Feature: Corporate Equity Public Offering & Dividend Distribution Engine (`nyx_factions` & `nyx_treasury`)**
   - **Implementation:** Enable corporations to sell `equity_shares` to outside investors for capital raising, executing automated weekly dividend payouts via double-entry treasury ledgers.
 
 - [ ] **Feature: Armored Cash Transit & High-Value Banking Freight (`nyx_factions` & `nyx_treasury`)**
@@ -107,6 +107,42 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Corporate Equity Public Offering & Dividend Distribution Engine (`nyx_factions` & `nyx_treasury`)**
+  - **Database Migrations (`052_corporate_equity_public_offerings_and_dividend_distribution.sql`)**:
+    - Created migration file and registered Step 52 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Mirrored migration to `FiveM/nyx_factions/sql/migrations/` and `FiveM/nyx_treasury/sql/migrations/`.
+    - Extended `nyx_factions_registry` with automated dividend distribution policy attributes: `dividend_frequency_days` (default 7 days), `last_dividend_run_at` (TIMESTAMP NULL), `auto_dividends_enabled` (TINYINT default 1), and `reinvestment_rate_target` (DECIMAL(5,4) default 0.2000 / 20%).
+    - Created `nyx_factions_equity_offerings` public marketplace table (`offering_id` PK, `faction_id`, `title`, `prospectus`, `total_shares_offered`, `shares_available`, `shares_sold`, `price_per_share`, `min_purchase`, `max_purchase`, `target_capital`, `capital_raised`, `status`, `created_by_citizen_id`, `expires_at`, timestamps) with B-tree indexes on `faction_id`, `status`, and `expires_at`.
+    - Created `nyx_factions_equity_shareholders` consolidated investor cap table (`holding_id` PK, `faction_id`, `citizen_id`, `equity_shares`, `is_external_investor`, `total_invested`, `total_dividends_collected`, `last_dividend_at`, timestamps) with UNIQUE composite key on `(faction_id, citizen_id)` and lookup indexes.
+    - Created `nyx_factions_equity_purchases` immutable capital investment ledger (`purchase_id` PK, `purchase_uuid` UNIQUE, `offering_id`, `faction_id`, `investor_citizen_id`, `shares_acquired`, `price_per_share`, `total_amount`, `treasury_tx_id`, `created_at`).
+    - Created `nyx_factions_dividend_runs` immutable audit ledger (`run_id` PK, `run_uuid` UNIQUE, `faction_id`, `declared_net_profit`, `reinvestment_rate`, `retained_reserves_amount`, `total_disbursed`, `shareholder_count`, `treasury_tx_ids`, `executed_by_citizen_id`, `status`, `failure_reason`, `created_at`).
+    - Seeded initial canonical public offering for Vanilla Unicorn (`corp_vanilla_unicorn`): Series-A Growth Capital Offering (25.00% equity @ $2,000.00/share, $50,000.00 target capital, min 1.00%, max 10.00%).
+  - **Item Registry Integration (`FiveM/nyx_inventory/shared/items.lua`)**:
+    - Registered `equity_shares` (Corporate Equity Share Certificate, 50g, document type, decayRate 0.00).
+    - Extended `CreateDefaultMetadata` to auto-populate `factionId`, `companyName`, `shares`, `sharePrice`, `offeringId`, `issuedAt`, and unique serialized `certificateUuid` (`EQ-%s-%06d`).
+  - **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_factions/shared/equity.lua`)**:
+    - Configured statutory bounds: minimum purchase (0.10%), maximum purchase (50.00%), constitutional reinvestment bounds (10% to 50%, default 20%), operational reserve floor ($5,000.00), and weekly frequency cycle (7 days).
+    - Implemented `Nyx.Equity.CalculateOfferingValuation` determining target capital raise and implied enterprise market capitalization.
+    - Implemented `Nyx.Equity.CalculatePurchaseCost` with exact decimal precision cents arithmetic.
+    - Implemented `Nyx.Equity.ValidateOfferingCreation` enforcing charter eligibility (`corporation`, `private_enterprise`, `syndicate`), active corporate status, and the 100.00% unissued equity boundary ceiling.
+    - Implemented `Nyx.Equity.ValidatePurchaseRequest` validating active offering state, non-expiration, order bounds `[min_purchase, max_purchase]`, remaining available shares, and investor liquidity.
+    - Implemented `Nyx.Equity.CalculateDividendDistribution` with exact zero-cent closed-loop conservation ($\Delta = 0.00$): splits declared profit into retained corporate operating reserves and distributable pool according to reinvestment rate, floors payouts to whole cents, and captures sub-cent remainder dust into company reserves such that $\sum(\text{Payouts}) + \text{RetainedReserves} \equiv \text{DeclaredNetProfit}$.
+    - Implemented `Nyx.Equity.EvaluateDividendEligibility` evaluating weekly cycle elapsed time, liquidity surplus above constitutional operational floor, and calculating recommended net profit declaration (25% of surplus).
+    - Implemented zero-trust payload sanitizers (`ValidateOfferingPayload`, `ValidatePurchasePayload`, `ValidateDividendPayload`) and UI formatters (`FormatEquityBadge`, `FormatCurrency`).
+  - **Authoritative Server Subsystems & RPCs**:
+    - `FiveM/nyx_factions/server/equity.lua`: In-memory active offerings cache hydration on startup, authoritative offering creation (`CreatePublicOffering`), share purchase processor (`PurchaseEquityShares`) executing double-entry treasury transfer from investor bank account (`citizen:<citizenId>`) to corporate operating account (`faction.treasury_account_id`) with category `equity_capital_investment`, cap table upsertion, purchase transaction logging, physical bearer certificate item delivery, offering cancellation (`CancelPublicOffering`), cap table queries (`GetConsolidatedCapTable`), citizen equity portfolio query (`GetCitizenPortfolio`), and RPCs (`factions:getPublicOfferings`, `factions:getOfferingDetails`, `factions:createPublicOffering`, `factions:purchaseEquityShares`, `factions:cancelPublicOffering`, `factions:getCitizenPortfolio`, `factions:getFactionCapTable`).
+    - `FiveM/nyx_factions/server/dividends.lua`: Consolidated cap table aggregation combining internal members and outside investors with deduplication, authoritative dividend disbursement (`DistributeDividends`) debiting corporate treasury account and crediting individual shareholder accounts (`citizen:<citizenId>`) via double-entry treasury ledger, automated weekly cycle distributor (`ProcessAutomatedDividendCycles`), background recurring sweeper thread (running every 300s), and RPCs (`factions:previewDividends`, `factions:distributeDividends`, `factions:getDividendHistory`, `factions:processDividendCycle`).
+    - Exported public APIs in `FiveM/nyx_factions/server/exports.lua` (`CreatePublicOffering`, `PurchaseEquityShares`, `CancelPublicOffering`, `GetPublicOfferings`, `GetOfferingDetails`, `GetCitizenPortfolio`, `GetConsolidatedCapTable`, `PreviewDividends`, `DistributeDividends`, `ProcessAutomatedDividendCycles`, `GetDividendHistory`).
+  - **Client Implementations & Interactions (`FiveM/nyx_factions/client/equity.lua`)**:
+    - Interactive commands: `/stockmarket` (list active corporate equity offerings with valuations), `/buyequity <offeringId> <shares>` (purchase shares with double-entry confirmation), `/myportfolio` (display citizen's active equity holdings and accumulated dividends), `/captable <factionId>` (inspect shareholder roster and ownership stakes), and `/distributedividends <factionId> <profit> [rate]` (corporate officer manual dividend distribution).
+    - Public client exports: `GetPublicOfferings`, `PurchaseEquityShares`, `GetCitizenPortfolio`, `GetCapTable`, `PreviewDividends`, `DistributeDividends`.
+  - **Manifests & Verification**:
+    - Updated `FiveM/nyx_factions/fxmanifest.lua` declaring `shared/equity.lua`, `server/equity.lua`, and `client/equity.lua`.
+    - Updated `FiveM/nyx_treasury/fxmanifest.lua` declaring `@nyx_factions/shared/equity.lua`.
+    - Added in-engine integration test Test 47 (`Nyx.Tests.TestCorporateEquityOfferingAndDividends`) to `FiveM/nyx_core/server/tests.lua` and wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_corporate_equity_and_dividend_distribution.py` (12/12 tests passing).
+    - Full pytest suite: 431/431 passed (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 257 Lua files, 52 migrations (100% clean verification).
 - **[2026-10-18] Feature: Commercial Money Laundering & Subpoena Ledger Auditing (`nyx_factions` & `nyx_treasury`)**
   - **Database Migrations (`051_commercial_money_laundering_and_subpoena_auditing.sql`)**:
     - Registered Step 51 in `FiveM/nyx_core/sql/migrations/index.json` and mirrored to `nyx_factions`, `nyx_treasury`, and `nyx_judiciary`.

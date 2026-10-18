@@ -112,13 +112,49 @@ exports("GetMultiSigAuditLog", function(factionId, limit)
     return Nyx.Factions.GetMultiSigAuditLog(factionId, limit)
 end)
 
--- Dividends & Equity
+-- Dividends & Equity Public Offerings
 exports("DistributeDividends", function(factionId, netProfit, rate, executingCitizenId)
     return Nyx.Factions.DistributeDividends(factionId, netProfit, rate, executingCitizenId)
 end)
 
 exports("PreviewDividends", function(factionId, netProfit, rate)
     return Nyx.Factions.PreviewDividends(factionId, netProfit, rate)
+end)
+
+exports("ProcessAutomatedDividendCycles", function()
+    return Nyx.Factions.ProcessAutomatedDividendCycles()
+end)
+
+exports("GetDividendHistory", function(factionId, limit)
+    return Nyx.Factions.GetDividendHistory(factionId, limit)
+end)
+
+exports("GetConsolidatedCapTable", function(factionId)
+    return Nyx.Factions.GetConsolidatedCapTable(factionId)
+end)
+
+exports("CreatePublicOffering", function(actorCitizenId, factionId, data)
+    return Nyx.Factions.CreatePublicOffering(actorCitizenId, factionId, data)
+end)
+
+exports("PurchaseEquityShares", function(investorCitizenId, offeringId, sharesRequested)
+    return Nyx.Factions.PurchaseEquityShares(investorCitizenId, offeringId, sharesRequested)
+end)
+
+exports("CancelPublicOffering", function(actorCitizenId, offeringId, reason)
+    return Nyx.Factions.CancelPublicOffering(actorCitizenId, offeringId, reason)
+end)
+
+exports("GetPublicOfferings", function(statusFilter)
+    return Nyx.Factions.GetPublicOfferings(statusFilter)
+end)
+
+exports("GetOfferingDetails", function(offeringId)
+    return Nyx.Factions.GetOfferingDetails(offeringId)
+end)
+
+exports("GetCitizenPortfolio", function(citizenId)
+    return Nyx.Factions.GetCitizenPortfolio(citizenId)
 end)
 
 -- Commercial Fleets
