@@ -132,6 +132,9 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Industrial Refining Plants, Forestry Timber Harvesting & Functional Parts Manufacturing (`nyx_logistics`, `nyx_services` & `nyx_inventory`)**
   - **Implementation:** Heavy industrial processing and refining plants (`fac_paleto_sawmill`, `fac_elysian_foundry`, `fac_davis_textile`), finite forestry timber and raw cotton harvest nodes (`node_paleto_forest_timber`, `node_chiliad_redwood`, `node_san_chianski_cotton`), pure Lua 5.4 industrial transformation blueprints (timber milling, structural sheet metal rolling, copper wire drawing, cotton textile carding, circuit substrate resin bonding, and weapon components machining), regional electrical power grid interlocks, immutable refining audit ledger (`nyx_logistics_refining_audits`), and Third-Eye spatial interaction targets across canonical industrial facilities.
 
+- [ ] **Feature: Pre-Trial Judicial Bail Bonds, Surety Escrow & Fugitive Recovery Warrants (`nyx_judiciary`, `nyx_treasury` & `nyx_mdt`)**
+  - **Implementation:** Pre-trial release bail schedule engine (misdemeanor standard schedules vs felony judicial discretion), cash and commercial surety bond escrow (`gov:escrow:bail`), release condition monitoring, appearance verification at courtroom terminals, automated 95%/5% exoneration distributions upon verdict, 100% forfeiture to `gov:city:master` on Failure to Appear (FTA), and automated felony fugitive warrants with 15% recovery bounties.
+
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
 - **[2026-10-18] Feature: Industrial Refining Plants, Forestry Timber Harvesting & Functional Parts Manufacturing (`nyx_logistics`, `nyx_services` & `nyx_inventory`)**

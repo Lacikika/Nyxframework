@@ -62,5 +62,6 @@
   "061_hospital_bed_maintenance_and_clinical_recovery.sql",
   "062_point_of_sale_physical_stocking_and_empty_shelf_displays.sql",
   "063_pharmaceutical_refining_and_player_chemical_labs.sql",
-  "064_industrial_refining_and_functional_parts_manufacturing.sql"
+  "064_industrial_refining_and_functional_parts_manufacturing.sql",
+  "065_judicial_bail_bonds_surety_escrow_and_fugitive_recovery.sql"
 ]

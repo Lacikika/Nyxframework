@@ -1,99 +1,88 @@
-# Task Plan: Organizational Warehousing & Storage Networks (`nyx_factions`, `nyx_logistics` & `nyx_inventory`)
+# Task Plan: Pre-Trial Judicial Bail Bonds, Surety Escrow & Fugitive Recovery Warrants (`nyx_judiciary`, `nyx_treasury` & `nyx_mdt`)
 
 ## Goal
-Implement full organizational warehousing and storage networks from Tervek.md section 5.2. Enable player organizations (factions/cooperatives/enterprises) to deploy, configure, and operate secured stashes, industrial workbenches, and pallet drop zones bound to customized role-based access control (RBAC) levels within their owned or leased warehouses, commercial storefronts, and facility properties.
+Implement a complete, authoritative judicial bail bonds and pre-trial release engine. Enable the municipal judiciary and magistrate council to configure bail schedules (misdemeanor standard vs felony judicial discretion), accept cash bail and commercial surety bonds into municipal escrow (`gov:escrow:bail`), enforce release conditions, verify defendant court appearance, execute automated 95%/5% exoneration distributions upon trial conclusion, forfeit 100% on failure to appear (FTA / bail jumping), and generate automated felony fugitive arrest warrants with 15% recovery bounties.
 
 ## Architecture & Requirements
-1. **Database Migration (`060_organizational_warehousing_and_storage_networks.sql` & `index.json`)**:
-   - Table `nyx_factions_deployed_assets`:
-     - `asset_id` INT AUTO_INCREMENT PRIMARY KEY
-     - `asset_uuid` VARCHAR(64) NOT NULL UNIQUE
-     - `faction_id` VARCHAR(32) NOT NULL
-     - `facility_type` ENUM('property', 'warehouse', 'commercial_storefront') NOT NULL
-     - `facility_id` VARCHAR(64) NOT NULL
-     - `asset_type` ENUM('secured_stash', 'industrial_workbench', 'pallet_drop_zone') NOT NULL
-     - `asset_label` VARCHAR(64) NOT NULL
-     - `model_name` VARCHAR(64) NOT NULL
-     - `coords` LONGTEXT NOT NULL (JSON: `{x, y, z, h}`)
-     - `routing_bucket` INT NOT NULL DEFAULT 0
-     - `access_permission_node` VARCHAR(64) NOT NULL DEFAULT 'inventory:view'
-     - `min_rank_level` INT NOT NULL DEFAULT 1
-     - `inventory_id` VARCHAR(64) NULL
-     - `capacity_grams` INT NOT NULL DEFAULT 1000000 (1,000 kg)
-     - `slots_count` INT NOT NULL DEFAULT 60
-     - `workbench_subtype` ENUM('assembly', 'refining', 'weapons', 'medical', 'none') NOT NULL DEFAULT 'none'
-     - `pallet_max_capacity` INT NOT NULL DEFAULT 4
-     - `staged_pallets_json` LONGTEXT NULL
-     - `is_locked` TINYINT(1) NOT NULL DEFAULT 0
-     - `decommissioned` TINYINT(1) NOT NULL DEFAULT 0
-     - `deployed_by_citizen_id` VARCHAR(32) NOT NULL
-     - `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-     - `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-   - Table `nyx_factions_storage_access_audit`:
-     - `audit_id` INT AUTO_INCREMENT PRIMARY KEY
-     - `audit_uuid` VARCHAR(64) NOT NULL UNIQUE
-     - `asset_id` INT NOT NULL
-     - `faction_id` VARCHAR(32) NOT NULL
-     - `citizen_id` VARCHAR(32) NOT NULL
-     - `action` ENUM('DEPLOYED', 'ACCESSED', 'STASH_OPENED', 'WORKBENCH_USED', 'PALLET_STAGED', 'PALLET_RETRIEVED', 'ACCESS_RULE_CHANGED', 'LOCK_TOGGLED', 'DECOMMISSIONED') NOT NULL
-     - `permission_evaluated` VARCHAR(64) NOT NULL
+1. **Database Migration (`065_judicial_bail_bonds_surety_escrow_and_fugitive_recovery.sql` & `index.json`)**:
+   - Table `nyx_judiciary_bail_bonds`:
+     - `bond_id` BIGINT AUTO_INCREMENT PRIMARY KEY
+     - `bond_uuid` VARCHAR(36) NOT NULL UNIQUE
+     - `docket_id` VARCHAR(32) NOT NULL
+     - `defendant_citizen_id` VARCHAR(16) NOT NULL
+     - `poster_citizen_id` VARCHAR(16) NOT NULL
+     - `bond_type` ENUM('cash', 'surety', 'recognizance') NOT NULL DEFAULT 'cash'
+     - `bail_amount` DECIMAL(15, 2) NOT NULL
+     - `collateral_amount` DECIMAL(15, 2) NOT NULL
+     - `bondsman_fee` DECIMAL(15, 2) NOT NULL DEFAULT 0.00
+     - `clerk_admin_fee` DECIMAL(15, 2) NOT NULL DEFAULT 0.00
+     - `status` ENUM('posted', 'exonerated', 'forfeited', 'revoked') NOT NULL DEFAULT 'posted'
+     - `escrow_account_id` VARCHAR(64) NOT NULL DEFAULT 'gov:escrow:bail'
+     - `treasury_tx_uuid` VARCHAR(36) NULL
+     - `conditions` JSON NOT NULL
+     - `court_appearance_verified` TINYINT(1) NOT NULL DEFAULT 0
+     - `bounty_claimed` TINYINT(1) NOT NULL DEFAULT 0
+     - `bounty_hunter_citizen_id` VARCHAR(16) NULL
+     - `posted_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+     - `resolved_at` TIMESTAMP NULL
      - `notes` VARCHAR(255) NULL
-     - `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-   - Seed default deployment catalog and baseline fixtures.
-   - Register Step 60 in `FiveM/nyx_core/sql/migrations/index.json` and mirror to `FiveM/nyx_factions/sql/migrations/`.
+   - Table `nyx_judiciary_bail_audits`:
+     - `audit_id` BIGINT AUTO_INCREMENT PRIMARY KEY
+     - `audit_uuid` VARCHAR(36) NOT NULL UNIQUE
+     - `bond_id` BIGINT NOT NULL
+     - `docket_id` VARCHAR(32) NOT NULL
+     - `citizen_id` VARCHAR(16) NOT NULL
+     - `action` ENUM('BAIL_SCHEDULE_SET', 'BAIL_POSTED', 'CONDITIONS_UPDATED', 'APPEARANCE_CHECKED', 'BAIL_EXONERATED', 'BAIL_FORFEITED_FTA', 'FUGITIVE_WARRANT_ISSUED', 'FUGITIVE_APPREHENDED', 'BOUNTY_DISBURSED') NOT NULL
+     - `amount` DECIMAL(15, 2) NOT NULL DEFAULT 0.00
+     - `treasury_tx_uuid` VARCHAR(36) NULL
+     - `notes` VARCHAR(255) NULL
+     - `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+   - Seed municipal escrow account in `nyx_treasury_accounts`:
+     - `account_id` = 'gov:escrow:bail', `label` = 'Municipal Court Judicial Bail Escrow Pool', `balance` = 0.00, `type` = 'reserve', `signatories_required` = 1.
+   - Extend `nyx_judiciary_dockets`:
+     - `bail_schedule_amount` DECIMAL(15, 2) NOT NULL DEFAULT 0.00
+     - `bail_status` ENUM('not_set', 'eligible', 'posted', 'remand_no_bail', 'exonerated', 'forfeited') NOT NULL DEFAULT 'not_set'
+     - `bail_bond_id` BIGINT NULL
+   - Register Step 65 in `FiveM/nyx_core/sql/migrations/index.json` and mirror to `FiveM/nyx_judiciary/sql/migrations/`.
 
-2. **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_factions/shared/storage_networks.lua`)**:
-   - `Nyx.StorageNetworks.Taxonomy`: Asset types (`secured_stash`, `industrial_workbench`, `pallet_drop_zone`), subtypes, capacities, default models, fee schedules.
-   - `Nyx.StorageNetworks.EvaluateAssetAccess(asset, citizenMember)`: Granular RBAC evaluation using wildcard hierarchy (`*`, `inventory:*`, `inventory:withdraw`, `inventory:manage_stashes`), rank levels, and lock status.
-   - `Nyx.StorageNetworks.ValidateDeploymentParameters(facilityType, facilityId, assetType, subtype, coords, existingCount)`: Spatial validation, bounds checking, and facility density limits.
-   - `Nyx.StorageNetworks.EvaluatePalletStaging(dropZone, palletId, action)`: Pallet staging / retrieval logic with capacity bounds and deduplication.
-   - `Nyx.StorageNetworks.FormatAssetSummary(asset, memberCount)`: Badge formatting and ASCII summary for terminal inspection.
+2. **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_judiciary/shared/bail_bonds.lua`)**:
+   - `Nyx.BailBonds.CalculateBailSchedule(caseType, priorFailuresToAppear, offenseGravityMultiplier)`
+   - `Nyx.BailBonds.EvaluateBailEligibility(docket, defendantRecord)`
+   - `Nyx.BailBonds.CalculateBailPaymentBreakdown(bailAmount, bondType)`
+   - `Nyx.BailBonds.EvaluateCourtAppearance(bond, defendantCitizenId, checkinCoords, courtroomCoords, maxDist)`
+   - `Nyx.BailBonds.CalculateForfeitureAndBounty(bond)`
+   - `Nyx.BailBonds.ValidateReleaseConditions(conditionsList, playerInventoryItems, playerCoords, currentHour)`
+   - `Nyx.BailBonds.FormatBailBadge(status, bondType)`
 
-3. **Authoritative Server Subsystems & RPCs (`FiveM/nyx_factions/server/storage_networks.lua`)**:
-   - Startup hydration into memory `Nyx.Factions.DeployedAssets`.
-   - Dynamic inventory container registration via `exports['nyx_inventory']:RegisterContainer(...)`.
-   - RPC routes:
-     - `factions:getFacilityAssets(facilityId)`
-     - `factions:deployStorageAsset(payload)`
-     - `factions:accessStorageAsset(assetId)`
-     - `factions:updateAssetAccessRule(assetId, newPermission, minRank)`
-     - `factions:toggleAssetLock(assetId)`
-     - `factions:decommissionStorageAsset(assetId)`
-     - `factions:stagePalletInDropZone(assetId, palletId)`
-     - `factions:retrievePalletFromDropZone(assetId, palletId)`
-   - Server exports in `server/exports.lua`:
-     - `GetDeployedAsset(assetId)`
-     - `GetFacilityAssets(facilityId)`
-     - `CanCitizenAccessAsset(citizenId, assetId)`
-     - `DeployStorageAsset(factionId, assetData)`
-     - `DecommissionStorageAsset(assetId)`
+3. **Authoritative Server Subsystems & RPCs (`FiveM/nyx_judiciary/server/bail.lua`)**:
+   - In-memory hydration `Nyx.Judiciary.ActiveBailBonds`.
+   - `SetBailSchedule(docketId, judgeCitizenId, bailAmount, conditions)`
+   - `PostBail(source, docketId, bondType, guarantorCitizenId)` with double-entry treasury transfer
+   - `VerifyCourtAppearance(source, docketId)`
+   - `ExonerateBail(docketId, reason)` with 95% refund and 5% clerk fee
+   - `ForfeitBail(docketId, reason)` with 100% seizure and automatic FTA felony bench warrant
+   - `ClaimFugitiveBounty(source, bondId, fugitiveCitizenId)` with 15% bounty disbursement
+   - RPC routes & public exports in `server/exports.lua`
+   - Verdict execution hook in `server/execution.lua`
 
-4. **Client Subsystems & Spatial Interaction (`FiveM/nyx_factions/client/storage_networks.lua`)**:
-   - Spawns client-side prop entities with proper collision and freezing.
-   - Third-Eye targets (`nyx_interact`):
-     - Secured Stash: "Biztonsági Raktárláda Megnyitása" & "Láda Jogosultságok Kezelése".
-     - Industrial Workbench: "Ipari Munkapad Használata" & "Munkapad Karbantartása".
-     - Pallet Drop Zone: "Raklap Lerakása Zónába" & "Raklap Felvétele Zónából".
-   - Event listeners for real-time asset syncing across clients.
-   - Player commands: `/deployasset [stash|workbench|pallet_zone]`, `/facilityassets`.
+4. **Client Subsystems & Spatial Interaction (`FiveM/nyx_judiciary/client/bail.lua`)**:
+   - Courtroom & Jail Bail Kiosk interaction targets (`nyx_interact`).
+   - Player commands `/bailstatus`, `/checkinbail`, `/postbail`.
+   - Client exports in `client/exports.lua`.
 
-5. **Manifest Declarations**:
-   - `FiveM/nyx_factions/fxmanifest.lua`: Add `shared/storage_networks.lua`, `server/storage_networks.lua`, `client/storage_networks.lua`.
-   - `FiveM/nyx_logistics/fxmanifest.lua`: Add `@nyx_factions/shared/storage_networks.lua`.
-
-6. **In-Engine Integration Test (`FiveM/nyx_core/server/tests.lua`)**:
-   - Test 55: `Nyx.Tests.TestOrganizationalWarehousingAndStorageNetworks()`
-   - Validates taxonomy, access evaluation with wildcards and rank requirements, capacity and slots math, deployment validation, pallet staging arithmetic, lock states, and receipt generation.
+5. **In-Engine Integration Test (`FiveM/nyx_core/server/tests.lua`)**:
+   - Test 60: `Nyx.Tests.TestJudicialBailBondsSuretyEscrowAndFugitiveRecovery()`
+   - Validates bail schedule math, eligibility, cash & surety payment breakdown, court appearance verification, exoneration splits, forfeiture with fugitive warrant bounty, and presentation badge formatting.
    - Wire into `Nyx.Tests.RunAll()`.
 
-7. **Dedicated Pytest Suite (`tests/test_organizational_warehousing_and_storage_networks.py`)**:
-   - Unit tests for pure algorithms, SQL migration, manifest entries, and integration tests.
+6. **Dedicated Pytest Suite (`tests/test_judicial_bail_bonds_surety_escrow_and_fugitive_recovery.py`)**:
+   - Unit tests for pure math, migration file syntax and schema definitions, registration, and integration checks.
 
 ## Phase Plan
-- [x] Phase 1: Test-Driven Design — Create pytest test suite (`tests/test_organizational_warehousing_and_storage_networks.py`)
-- [x] Phase 2: Database Migration — Create `060_organizational_warehousing_and_storage_networks.sql`, register in `index.json`, mirror to `nyx_factions`
-- [x] Phase 3: Shared Pure Lua 5.4 Storage Networks Engine — Implement `FiveM/nyx_factions/shared/storage_networks.lua`, update manifests
-- [x] Phase 4: Authoritative Server Subsystems & RPCs — Implement `FiveM/nyx_factions/server/storage_networks.lua`, update `server/exports.lua` and `server/main.lua`
-- [x] Phase 5: Client Subsystems & Spatial Interaction — Implement `FiveM/nyx_factions/client/storage_networks.lua`, update `client/exports.lua`
-- [x] Phase 6: In-Engine Integration Test — Implement Test 55 in `FiveM/nyx_core/server/tests.lua` & wire into `RunAll()`
-- [x] Phase 7: Full Verification & Completion — Run pytest, validator.py, verify.ps1, update `AGENT_TASK.md` and `Tervek.md`
+- [ ] Phase 1: Test-Driven Design — Create pytest test suite (`tests/test_judicial_bail_bonds_surety_escrow_and_fugitive_recovery.py`)
+- [ ] Phase 2: Database Migration — Create `065_judicial_bail_bonds_surety_escrow_and_fugitive_recovery.sql`, register in `index.json`, mirror to `nyx_judiciary`
+- [ ] Phase 3: Shared Pure Lua 5.4 Bail Bonds Engine — Implement `FiveM/nyx_judiciary/shared/bail_bonds.lua`, update `fxmanifest.lua`
+- [ ] Phase 4: Authoritative Server Subsystems & RPCs — Implement `FiveM/nyx_judiciary/server/bail.lua`, update `server/exports.lua` and `server/execution.lua`
+- [ ] Phase 5: Client Subsystems & Spatial Interaction — Implement `FiveM/nyx_judiciary/client/bail.lua`, update `client/exports.lua`
+- [ ] Phase 6: In-Engine Integration Test — Implement Test 60 in `FiveM/nyx_core/server/tests.lua` & wire into `RunAll()`
+- [ ] Phase 7: Full Verification & Completion — Run pytest, validator.py, update `AGENT_TASK.md`

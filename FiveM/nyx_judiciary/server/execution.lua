@@ -206,6 +206,11 @@ function Nyx.Judiciary.ExecuteVerdict(docketId, verdictPayload, presidingJudgeCi
             docketId, ruling, restitution, fine, sentenceMonths))
     end
 
+    -- Pre-Trial Bail Exoneration: resolve any active bail bond escrow
+    if Nyx.Judiciary.ExonerateBail then
+        Nyx.Judiciary.ExonerateBail(docketId, string.format("Verdict rendered (%s); bail exonerated.", ruling))
+    end
+
     -- Conclude trial session: award juror stipends, log civic service, restore public routing bucket
     if Nyx.Judiciary.ConcludeTrial then
         Nyx.Judiciary.ConcludeTrial(docketId, ruling)
