@@ -62,6 +62,44 @@ CreateThread(function()
             local m = Nyx.Services.GetMeter(meterId)
             return { success = (m ~= nil), meter = m }
         end)
+
+        -- Query substation diagnostics telemetry
+        exports['nyx_core']:RegisterRPC("services:getDiagnostics", function(src, substationId)
+            local diag = Nyx.Services.GetSubstationDiagnostics(substationId)
+            return { success = (diag ~= nil), data = diag, error = (not diag and "SUBSTATION_NOT_FOUND" or nil) }
+        end)
+
+        -- Reset substation circuit breaker
+        exports['nyx_core']:RegisterRPC("services:resetBreaker", function(src, substationId)
+            local ok, res = Nyx.Services.ResetCircuitBreaker(src, substationId)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- Trigger substation failure simulation (admin only)
+        exports['nyx_core']:RegisterRPC("services:triggerFailure", function(src, substationId, reason)
+            local player = Nyx.GetPlayer(src)
+            if not player or not player.hasPermission or not player.hasPermission("admin") then
+                return { success = false, error = "UNAUTHORIZED" }
+            end
+            local ok, res = Nyx.Services.TriggerSubstationFailure(substationId, reason, player.citizenId)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- Restore substation grid power (admin only)
+        exports['nyx_core']:RegisterRPC("services:restoreGrid", function(src, substationId)
+            local player = Nyx.GetPlayer(src)
+            if not player or not player.hasPermission or not player.hasPermission("admin") then
+                return { success = false, error = "UNAUTHORIZED" }
+            end
+            local s = Nyx.Services.Substations[substationId]
+            if not s then return { success = false, error = "SUBSTATION_NOT_FOUND" } end
+            s.fuelLevel = 100.00
+            s.conditionHealth = 100.00
+            s.breakerTripped = false
+            s.failureReason = nil
+            evaluateSubstationState(s, false)
+            return { success = true, substationId = substationId, isBlackout = s.isBlackout }
+        end)
     end
 
     -- 3. Power Grid Consumption Tick Loop (Every 60 seconds)
@@ -98,3 +136,123 @@ RegisterNetEvent("nyx:services:server:requestGridSync", function()
     end
     TriggerClientEvent("nyx:services:client:initialGridSync", src, blackouts)
 end)
+
+-- Console / Chat Command: View Municipal Power Grid Status
+RegisterCommand("gridstatus", function(source, args)
+    local msg = "^5=== MUNICIPAL POWER GRID TELEMETRY ===^7\n"
+    for id, s in pairs(Nyx.Services.Substations) do
+        local stateStr = s.isBlackout and "^1[BLACKOUT]^7" or "^2[ONLINE]^7"
+        local breakerStr = s.breakerTripped and "^1[TRIPPED]^7" or "^2[NORMAL]^7"
+        msg = msg .. string.format("• %s (%s): %s | Fuel: %.1f%% | Condition: %.1f%% | Breaker: %s | Load: %.1f MW\n",
+            s.label, id, stateStr, s.fuelLevel, s.conditionHealth, breakerStr, s.peakLoadMw or 45.0)
+    end
+    msg = msg .. "^5=======================================^7"
+
+    if source == 0 then
+        print(msg)
+    else
+        TriggerClientEvent("chat:addMessage", source, {
+            color = { 70, 180, 255 },
+            multiline = true,
+            args = { "PowerGrid", msg }
+        })
+    end
+end, false)
+
+-- Admin / Console Command: Simulate Regional Substation Blackout / Failure
+RegisterCommand("blackout", function(source, args)
+    local subId = args[1]
+    local reason = args[2] or "admin_simulation"
+
+    if source ~= 0 then
+        local player = Nyx.GetPlayer(source)
+        if not player or not player.hasPermission or not player.hasPermission("admin") then
+            TriggerClientEvent("nyx:ui:notify", source, { type = "error", title = "UNAUTHORIZED", message = "Permission denied." })
+            return
+        end
+    end
+
+    if not subId then
+        print("^3Usage: /blackout <substationId> [reason]^7")
+        return
+    end
+
+    local ok, res = Nyx.Services.TriggerSubstationFailure(subId, reason, source == 0 and "SERVER_CONSOLE" or "ADMIN")
+    if ok then
+        print(string.format("^1[Nyx:Services] Blackout triggered on substation '%s' (Reason: %s)^7", subId, reason))
+    else
+        print(string.format("^1[Nyx:Services] Failed to trigger blackout: %s^7", tostring(res)))
+    end
+end, true)
+
+-- Admin / Console Command: Restore Grid Power
+RegisterCommand("restoregrid", function(source, args)
+    local subId = args[1]
+
+    if source ~= 0 then
+        local player = Nyx.GetPlayer(source)
+        if not player or not player.hasPermission or not player.hasPermission("admin") then
+            TriggerClientEvent("nyx:ui:notify", source, { type = "error", title = "UNAUTHORIZED", message = "Permission denied." })
+            return
+        end
+    end
+
+    if not subId or subId == "all" then
+        for id, s in pairs(Nyx.Services.Substations) do
+            s.fuelLevel = 100.00
+            s.conditionHealth = 100.00
+            s.breakerTripped = false
+            s.failureReason = nil
+            evaluateSubstationState(s, false)
+        end
+        print("^2[Nyx:Services] Full municipal power grid energized and restored to 100% across all sectors!^7")
+    else
+        local s = Nyx.Services.Substations[subId]
+        if s then
+            s.fuelLevel = 100.00
+            s.conditionHealth = 100.00
+            s.breakerTripped = false
+            s.failureReason = nil
+            evaluateSubstationState(s, false)
+            print(string.format("^2[Nyx:Services] Substation '%s' restored to 100%% capacity!^7", subId))
+        else
+            print(string.format("^1[Nyx:Services] Substation '%s' not found!^7", tostring(subId)))
+        end
+    end
+end, true)
+
+-- Admin / Maintenance Command: Reset Tripped Circuit Breaker
+RegisterCommand("resetbreaker", function(source, args)
+    local subId = args[1]
+    if not subId then
+        print("^3Usage: /resetbreaker <substationId>^7")
+        return
+    end
+
+    if source == 0 then
+        local s = Nyx.Services.Substations[subId]
+        if s then
+            s.breakerTripped = false
+            s.failureReason = nil
+            evaluateSubstationState(s, false)
+            print(string.format("^2[Nyx:Services] Circuit breaker manually reset on '%s'^7", subId))
+        else
+            print("^1[Nyx:Services] Substation not found.^7")
+        end
+    else
+        local ok, res = Nyx.Services.ResetCircuitBreaker(source, subId)
+        if ok then
+            TriggerClientEvent("nyx:ui:notify", source, {
+                type = "success",
+                title = "BREAKER RESET",
+                message = "Substation circuit breaker successfully closed and energized."
+            })
+        else
+            TriggerClientEvent("nyx:ui:notify", source, {
+                type = "error",
+                title = "BREAKER RESET FAILED",
+                message = string.format("Cannot reset breaker: %s", tostring(res))
+            })
+        end
+    end
+end, false)

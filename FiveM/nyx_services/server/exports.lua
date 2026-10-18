@@ -32,6 +32,22 @@ exports("RepairSubstation", function(src, substationId)
     return Nyx.Services.RepairSubstation(src, substationId)
 end)
 
+exports("TriggerSubstationFailure", function(substationId, reason, citizenId)
+    return Nyx.Services.TriggerSubstationFailure(substationId, reason, citizenId)
+end)
+
+exports("ResetCircuitBreaker", function(src, substationId)
+    return Nyx.Services.ResetCircuitBreaker(src, substationId)
+end)
+
+exports("SimulateGridOverload", function(substationId, spikeMw)
+    return Nyx.Services.SimulateGridOverload(substationId, spikeMw)
+end)
+
+exports("GetSubstationDiagnostics", function(substationId)
+    return Nyx.Services.GetSubstationDiagnostics(substationId)
+end)
+
 -- Metered Utility Billing
 exports("RegisterUtilityMeter", function(meterId, ownerCitId, substationId, propertyType)
     return Nyx.Services.RegisterMeter(meterId, ownerCitId, substationId, propertyType)

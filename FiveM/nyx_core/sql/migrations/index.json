@@ -18,5 +18,6 @@
   "017_inventory_world_placement_rotation.sql",
   "018_inventory_drop_models.sql",
   "019_logistics_warehouses_and_shelf_matrices.sql",
-  "020_expand_player_inventory_capacity.sql"
+  "020_expand_player_inventory_capacity.sql",
+  "021_substation_failure_and_blackout_simulation.sql"
 ]

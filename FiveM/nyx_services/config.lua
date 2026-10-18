@@ -15,38 +15,70 @@ Config.PowerGrid = {
     HealthDegradationPerMinute = 0.15,    -- Wear and tear per real-time minute (0.15%)
     BlackoutFuelThreshold = 0.00,         -- Level at which substation shuts down
     BlackoutHealthThreshold = 10.00,      -- Critical wear threshold triggering grid failure
+    CriticalWarningThreshold = 20.00,     -- Warning threshold triggering emergency logistics hauling contracts
+    MaxRatedCapacityMw = 75.00,           -- Standard continuous rated transformer capacity in MegaWatts
     FuelDrumRefuelAmount = 25.00,         -- Fuel percentage restored by one industrial fuel drum
     RepairKitRestoreAmount = 30.00,       -- Generator health percentage restored by one repair kit
+    EmergencyFuelContract = {
+        Quantity = 4,
+        PayoutPerUnit = 200.00
+    },
+    EmergencyRepairContract = {
+        Quantity = 3,
+        PayoutPerUnit = 250.00
+    },
+    WeatherStressMultiplier = {
+        ['THUNDER'] = 2.50,
+        ['RAIN'] = 1.40,
+        ['FOGGY'] = 1.20
+    },
+    Blips = {
+        Sprite = 354,                     -- Lightning bolt / power grid icon
+        Scale = 0.85,
+        ColorOnline = 2,                  -- Green: normal operation
+        ColorWarning = 5,                 -- Yellow: low fuel / critical health
+        ColorBlackout = 1                 -- Red: failed / blackout
+    },
     Substations = {
         ['grid_central_ls'] = {
             label = "Central Los Santos Metro Substation",
             coords = vector3(711.5, -963.2, 30.4),
             radius = 1600.0,
-            maintenancePoint = vector3(711.5, -963.2, 30.4)
+            maintenancePoint = vector3(711.5, -963.2, 30.4),
+            transformerCoords = vector3(714.2, -960.5, 30.5),
+            connectedDistricts = "Downtown, Pillbox Hill, Legion Square, Vinewood"
         },
         ['grid_port_ls'] = {
             label = "Port of Los Santos & Cypress Industrial Grid",
             coords = vector3(1072.0, -2006.0, 31.5),
             radius = 1800.0,
-            maintenancePoint = vector3(1072.0, -2006.0, 31.5)
+            maintenancePoint = vector3(1072.0, -2006.0, 31.5),
+            transformerCoords = vector3(1075.1, -2003.8, 31.5),
+            connectedDistricts = "Port of Los Santos, Terminal, Cypress Flats, Elysian Island"
         },
         ['grid_rockford'] = {
             label = "Rockford Hills & Del Perro Power Station",
             coords = vector3(-1440.0, -250.0, 48.0),
             radius = 2000.0,
-            maintenancePoint = vector3(-1440.0, -250.0, 48.0)
+            maintenancePoint = vector3(-1440.0, -250.0, 48.0),
+            transformerCoords = vector3(-1438.2, -247.1, 48.2),
+            connectedDistricts = "Rockford Hills, Del Perro, Richman, Morningwood"
         },
         ['grid_sandy_shores'] = {
             label = "Grand Senora Desert Substation",
             coords = vector3(2732.0, 1572.0, 24.5),
             radius = 2500.0,
-            maintenancePoint = vector3(2732.0, 1572.0, 24.5)
+            maintenancePoint = vector3(2732.0, 1572.0, 24.5),
+            transformerCoords = vector3(2735.0, 1575.2, 24.6),
+            connectedDistricts = "Sandy Shores, Grapeseed, Grand Senora Desert, Harmony"
         },
         ['grid_paleto'] = {
             label = "Paleto Bay & Mount Chiliad Regional Generator",
             coords = vector3(140.0, 6600.0, 31.8),
             radius = 2200.0,
-            maintenancePoint = vector3(140.0, 6600.0, 31.8)
+            maintenancePoint = vector3(140.0, 6600.0, 31.8),
+            transformerCoords = vector3(142.5, 6602.8, 32.0),
+            connectedDistricts = "Paleto Bay, Mount Chiliad, Procopio Beach, North Chumash"
         }
     }
 }

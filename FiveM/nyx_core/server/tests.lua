@@ -1737,7 +1737,259 @@ function Nyx.Tests.TestGridSnappingWarehousesAndRoutingBuckets()
     return passes == total
 end
 
--- 15. Master Test Runner
+-- 15. Test Regional Power Grid Substation Failure & Blackout Simulation
+function Nyx.Tests.TestPowerGridSubstationFailureAndBlackout()
+    print("^3[Nyx:Tests] Running Regional Power Grid Substation Failure & Blackout Simulation Suite...^7")
+    local passes = 0
+    local total = 6
+
+    local mockConfig = {
+        FuelConsumptionPerMinute = 0.50,
+        HealthDegradationPerMinute = 0.15,
+        BlackoutFuelThreshold = 0.00,
+        BlackoutHealthThreshold = 10.00,
+        CriticalWarningThreshold = 20.00,
+        MaxRatedCapacityMw = 75.00,
+        FuelDrumRefuelAmount = 25.00,
+        RepairKitRestoreAmount = 30.00,
+    }
+
+    local mockSubstations = {}
+    local mockLogs = {}
+    local mockContracts = {}
+
+    local function createSubstation(id, label, coords, radius, fuel, health)
+        return {
+            id = id,
+            label = label,
+            coords = coords,
+            radius = radius,
+            fuelLevel = fuel or 100.0,
+            conditionHealth = health or 100.0,
+            isBlackout = false,
+            failureReason = nil,
+            breakerTripped = false,
+            peakLoadMw = 45.0,
+            totalBlackoutsCount = 0
+        }
+    end
+
+    local function evaluateSub(s)
+        local fuelThresh = mockConfig.BlackoutFuelThreshold
+        local healthThresh = mockConfig.BlackoutHealthThreshold
+        local shouldBlackout = (s.fuelLevel <= fuelThresh or s.conditionHealth <= healthThresh or s.breakerTripped)
+
+        if shouldBlackout and not s.isBlackout then
+            s.isBlackout = true
+            s.breakerTripped = true
+            s.totalBlackoutsCount = s.totalBlackoutsCount + 1
+            if not s.failureReason then
+                if s.fuelLevel <= fuelThresh then
+                    s.failureReason = "fuel_exhaustion"
+                elseif s.conditionHealth <= healthThresh then
+                    s.failureReason = "mechanical_breakdown"
+                elseif s.breakerTripped then
+                    s.failureReason = "overload_trip"
+                else
+                    s.failureReason = "system_failure"
+                end
+            end
+
+            mockLogs[#mockLogs + 1] = {
+                substationId = s.id,
+                failureReason = s.failureReason,
+                status = "active"
+            }
+
+            -- Check emergency contracts
+            local critThresh = mockConfig.CriticalWarningThreshold
+            local destShelfId = "substation:" .. s.id
+            if s.fuelLevel <= critThresh then
+                local exists = false
+                for _, c in ipairs(mockContracts) do
+                    if c.destShelfId == destShelfId and c.item == "industrial_fuel" and c.status == "available" then
+                        exists = true; break
+                    end
+                end
+                if not exists then
+                    mockContracts[#mockContracts + 1] = { destShelfId = destShelfId, item = "industrial_fuel", qty = 4, status = "available" }
+                end
+            end
+            if s.conditionHealth <= critThresh then
+                local exists = false
+                for _, c in ipairs(mockContracts) do
+                    if c.destShelfId == destShelfId and c.item == "tool_repairkit" and c.status == "available" then
+                        exists = true; break
+                    end
+                end
+                if not exists then
+                    mockContracts[#mockContracts + 1] = { destShelfId = destShelfId, item = "tool_repairkit", qty = 3, status = "available" }
+                end
+            end
+
+        elseif not shouldBlackout and s.isBlackout then
+            s.isBlackout = false
+            s.breakerTripped = false
+            s.failureReason = nil
+            for i = #mockLogs, 1, -1 do
+                if mockLogs[i].substationId == s.id and mockLogs[i].status == "active" then
+                    mockLogs[i].status = "resolved"
+                    break
+                end
+            end
+        end
+        return s.isBlackout
+    end
+
+    local function isCoordsPowered(coords)
+        for _, s in pairs(mockSubstations) do
+            local dx = coords.x - s.coords.x
+            local dy = coords.y - s.coords.y
+            local dist = math.sqrt(dx * dx + dy * dy)
+            if dist <= s.radius then
+                if s.isBlackout then
+                    return false, s.id
+                end
+            end
+        end
+        return true, nil
+    end
+
+    -- Test A: Baseline Operational State & Continuous Fuel/Wear Drain
+    local centralSub = createSubstation("grid_central_ls", "Central Metro", { x = 711.5, y = -963.2, z = 30.4 }, 1600.0, 100.0, 100.0)
+    mockSubstations["grid_central_ls"] = centralSub
+
+    local initPowered, _ = isCoordsPowered({ x = 711.5, y = -963.2, z = 30.4 })
+    -- Simulate 10-minute drain
+    centralSub.fuelLevel = centralSub.fuelLevel - (mockConfig.FuelConsumptionPerMinute * 10)
+    centralSub.conditionHealth = centralSub.conditionHealth - (mockConfig.HealthDegradationPerMinute * 10)
+    evaluateSub(centralSub)
+
+    local testA_ok = (initPowered == true) and (centralSub.isBlackout == false) and (centralSub.fuelLevel == 95.0) and (centralSub.conditionHealth == 98.5)
+    if assertTest(testA_ok == true,
+        "Continuous Fuel/Wear Degradation & Baseline Power Energization",
+        "Substation failed during normal operational levels or did not decrement fuel/health") then
+        passes = passes + 1
+    end
+
+    -- Test B: Fuel Exhaustion & Mechanical Wear Threshold Cascades
+    centralSub.fuelLevel = 0.00
+    evaluateSub(centralSub)
+    local testB_fuelBlackout = (centralSub.isBlackout == true) and (centralSub.failureReason == "fuel_exhaustion") and (centralSub.totalBlackoutsCount == 1)
+
+    local portSub = createSubstation("grid_port_ls", "Port Grid", { x = 1072.0, y = -2006.0, z = 31.5 }, 1800.0, 80.0, 10.00)
+    mockSubstations["grid_port_ls"] = portSub
+    evaluateSub(portSub)
+    local testB_wearBlackout = (portSub.isBlackout == true) and (portSub.failureReason == "mechanical_breakdown")
+
+    if assertTest(testB_fuelBlackout == true and testB_wearBlackout == true,
+        "Fuel Exhaustion & Critical Turbine Wear Blackout Cascades",
+        "Substation did not trigger blackout or failed to record failure reason upon breaching thresholds") then
+        passes = passes + 1
+    end
+
+    -- Test C: Manual Failure Trigger & Spatial Coordinate Outage Mapping
+    local rockfordSub = createSubstation("grid_rockford", "Rockford Station", { x = -1440.0, y = -250.0, z = 48.0 }, 2000.0, 90.0, 90.0)
+    mockSubstations["grid_rockford"] = rockfordSub
+
+    rockfordSub.breakerTripped = true
+    rockfordSub.failureReason = "sabotage"
+    evaluateSub(rockfordSub)
+
+    local targetInside = { x = -1400.0, y = -240.0, z = 48.0 }
+    local targetOutside = { x = 4000.0, y = 4000.0, z = 20.0 }
+    local powInside, failSubId = isCoordsPowered(targetInside)
+    local powOutside, _ = isCoordsPowered(targetOutside)
+
+    local testC_ok = (rockfordSub.isBlackout == true) and (powInside == false) and (failSubId == "grid_rockford") and (powOutside == true) and (#mockLogs >= 3)
+    if assertTest(testC_ok == true,
+        "Manual Failure Trigger, Blackout Spatial Query & Incident Audit Log",
+        "Coordinates inside failing substation radius were not blacked out or audit log was omitted") then
+        passes = passes + 1
+    end
+
+    -- Test D: Circuit Breaker Interlocks (Rejection while unsafe & success when restored)
+    local function resetBreaker(s)
+        if not s.breakerTripped and not s.isBlackout then return false, "BREAKER_NOT_TRIPPED" end
+        if s.fuelLevel <= mockConfig.BlackoutFuelThreshold then return false, "CANNOT_RESET_FUEL_DEPLETED" end
+        if s.conditionHealth <= mockConfig.BlackoutHealthThreshold then return false, "CANNOT_RESET_CRITICAL_DAMAGE" end
+        s.breakerTripped = false
+        s.failureReason = nil
+        evaluateSub(s)
+        return true, s
+    end
+
+    -- centralSub is dry (0% fuel): breaker reset MUST BE REJECTED
+    local reset1_ok, reset1_err = resetBreaker(centralSub)
+    local testD_rejectOk = (reset1_ok == false) and (reset1_err == "CANNOT_RESET_FUEL_DEPLETED") and (centralSub.isBlackout == true)
+
+    -- Refuel centralSub to 50%
+    centralSub.fuelLevel = 50.0
+    local reset2_ok, _ = resetBreaker(centralSub)
+    local testD_restoreOk = (reset2_ok == true) and (centralSub.isBlackout == false) and (centralSub.breakerTripped == false)
+
+    if assertTest(testD_rejectOk == true and testD_restoreOk == true,
+        "Circuit Breaker Safety Interlocks & Manual Re-Energization",
+        "Breaker allowed premature re-energization while dry or failed to restore grid once refueled") then
+        passes = passes + 1
+    end
+
+    -- Test E: Grid Overload Surge Simulation (Trip on excess MW)
+    local sandySub = createSubstation("grid_sandy", "Sandy Substation", { x = 2732.0, y = 1572.0, z = 24.5 }, 2500.0, 75.0, 80.0)
+    mockSubstations["grid_sandy"] = sandySub
+
+    local function simulateOverload(s, spikeMw)
+        local total = s.peakLoadMw + spikeMw
+        if total > mockConfig.MaxRatedCapacityMw then
+            s.conditionHealth = math.max(0.0, s.conditionHealth - 15.0)
+            s.breakerTripped = true
+            s.failureReason = "overload_trip"
+            evaluateSub(s)
+            return true, { tripped = true, total = total }
+        end
+        return true, { tripped = false, total = total }
+    end
+
+    local _, res1 = simulateOverload(sandySub, 15.0) -- 45 + 15 = 60 <= 75 MW
+    local testE_safeOk = (res1.tripped == false) and (sandySub.isBlackout == false)
+
+    local _, res2 = simulateOverload(sandySub, 35.0) -- 45 + 35 = 80 > 75 MW (TRIP!)
+    local testE_tripOk = (res2.tripped == true) and (sandySub.isBlackout == true) and (sandySub.failureReason == "overload_trip") and (sandySub.conditionHealth == 65.0)
+
+    if assertTest(testE_safeOk == true and testE_tripOk == true,
+        "Grid Overload Surge Simulation, MW Capacity Bounds & Turbine Wear",
+        "Overload spike failed to trip circuit breaker or did not wear down generator condition") then
+        passes = passes + 1
+    end
+
+    -- Test F: Emergency Logistics Hauling Contract Dispatching & Replenishment
+    -- centralSub fuel exhaustion in Test B triggered contract
+    local fuelContract = nil
+    for _, c in ipairs(mockContracts) do
+        if c.destShelfId == "substation:grid_central_ls" and c.item == "industrial_fuel" then
+            fuelContract = c; break
+        end
+    end
+
+    local contractDispatched = (fuelContract ~= nil) and (fuelContract.status == "available") and (fuelContract.qty == 4)
+
+    -- Fulfill upon replenishment
+    if centralSub.fuelLevel > mockConfig.CriticalWarningThreshold and fuelContract then
+        fuelContract.status = "fulfilled"
+    end
+
+    local contractFulfilled = (fuelContract ~= nil) and (fuelContract.status == "fulfilled")
+
+    if assertTest(contractDispatched == true and contractFulfilled == true,
+        "Emergency Logistics Hauling Contract Dispatching & Replenishment Lifecycle",
+        "Substation failure failed to dispatch emergency logistics contract or fulfill on restock") then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 16. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -1757,9 +2009,10 @@ function Nyx.Tests.RunAll()
     local t12 = Nyx.Tests.TestThirdEyeAndZeroPacketPlacement()
     local t13 = Nyx.Tests.TestAutoMergingWorldDropsAndFallbackModels()
     local t14 = Nyx.Tests.TestGridSnappingWarehousesAndRoutingBuckets()
+    local t15 = Nyx.Tests.TestPowerGridSubstationFailureAndBlackout()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

@@ -2,7 +2,7 @@
     Nyxframework: nyx_services
     File: client/blackout.lua
     Description: Localized blackout renderer, artificial street lighting controller,
-                 and disabled ATM terminal interception.
+                 spark/explosion audiovisual cues, and disabled terminal interception.
 ]]
 
 local ActiveBlackouts = {}
@@ -18,30 +18,79 @@ RegisterNetEvent("nyx:services:client:initialGridSync", function(blackoutList)
     ActiveBlackouts = {}
     for _, b in ipairs(blackoutList or {}) do
         ActiveBlackouts[b.substationId] = {
+            substationId = b.substationId,
             coords = vector3(b.coords.x, b.coords.y, b.coords.z),
-            radius = b.radius
+            radius = b.radius,
+            reason = b.reason or "system_failure"
         }
     end
 end)
+
+-- Play localized electrical sparks and explosion sounds at failing transformer
+local function playTransformerFailureEffects(coords)
+    if not coords then return end
+    local pCoords = GetEntityCoords(PlayerPedId())
+    local dist = #(pCoords - coords)
+
+    if dist < 450.0 then
+        -- Play sound effect
+        PlaySoundFromCoord(-1, "DISTANT_EXPLOSION", coords.x, coords.y, coords.z, "DLC_HEISTS_GENERAL_FRONTEND_SOUNDS", false, 0, false)
+
+        -- Spawn electrical spark particles
+        RequestNamedPtfxAsset("core")
+        local timeout = 0
+        while not HasNamedPtfxAssetLoaded("core") and timeout < 20 do
+            Wait(50)
+            timeout = timeout + 1
+        end
+
+        if HasNamedPtfxAssetLoaded("core") then
+            UseParticleFxAssetNextCall("core")
+            StartParticleFxNonLoopedAtCoord("sparks", coords.x, coords.y, coords.z + 2.0,
+                0.0, 0.0, 0.0, 2.5, false, false, false
+            )
+        end
+    end
+end
 
 -- Real-time Blackout state change broadcaster
 RegisterNetEvent("nyx:services:client:blackoutChanged", function(data)
     if data.isBlackout then
         ActiveBlackouts[data.substationId] = {
+            substationId = data.substationId,
             coords = vector3(data.coords.x, data.coords.y, data.coords.z),
-            radius = data.radius
+            radius = data.radius,
+            reason = data.reason or "system_failure"
         }
+
+        if data.transformerCoords then
+            local tVec = vector3(data.transformerCoords.x, data.transformerCoords.y, data.transformerCoords.z)
+            playTransformerFailureEffects(tVec)
+        end
+
+        local reasonLabels = {
+            ['fuel_exhaustion'] = "Fuel Reserves Exhausted",
+            ['mechanical_breakdown'] = "Turbine Structural Failure",
+            ['overload_trip'] = "Grid Overload - Breaker Tripped",
+            ['sabotage'] = "Physical Sabotage / Breached Generator",
+            ['admin_simulation'] = "Municipal Power Outage Drill"
+        }
+        local reasonText = reasonLabels[data.reason] or (data.reason or "Power Grid Outage")
+
         TriggerEvent("nyx:ui:notify", {
             type = "error",
             title = "POWER GRID OUTAGE",
-            message = "A regional electrical substation has suffered a catastrophic failure!"
+            message = string.format("Regional substation '%s' failed! Cause: %s",
+                data.label or data.substationId, reasonText)
         })
     else
         ActiveBlackouts[data.substationId] = nil
+
         TriggerEvent("nyx:ui:notify", {
             type = "success",
             title = "POWER RESTORED",
-            message = "Regional electrical substation has been refueled and energized."
+            message = string.format("Regional substation '%s' re-energized and online.",
+                data.label or data.substationId)
         })
     end
 end)
@@ -112,7 +161,25 @@ CreateThread(function()
     end
 end)
 
--- Public getter
+-- Public getters & spatial queries
 function IsPlayerInBlackout()
     return isInBlackoutZone
+end
+
+function IsCoordsPowered(coords)
+    if not coords then return true, nil end
+    local targetVec = vector3(coords.x, coords.y, coords.z)
+
+    for subId, b in pairs(ActiveBlackouts) do
+        local dist = #(targetVec - b.coords)
+        if dist <= b.radius then
+            return false, subId
+        end
+    end
+
+    return true, nil
+end
+
+function GetActiveBlackouts()
+    return ActiveBlackouts
 end
