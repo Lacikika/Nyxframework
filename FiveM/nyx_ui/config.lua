@@ -9,10 +9,10 @@ Config = {}
 
 Config.Debug = false
 
--- HUD Sync Settings
+-- HUD Sync Settings (Strict 100ms-250ms throttled delta updates, never Wait(0))
 Config.Hud = {
     Enabled = true,
-    UpdateIntervalMs = 500,     -- Polling interval for health, armor, stamina, cash
+    UpdateIntervalMs = 150,     -- Delta-throttled polling interval (100ms-250ms)
     HideInPauseMenu = true,
     ShowStamina = true,
     ShowOxygen = true

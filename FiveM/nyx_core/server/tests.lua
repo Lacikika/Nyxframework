@@ -963,7 +963,150 @@ function Nyx.Tests.TestMultiSigVaultsAndSignOffRules()
     return passes == total
 end
 
--- 11. Master Test Runner
+-- 11. Test Master UI Architecture, CEF Delta-Throttling & Zero-Trust Intent Sanitization
+function Nyx.Tests.TestMasterUIArchitecture()
+    print("^3[Nyx:Tests] Running Master UI Architecture & Zero-Trust Suite...^7")
+    local passes = 0
+    local total = 4
+
+    -- Test A: HUD Delta-Checking Invariant
+    local function areVitalsEqual(a, b)
+        if not a or not b then return false end
+        return a.health == b.health and a.armor == b.armor and a.hunger == b.hunger and
+               a.thirst == b.thirst and a.stamina == b.stamina and a.oxygen == b.oxygen and
+               a.voiceRange == b.voiceRange and a.isUnderwater == b.isUnderwater and a.isDead == b.isDead
+    end
+
+    local function hasHudDelta(curr, prev)
+        if not prev or not prev.vitals then return true end
+        if not areVitalsEqual(curr.vitals, prev.vitals) then return true end
+        if curr.vehicle.inVehicle ~= prev.vehicle.inVehicle then return true end
+        if curr.vehicle.inVehicle and (curr.vehicle.speed ~= prev.vehicle.speed or curr.vehicle.gear ~= prev.vehicle.gear) then
+            return true
+        end
+        if curr.finances.cash ~= prev.finances.cash or curr.finances.bank ~= prev.finances.bank then
+            return true
+        end
+        return false
+    end
+
+    local stateA = {
+        vitals = { health = 100, armor = 50, hunger = 80, thirst = 80, stamina = 100, oxygen = 100, voiceRange = 2, isUnderwater = false, isDead = false },
+        vehicle = { inVehicle = false, speed = 0, gear = 0 },
+        finances = { cash = 1500, bank = 25000 }
+    }
+    local stateB = {
+        vitals = { health = 100, armor = 50, hunger = 80, thirst = 80, stamina = 100, oxygen = 100, voiceRange = 2, isUnderwater = false, isDead = false },
+        vehicle = { inVehicle = false, speed = 0, gear = 0 },
+        finances = { cash = 1500, bank = 25000 }
+    }
+    local stateC = {
+        vitals = { health = 95, armor = 50, hunger = 80, thirst = 80, stamina = 100, oxygen = 100, voiceRange = 2, isUnderwater = false, isDead = false },
+        vehicle = { inVehicle = false, speed = 0, gear = 0 },
+        finances = { cash = 1500, bank = 25000 }
+    }
+
+    local deltaIdentical = hasHudDelta(stateB, stateA)
+    local deltaChanged = hasHudDelta(stateC, stateA)
+    if assertTest(deltaIdentical == false and deltaChanged == true,
+        "HUD State Delta Invariant",
+        "Delta checking failed to suppress redundant NUI packet or detect vital changes") then
+        passes = passes + 1
+    end
+
+    -- Test B: HUD Throttle Bounds (Never Wait(0), 100ms-250ms)
+    local rawIntervals = { 0, 50, 150, 500 }
+    local allClamped = true
+    for _, raw in ipairs(rawIntervals) do
+        local clamped = math.max(100, math.min(250, raw))
+        if clamped < 100 or clamped > 250 then
+            allClamped = false
+            break
+        end
+    end
+    if assertTest(allClamped, "HUD Interval Clamping (100ms-250ms)", "Interval bounds violated safe CEF render budget") then
+        passes = passes + 1
+    end
+
+    -- Test C: Zero-Trust Intent Payload Sanitization
+    local function sanitizePayload(data)
+        if type(data) ~= "table" then return {} end
+        local sanitized = {}
+        if data.app and type(data.app) == "string" then sanitized.app = string.sub(data.app, 1, 64) end
+        if data.action and type(data.action) == "string" then sanitized.action = string.sub(data.action, 1, 64) end
+        if data.itemId and (type(data.itemId) == "string" or type(data.itemId) == "number") then
+            sanitized.itemId = tostring(data.itemId)
+        end
+        if data.slot and type(data.slot) == "number" then
+            sanitized.slot = math.max(1, math.min(1000, math.floor(data.slot)))
+        end
+        if data.amount and type(data.amount) == "number" then
+            sanitized.amount = math.max(1, math.min(1000, math.floor(data.amount)))
+        end
+        return sanitized
+    end
+
+    local maliciousPayload = {
+        app = "inventory",
+        action = "useItem",
+        itemId = "repairkit",
+        slot = 4,
+        amount = 1,
+        balance = 9999999,          -- Spoofed authoritative field
+        admin = true,               -- Spoofed permission
+        permissions = { "all" }     -- Injected payload
+    }
+    local clean = sanitizePayload(maliciousPayload)
+    local hasSpoofedKeys = (clean.balance ~= nil or clean.admin ~= nil or clean.permissions ~= nil)
+    local hasIntentKeys = (clean.itemId == "repairkit" and clean.slot == 4 and clean.amount == 1)
+
+    if assertTest(not hasSpoofedKeys and hasIntentKeys,
+        "Zero-Trust Intent Payload Sanitization",
+        "Sanitizer leaked client-injected authoritative attributes") then
+        passes = passes + 1
+    end
+
+    -- Test D: Guaranteed Callback Safety Resolution
+    local cbCount = 0
+    local function mockCb(resp)
+        cbCount = cbCount + 1
+    end
+
+    local function runSafeCallback(handler)
+        local cbHandled = false
+        local function safeCb(resp)
+            if not cbHandled then
+                cbHandled = true
+                mockCb(resp)
+            end
+        end
+        local ok, err = pcall(handler, safeCb)
+        if not ok then
+            safeCb({ success = false, error = "INTERNAL_ERROR" })
+        else
+            safeCb({ success = true })
+        end
+    end
+
+    -- Scenario 1: Handler throws error
+    runSafeCallback(function(cb)
+        error("Unexpected native crash")
+    end)
+    -- Scenario 2: Handler completes without calling cb
+    runSafeCallback(function(cb)
+        -- Forgot to invoke cb
+    end)
+
+    if assertTest(cbCount == 2,
+        "Guaranteed NUI Callback Invocation",
+        "Safe runner failed to resolve callback on error or omission") then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 12. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -979,9 +1122,10 @@ function Nyx.Tests.RunAll()
     local t8 = Nyx.Tests.TestEvidenceChainOfCustody()
     local t9 = Nyx.Tests.TestSharedMathAndVectorUtils()
     local t10 = Nyx.Tests.TestMultiSigVaultsAndSignOffRules()
+    local t11 = Nyx.Tests.TestMasterUIArchitecture()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

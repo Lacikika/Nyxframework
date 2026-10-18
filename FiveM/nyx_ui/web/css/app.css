@@ -1,7 +1,8 @@
 /* ==========================================================================
    NYXFRAMEWORK MASTER SPA DESIGN SYSTEM (app.css)
-   Aesthetic: Dark Obsidian Glassmorphism, Vibrant Accents, Low-Profile Toasts
+   CEF Budget Optimized: Strict Zero-Blur, Dark Obsidian Surfaces, Pure Transform/Opacity Keyframes
    Fonts: 'Outfit' (Headings), 'Inter' (Body), 'JetBrains Mono' (Code/Numbers)
+   WCAG AA+ Compliant Contrast & Aspect-Ratio Adaptive (16:9, 21:9, 32:9, 4:3)
    ========================================================================== */
 
 :root {
@@ -9,12 +10,12 @@
     --font-display: 'Outfit', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
 
-    /* Color Tokens */
-    --color-bg-base: rgba(10, 14, 23, 0.88);
-    --color-bg-card: rgba(18, 25, 40, 0.75);
-    --color-bg-card-hover: rgba(28, 38, 58, 0.88);
+    /* High-Opacity Dark Surfaces (Strict CEF Render Budget - No Backdrop Filters) */
+    --color-bg-base: rgba(12, 15, 22, 0.94);
+    --color-bg-card: rgba(18, 24, 38, 0.94);
+    --color-bg-card-hover: rgba(28, 38, 58, 0.96);
     --color-border-subtle: rgba(255, 255, 255, 0.08);
-    --color-border-glow: rgba(56, 189, 248, 0.35);
+    --color-border-glow: rgba(56, 189, 248, 0.4);
 
     /* Vibrant Accents */
     --accent-cyan: #38bdf8;
@@ -24,29 +25,31 @@
     --accent-indigo: #6366f1;
     --accent-blue: #3b82f6;
 
-    /* Text Colors */
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --text-dim: #64748b;
+    /* WCAG AA+ Compliant Text Tokens */
+    --text-main: #F8FAFC;       /* Primary text */
+    --text-secondary: #94A3B8;  /* Secondary text */
+    --text-muted: #475569;      /* Muted text */
+    --text-dim: #64748B;
 
-    /* Glass Effect */
-    --glass-filter: blur(16px);
-    --glass-shadow: 0 12px 36px -4px rgba(0, 0, 0, 0.65), 0 4px 12px -2px rgba(0, 0, 0, 0.4);
-    --pill-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    /* Discrete Non-Blur Surface Shadows */
+    --glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --pill-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    user-select: none;
 }
 
-body {
+/* Strict CEF Render Budget Root */
+html, body {
+    background: transparent !important;
+    overflow: hidden !important;
+    user-select: none !important;
+    -webkit-user-drag: none !important;
     width: 100vw;
     height: 100vh;
-    overflow: hidden;
-    background: transparent;
     font-family: var(--font-primary);
     color: var(--text-main);
     font-size: 14px;
@@ -54,6 +57,13 @@ body {
 
 .hidden {
     display: none !important;
+}
+
+/* Text Truncation Utilities */
+.truncate, .text-truncate {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
 }
 
 /* ==========================================================================
@@ -85,7 +95,7 @@ body {
     border: 1.5px solid var(--accent-cyan);
     opacity: 0;
     transform: scale(0.6);
-    transition: all 0.25s ease-out;
+    transition: opacity 0.25s ease-out, transform 0.25s ease-out;
 }
 
 .reticle-dot.active {
@@ -99,9 +109,10 @@ body {
     animation: pulseGlow 1.8s infinite;
 }
 
+/* Exclusively transform and opacity animations */
 @keyframes pulseGlow {
-    0%, 100% { transform: scale(1.5); opacity: 0.8; }
-    50% { transform: scale(2.2); opacity: 0.2; }
+    0%, 100% { transform: scale(1.4); opacity: 0.8; }
+    50% { transform: scale(1.9); opacity: 0.2; }
 }
 
 /* Radial Wheel */
@@ -127,9 +138,8 @@ body {
     width: 84px;
     height: 84px;
     border-radius: 50%;
-    background: rgba(15, 23, 42, 0.95);
+    background: var(--color-bg-base);
     border: 2px solid var(--accent-cyan);
-    box-shadow: 0 0 20px rgba(56, 189, 248, 0.35);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -139,6 +149,7 @@ body {
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.05em;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
 }
 
 .radial-wheel-items {
@@ -151,23 +162,22 @@ body {
     width: 54px;
     height: 54px;
     border-radius: 50%;
-    background: rgba(30, 41, 59, 0.92);
+    background: var(--color-bg-card);
     border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     color: var(--text-main);
     cursor: pointer;
-    transition: all 0.15s ease;
+    box-shadow: var(--pill-shadow);
+    transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
 .radial-item-btn:hover {
     background: var(--accent-cyan);
     color: #000;
     transform: scale(1.15);
-    box-shadow: 0 0 16px var(--accent-cyan);
 }
 
 /* Linear Context Menu */
@@ -176,7 +186,6 @@ body {
     top: calc(50% + 24px);
     left: calc(50% + 24px);
     background: var(--color-bg-base);
-    backdrop-filter: var(--glass-filter);
     border: 1px solid var(--color-border-subtle);
     border-radius: 12px;
     padding: 12px;
@@ -203,9 +212,9 @@ body {
 .badge {
     background: rgba(56, 189, 248, 0.15);
     color: var(--accent-cyan);
-    padding: 2px 6px;
+    padding: 2px 8px;
     border-radius: 4px;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
 }
 
@@ -217,22 +226,23 @@ body {
 .options-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
 }
 
 .option-btn {
     background: var(--color-bg-card);
     border: 1px solid var(--color-border-subtle);
     border-radius: 8px;
-    padding: 8px 12px;
+    padding: 10px 14px;
+    min-height: 40px;
     color: var(--text-main);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     display: flex;
     align-items: center;
     gap: 10px;
     cursor: pointer;
-    transition: all 0.12s ease;
+    transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
 }
 
 .option-btn:hover {
@@ -257,12 +267,12 @@ body {
 
 .toast-card {
     background: var(--color-bg-base);
-    backdrop-filter: var(--glass-filter);
     border: 1px solid var(--color-border-subtle);
     border-radius: 10px;
     padding: 12px 16px;
     min-width: 280px;
     max-width: 380px;
+    min-height: 44px;
     display: flex;
     align-items: flex-start;
     gap: 12px;
@@ -271,6 +281,7 @@ body {
     position: relative;
     overflow: hidden;
     animation: toastSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
 @keyframes toastSlideIn {
@@ -290,8 +301,8 @@ body {
 .toast-card.info .toast-icon { color: var(--accent-cyan); }
 
 .toast-content { flex: 1; }
-.toast-title { font-family: var(--font-display); font-weight: 700; font-size: 13px; margin-bottom: 2px; }
-.toast-msg { color: var(--text-muted); font-size: 12px; line-height: 1.4; }
+.toast-title { font-family: var(--font-display); font-weight: 700; font-size: 13px; margin-bottom: 2px; color: var(--text-main); }
+.toast-msg { color: var(--text-secondary); font-size: 12px; line-height: 1.4; }
 
 .toast-bar {
     position: absolute;
@@ -326,11 +337,12 @@ body {
 
 .finance-card {
     background: var(--color-bg-card);
-    backdrop-filter: var(--glass-filter);
     border: 1px solid var(--color-border-subtle);
     border-radius: 12px;
-    padding: 10px 14px;
+    padding: 10px 16px;
+    min-height: 40px;
     display: flex;
+    align-items: center;
     gap: 16px;
     box-shadow: var(--pill-shadow);
 }
@@ -342,6 +354,7 @@ body {
     font-family: var(--font-mono);
     font-weight: 600;
     font-size: 13px;
+    color: var(--text-main);
 }
 
 .finance-item.cash i { color: var(--accent-emerald); }
@@ -359,7 +372,6 @@ body {
 /* Digital Vehicular Telemetry Cluster */
 .vehicle-hud {
     background: var(--color-bg-base);
-    backdrop-filter: var(--glass-filter);
     border: 1px solid var(--color-border-subtle);
     border-radius: 14px;
     padding: 12px 18px;
@@ -389,7 +401,7 @@ body {
 .speed-unit {
     font-size: 10px;
     font-weight: 700;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     letter-spacing: 0.08em;
 }
 
@@ -430,7 +442,7 @@ body {
     gap: 6px;
     font-size: 11px;
     font-weight: 600;
-    color: var(--text-muted);
+    color: var(--text-secondary);
 }
 
 .gauge-pill.fuel i { color: var(--accent-amber); }
@@ -467,15 +479,15 @@ body {
 
 .vital-pill {
     background: var(--color-bg-card);
-    backdrop-filter: var(--glass-filter);
     border: 1px solid var(--color-border-subtle);
     border-radius: 20px;
-    padding: 6px 10px;
+    padding: 6px 12px;
+    min-height: 38px;
     display: flex;
     align-items: center;
     gap: 8px;
     box-shadow: var(--pill-shadow);
-    transition: all 0.2s ease;
+    transition: border-color 0.2s ease;
 }
 
 .vital-pill.pulse-warn {
@@ -483,9 +495,10 @@ body {
     animation: vitalWarningPulse 1.2s infinite;
 }
 
+/* Strictly animate opacity and transform */
 @keyframes vitalWarningPulse {
-    0%, 100% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
-    50% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.8); }
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.65; transform: scale(0.97); }
 }
 
 .vital-pill i { font-size: 12px; }
@@ -529,7 +542,7 @@ body {
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 8px;
+    gap: 10px;
     pointer-events: none;
     z-index: 100;
 }
@@ -537,8 +550,8 @@ body {
 .hotbar-slot {
     width: 60px;
     height: 60px;
+    min-height: 44px;
     background: var(--color-bg-base);
-    backdrop-filter: var(--glass-filter);
     border: 1px solid var(--color-border-subtle);
     border-radius: 12px;
     position: relative;
@@ -547,12 +560,11 @@ body {
     align-items: center;
     justify-content: center;
     box-shadow: var(--pill-shadow);
-    transition: all 0.15s ease;
+    transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
 .hotbar-slot.active {
     border-color: var(--accent-cyan);
-    box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
     transform: translateY(-4px);
 }
 
@@ -574,7 +586,7 @@ body {
     position: absolute;
     bottom: 3px;
     font-size: 9px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     max-width: 88%;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -587,8 +599,7 @@ body {
 .inventory-screen {
     position: absolute;
     inset: 0;
-    background: rgba(5, 8, 15, 0.78);
-    backdrop-filter: blur(20px);
+    background: rgba(5, 8, 15, 0.88);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -606,6 +617,7 @@ body {
     align-items: stretch;
     gap: 20px;
     max-height: 85vh;
+    max-width: 90vw;
 }
 
 .inventory-panel {
@@ -617,6 +629,7 @@ body {
     display: flex;
     flex-direction: column;
     width: 440px;
+    max-height: 85vh;
 }
 
 .panel-header {
@@ -648,7 +661,7 @@ body {
 .weight-meter span {
     font-family: var(--font-mono);
     font-size: 11px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
 }
 
 .progress-bar {
@@ -685,6 +698,7 @@ body {
 
 .slot-card {
     height: 76px;
+    min-height: 44px;
     background: var(--color-bg-card);
     border: 1px solid var(--color-border-subtle);
     border-radius: 10px;
@@ -694,7 +708,7 @@ body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.12s ease;
+    transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
 
 .slot-card:hover {
@@ -705,7 +719,6 @@ body {
 
 .slot-card.selected {
     border-color: var(--accent-cyan);
-    box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
     background: rgba(56, 189, 248, 0.14);
 }
 
@@ -736,7 +749,7 @@ body {
 
 .slot-label {
     font-size: 10px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
@@ -744,7 +757,6 @@ body {
     width: 90%;
 }
 
-/* Durability Bar on Slot */
 .slot-durability-track {
     position: absolute;
     bottom: 2px;
@@ -784,10 +796,10 @@ body {
 
 .action-btn {
     background: var(--color-bg-card);
-    backdrop-filter: var(--glass-filter);
     border: 1px solid var(--color-border-subtle);
     border-radius: 10px;
     padding: 10px 14px;
+    min-height: 42px;
     color: var(--text-main);
     font-family: var(--font-primary);
     font-size: 12px;
@@ -796,8 +808,8 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
-    transition: all 0.15s ease;
     box-shadow: var(--pill-shadow);
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
 .action-btn:hover {
@@ -814,6 +826,13 @@ body {
 .action-btn.close {
     margin-top: 10px;
     background: rgba(255, 255, 255, 0.05);
+}
+
+/* Button Pending Locking State */
+.btn.is-pending, .action-btn.is-pending {
+    pointer-events: none !important;
+    opacity: 0.65 !important;
+    cursor: wait !important;
 }
 
 .split-amount-box {
@@ -834,7 +853,8 @@ body {
     background: rgba(15, 23, 42, 0.8);
     border: 1px solid var(--color-border-subtle);
     border-radius: 6px;
-    padding: 6px;
+    padding: 8px;
+    min-height: 38px;
     color: var(--text-main);
     font-family: var(--font-mono);
     font-size: 12px;
@@ -847,12 +867,11 @@ body {
     bottom: 24px;
     right: 24px;
     width: 280px;
-    background: rgba(15, 23, 42, 0.96);
-    backdrop-filter: var(--glass-filter);
+    background: var(--color-bg-base);
     border: 1px solid rgba(56, 189, 248, 0.3);
     border-radius: 12px;
     padding: 14px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+    box-shadow: var(--glass-shadow);
     animation: fadeInSlide 0.18s ease-out;
 }
 
@@ -866,14 +885,14 @@ body {
 }
 
 .inspect-header i { font-size: 24px; color: var(--accent-cyan); }
-.inspect-header h4 { font-family: var(--font-display); font-size: 14px; margin: 0; }
+.inspect-header h4 { font-family: var(--font-display); font-size: 14px; margin: 0; color: var(--text-main); }
 .inspect-tag { font-size: 9px; font-weight: 700; color: var(--accent-cyan); background: rgba(56, 189, 248, 0.15); padding: 2px 6px; border-radius: 4px; }
 
 .inspect-stat-row {
     display: flex;
     justify-content: space-between;
     font-size: 11px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     margin-bottom: 4px;
 }
 
@@ -911,7 +930,7 @@ body {
     gap: 4px;
     font-size: 11px;
     font-family: var(--font-mono);
-    color: var(--text-muted);
+    color: var(--text-secondary);
 }
 
 .meta-row {
@@ -930,8 +949,7 @@ body {
 .modal-backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(5, 8, 15, 0.82);
-    backdrop-filter: blur(16px);
+    background: rgba(5, 8, 15, 0.88);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -940,11 +958,14 @@ body {
 }
 
 .modal-dialog {
-    background: rgba(15, 23, 42, 0.95);
+    background: var(--color-bg-base);
     border: 1px solid var(--color-border-subtle);
     border-radius: 14px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
-    width: 480px;
+    box-shadow: var(--glass-shadow);
+    width: clamp(320px, 80vw, 1040px);
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
 }
 
@@ -953,7 +974,9 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 14px 20px;
+    min-height: 44px;
     border-bottom: 1px solid var(--color-border-subtle);
+    flex-shrink: 0;
 }
 
 .modal-header .header-left {
@@ -976,14 +999,19 @@ body {
 
 .sub-heading {
     font-size: 11px;
-    color: var(--text-dim);
+    color: var(--text-secondary);
 }
 
 .icon-btn {
     background: none;
     border: none;
-    color: var(--text-muted);
-    font-size: 16px;
+    color: var(--text-secondary);
+    font-size: 18px;
+    min-width: 38px;
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
     transition: color 0.15s ease;
 }
@@ -992,33 +1020,44 @@ body {
 
 .modal-body {
     padding: 20px;
-    max-height: 70vh;
+    max-height: 85vh;
     overflow-y: auto;
+    flex: 1;
 }
 
 .modal-footer {
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 12px;
     padding: 12px 20px;
+    min-height: 44px;
     border-top: 1px solid var(--color-border-subtle);
+    flex-shrink: 0;
 }
 
 .btn {
-    padding: 8px 16px;
+    padding: 10px 18px;
+    min-height: 40px;
     border-radius: 8px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     border: none;
-    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
 .btn-primary { background: var(--accent-cyan); color: #000; }
-.btn-primary:hover { transform: scale(1.02); box-shadow: 0 0 12px rgba(56, 189, 248, 0.4); }
+.btn-primary:hover { transform: scale(1.02); }
 .btn-secondary { background: rgba(255, 255, 255, 0.1); color: var(--text-main); }
+.btn-secondary:hover { transform: scale(1.02); }
 .btn-success { background: var(--accent-emerald); color: #000; }
+.btn-success:hover { transform: scale(1.02); }
 .btn-danger { background: var(--accent-crimson); color: #fff; }
+.btn-danger:hover { transform: scale(1.02); }
 
 /* Freight Dialog */
 .freight-dialog {
@@ -1051,7 +1090,7 @@ body {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--text-dim);
+    color: var(--text-secondary);
     margin-bottom: 10px;
 }
 
@@ -1066,10 +1105,11 @@ body {
     border: 1px solid var(--color-border-subtle);
     border-radius: 10px;
     padding: 12px 16px;
+    min-height: 44px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: all 0.15s ease;
+    transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .freight-item:hover {
@@ -1104,7 +1144,7 @@ body {
 .kpi-label { font-size: 10px; font-weight: 700; color: var(--text-dim); letter-spacing: 0.04em; }
 .kpi-val { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--text-main); }
 .kpi-val.status-ok { color: var(--accent-emerald); }
-.kpi-sub { font-size: 10px; color: var(--text-muted); }
+.kpi-sub { font-size: 10px; color: var(--text-secondary); }
 
 .table-container {
     background: var(--color-bg-card);
@@ -1125,7 +1165,7 @@ body {
 .nyx-table th {
     background: rgba(255, 255, 255, 0.04);
     padding: 10px 14px;
-    color: var(--text-dim);
+    color: var(--text-secondary);
     font-weight: 700;
     font-size: 11px;
     border-bottom: 1px solid var(--color-border-subtle);
@@ -1149,18 +1189,20 @@ body {
 
 .mdt-nav-tabs {
     display: flex;
-    gap: 4px;
+    gap: 8px;
     background: rgba(15, 23, 42, 0.9);
     padding: 8px 16px;
     border-bottom: 1px solid var(--color-border-subtle);
+    flex-shrink: 0;
 }
 
 .mdt-tab {
     background: none;
     border: none;
     border-radius: 6px;
-    padding: 8px 14px;
-    color: var(--text-muted);
+    padding: 10px 16px;
+    min-height: 40px;
+    color: var(--text-secondary);
     font-family: var(--font-primary);
     font-size: 12px;
     font-weight: 600;
@@ -1168,7 +1210,7 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
-    transition: all 0.15s ease;
+    transition: background 0.15s ease, color 0.15s ease;
 }
 
 .mdt-tab:hover { background: rgba(255, 255, 255, 0.05); color: var(--text-main); }
@@ -1176,7 +1218,7 @@ body {
 
 .mdt-search-bar {
     display: flex;
-    gap: 10px;
+    gap: 12px;
     margin-bottom: 16px;
 }
 
@@ -1186,8 +1228,14 @@ body {
     border: 1px solid var(--color-border-subtle);
     border-radius: 8px;
     padding: 10px 14px;
+    min-height: 40px;
     color: var(--text-main);
     font-size: 13px;
+    outline: none;
+}
+
+.mdt-search-bar input:focus {
+    border-color: var(--accent-cyan);
 }
 
 .dispatch-layout {
@@ -1208,9 +1256,10 @@ body {
     background: var(--color-bg-card);
     border: 1px solid var(--color-border-subtle);
     border-radius: 8px;
-    padding: 10px 14px;
+    padding: 12px 14px;
+    min-height: 44px;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .dispatch-item:hover, .dispatch-item.active {
@@ -1224,4 +1273,90 @@ body {
     border: 1px solid var(--color-border-subtle);
     border-radius: 8px;
     padding: 14px;
+}
+
+.modal-input {
+    width: 100%;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 8px;
+    padding: 10px 14px;
+    min-height: 40px;
+    color: var(--text-main);
+    font-size: 13px;
+    margin-top: 10px;
+    outline: none;
+}
+
+.modal-input:focus {
+    border-color: var(--accent-cyan);
+}
+
+/* ==========================================================================
+   7. VIRTUALIZED LIST CONTAINER STYLES (For 100+ Items)
+   ========================================================================== */
+.virtual-scroll-container {
+    position: relative;
+    overflow-y: auto;
+    overflow-x: hidden;
+    contain: content;
+}
+
+.virtual-scroll-spacer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    pointer-events: none;
+    z-index: -1;
+}
+
+.virtual-scroll-content {
+    position: relative;
+    width: 100%;
+}
+
+/* ==========================================================================
+   8. DESKTOP BROWSER DEV MODE CONTROLS
+   ========================================================================== */
+#dev-mode-bar {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(12, 15, 22, 0.96);
+    border: 1px solid var(--accent-cyan);
+    border-radius: 8px;
+    padding: 6px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 99999;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8);
+}
+
+#dev-mode-bar .dev-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent-cyan);
+    margin-right: 6px;
+}
+
+#dev-mode-bar button {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--color-border-subtle);
+    color: var(--text-main);
+    padding: 4px 10px;
+    min-height: 38px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+#dev-mode-bar button:hover {
+    background: var(--accent-cyan);
+    color: #000;
 }

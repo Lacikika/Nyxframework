@@ -9,17 +9,66 @@ Nyx.UI = Nyx.UI or {}
 Nyx.UI.Hud = {}
 
 Nyx.UI.Hud.LastPayload = {}
+Nyx.UI.Hud.WasVisible = nil
+
+local function AreVitalsEqual(a, b)
+    if not a or not b then return false end
+    return a.health == b.health and
+           a.armor == b.armor and
+           a.hunger == b.hunger and
+           a.thirst == b.thirst and
+           a.stamina == b.stamina and
+           a.oxygen == b.oxygen and
+           a.voiceRange == b.voiceRange and
+           a.isUnderwater == b.isUnderwater and
+           a.isDead == b.isDead
+end
+
+local function AreVehiclesEqual(a, b)
+    if not a or not b then return false end
+    if a.inVehicle ~= b.inVehicle then return false end
+    if not a.inVehicle then return true end
+    return a.speed == b.speed and
+           a.gear == b.gear and
+           a.fuel == b.fuel and
+           a.engineHealth == b.engineHealth and
+           math.abs((a.rpm or 0) - (b.rpm or 0)) < 0.05
+end
+
+local function AreFinancesEqual(a, b)
+    if not a or not b then return false end
+    return a.cash == b.cash and a.bank == b.bank
+end
+
+local function HasHudDelta(curr, prev)
+    if not prev or not prev.vitals then return true end
+    if not AreVitalsEqual(curr.vitals, prev.vitals) then return true end
+    if not AreVehiclesEqual(curr.vehicle, prev.vehicle) then return true end
+    if not AreFinancesEqual(curr.finances, prev.finances) then return true end
+    return false
+end
 
 CreateThread(function()
     while true do
         if not Config.Hud.Enabled then
             Wait(1000)
         else
+            -- Strict throttle: zero busy-wait, clamp polling interval to 100ms-250ms
+            local pollInterval = math.max(100, math.min(250, Config.Hud.UpdateIntervalMs or 150))
             local isPaused = IsPauseMenuActive()
+
             if isPaused and Config.Hud.HideInPauseMenu then
-                Nyx.UI.Send("hud", "SET_VISIBILITY", { visible = false })
-                Wait(500)
+                if Nyx.UI.Hud.WasVisible ~= false then
+                    Nyx.UI.Hud.WasVisible = false
+                    Nyx.UI.Send("hud", "SET_VISIBILITY", { visible = false })
+                end
+                Wait(300)
             else
+                if Nyx.UI.Hud.WasVisible == false then
+                    Nyx.UI.Hud.WasVisible = true
+                    Nyx.UI.Send("hud", "SET_VISIBILITY", { visible = true })
+                end
+
                 local playerPed = PlayerPedId()
                 local playerId = PlayerId()
 
@@ -49,8 +98,8 @@ CreateThread(function()
                     local veh = GetVehiclePedIsIn(playerPed, false)
                     speedMph = math.floor(GetEntitySpeed(veh) * 2.236936) -- m/s to mph
                     gear = GetVehicleCurrentGear(veh)
-                    rpm = GetVehicleCurrentRpm(veh)
-                    engineHealth = GetVehicleEngineHealth(veh)
+                    rpm = math.floor(GetVehicleCurrentRpm(veh) * 100) / 100 -- 2 decimal precision
+                    engineHealth = math.floor(GetVehicleEngineHealth(veh))
 
                     -- Integrate with nyx_vehicles fuel if available
                     if exports['nyx_vehicles'] and exports['nyx_vehicles'].GetActiveVehicleFuel then
@@ -98,8 +147,13 @@ CreateThread(function()
                     }
                 }
 
-                Nyx.UI.Send("hud", "UPDATE_STATUS", payload)
-                Wait(Config.Hud.UpdateIntervalMs or 500)
+                -- Enforce State Delta-Checking: only send NUI message when data changed
+                if HasHudDelta(payload, Nyx.UI.Hud.LastPayload) then
+                    Nyx.UI.Hud.LastPayload = payload
+                    Nyx.UI.Send("hud", "UPDATE_STATUS", payload)
+                end
+
+                Wait(pollInterval)
             end
         end
     end
