@@ -737,6 +737,39 @@ Nyx.Items.Registry = {
         client = {
             model = `prop_anim_cash_pile_01`
         }
+    },
+
+    -- Armored Banking & High-Value Cash Transit
+    ['armored_cash_box'] = {
+        name = 'armored_cash_box',
+        label = 'Armored High-Value Cash Box',
+        weight = 12000, -- 12 kg
+        stackable = false,
+        maxSlots = 1,
+        type = 'freight',
+        isHeavyFreight = true,
+        decayRate = 0.00,
+        description = 'Reinforced titanium-alloy cash transit box with biometric tamper seals and GPS telemetry.',
+        client = {
+            model = `prop_security_case_01`,
+            animDict = 'anim@heists@box_carry@',
+            anim = 'idle',
+            attachOffset = { x = 0.0, y = 0.45, z = -0.18 },
+            attachRot = { x = 0.0, y = 0.0, z = 0.0 }
+        }
+    },
+    ['cash_transit_manifest'] = {
+        name = 'cash_transit_manifest',
+        label = 'Cash-In-Transit Security Manifest',
+        weight = 50,
+        stackable = false,
+        maxSlots = 1,
+        type = 'document',
+        decayRate = 0.00,
+        description = 'Certified bill of lading for armored commercial cash collection and municipal vault deposit.',
+        client = {
+            model = `prop_cs_clipboard`
+        }
     }
 }
 
@@ -837,6 +870,24 @@ function Nyx.Items.CreateDefaultMetadata(name, extra)
             meta.offeringId = (type(extra) == "table" and extra.offeringId) or "offering_unicorn_ipo"
             meta.issuedAt = os.time()
             meta.certificateUuid = (type(extra) == "table" and extra.certificateUuid) or string.format("EQ-%s-%06d", string.upper(string.sub(meta.factionId, 1, 4)), math.random(100000, 999999))
+        elseif item.name == 'armored_cash_box' then
+            meta.boxUuid = (type(extra) == "table" and extra.boxUuid) or string.format("BOX-CIT-%06d", math.random(100000, 999999))
+            meta.registerId = (type(extra) == "table" and extra.registerId) or "reg_unicorn_main"
+            meta.factionId = (type(extra) == "table" and extra.factionId) or "corp_vanilla_unicorn"
+            meta.cashAmount = (type(extra) == "table" and extra.cashAmount) or 10000.00
+            meta.amount = meta.cashAmount
+            meta.sealSerial = (type(extra) == "table" and extra.sealSerial) or string.format("SEAL-CIT-%07d", math.random(1000000, 9999999))
+            meta.destinationVault = (type(extra) == "table" and extra.destinationVault) or "vault:pacific_standard"
+            meta.tamperState = (type(extra) == "table" and extra.tamperState) or "sealed"
+            meta.dispatchedAt = os.time()
+        elseif item.name == 'cash_transit_manifest' then
+            meta.manifestUuid = (type(extra) == "table" and extra.manifestUuid) or string.format("MNF-CIT-%06d", math.random(100000, 999999))
+            meta.boxUuid = (type(extra) == "table" and extra.boxUuid) or "BOX-CIT-000000"
+            meta.registerId = (type(extra) == "table" and extra.registerId) or "reg_unicorn_main"
+            meta.factionId = (type(extra) == "table" and extra.factionId) or "corp_vanilla_unicorn"
+            meta.carrierCitizenId = (type(extra) == "table" and extra.carrierCitizenId) or "CIT-AGENT"
+            meta.amount = (type(extra) == "table" and extra.amount) or 10000.00
+            meta.issuedAt = os.time()
         end
     end
 

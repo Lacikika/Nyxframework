@@ -18,7 +18,8 @@ shared_scripts {
     'shared/degradation.lua',
     '@nyx_factions/shared/laundering.lua',
     '@nyx_factions/shared/equity.lua',
-    'shared/subpoena_audit.lua'
+    'shared/subpoena_audit.lua',
+    'shared/cash_transit.lua'
 }
 
 server_scripts {
@@ -29,6 +30,7 @@ server_scripts {
     'server/taxes.lua',
     'server/payroll.lua',
     'server/subpoena_audit.lua',
+    'server/cash_transit.lua',
     'server/main.lua',
     'server/exports.lua'
 }
@@ -36,6 +38,7 @@ server_scripts {
 client_scripts {
     'client/terminals.lua',
     'client/subpoena_audit.lua',
+    'client/cash_transit.lua',
     'client/main.lua',
     'client/exports.lua'
 }

@@ -304,3 +304,12 @@ end)
 exports("UnfreezeRegister", function(registerId, judgeCitId)
     return Nyx.Laundering.UnfreezeRegister(registerId, judgeCitId)
 end)
+
+-- Armored Cash Transit Exports
+exports("CreateCashTransitBox", function(src, registerId, amount, destinationVault)
+    return Nyx.Factions.CreateCashTransitBox(src, registerId, amount, destinationVault)
+end)
+
+exports("GetRegistersNeedingTransit", function()
+    return Nyx.Factions.GetRegistersNeedingTransit()
+end)

@@ -10113,7 +10113,197 @@ function Nyx.Tests.TestCorporateEquityOfferingAndDividends()
     return passes == total
 end
 
--- 45. Master Test Runner (Suite 1 - Suite 47)
+-- 48. Armored Cash Transit & High-Value Banking Freight Suite
+function Nyx.Tests.TestArmoredCashTransitAndBankingFreight()
+    print("^3[Nyx:Tests] Running Armored Cash Transit & High-Value Banking Freight Suite...^7")
+    local passes = 0
+    local total = 8
+
+    local CashTransit = Nyx.CashTransit or {}
+
+    -- Sub-test A: Migration 053 Schema Definition & Table Contracts
+    local m53_contracts = {
+        vaults = "nyx_treasury_bank_vaults",
+        boxes = "nyx_treasury_cash_transit_boxes",
+        audits = "nyx_treasury_cash_transit_audits",
+        item_box = "armored_cash_box",
+        item_manifest = "cash_transit_manifest"
+    }
+    local testA_ok = (m53_contracts.vaults ~= nil and m53_contracts.boxes ~= nil and
+                      m53_contracts.audits ~= nil and m53_contracts.item_box == "armored_cash_box" and
+                      m53_contracts.item_manifest == "cash_transit_manifest")
+
+    if assertTest(testA_ok == true,
+        "Migration 053 Schema Contracts (Vaults, Transit Boxes, Audits & Heavy Freight Box Items)",
+        string.format("vaults=%s, boxes=%s, audits=%s, item=%s",
+            m53_contracts.vaults, m53_contracts.boxes, m53_contracts.audits, m53_contracts.item_box)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Transit Split Arithmetic & Strict Zero-Cent Conservation (Delta = 0.00)
+    local s1 = CashTransit.CalculateTransitSplit(50000.00, 1.00, 2.00)
+    local s2 = CashTransit.CalculateTransitSplit(12345.67, 1.25, 2.50)
+    local sZero = CashTransit.CalculateTransitSplit(0.00, 1.00, 2.00)
+
+    local sum1 = s1.netCorporateDeposit + s1.municipalBankFee + s1.courierPayout
+    local sum2 = s2.netCorporateDeposit + s2.municipalBankFee + s2.courierPayout
+
+    local testB_ok = (s1.grossAmount == 50000.00 and s1.municipalBankFee == 500.00 and
+                      s1.courierPayout == 1000.00 and s1.netCorporateDeposit == 48500.00 and sum1 == 50000.00) and
+                     (math.abs(sum2 - 12345.67) < 0.001) and (sZero.grossAmount == 0.00)
+
+    if assertTest(testB_ok == true,
+        "Double-Entry Transit Split Math & Exact Zero-Cent Conservation (Delta == 0.00)",
+        string.format("s1(corp=$%.2f, fee=$%.2f, courier=$%.2f, sum=$%.2f); s2(sum=$%.2f)",
+            s1.netCorporateDeposit, s1.municipalBankFee, s1.courierPayout, sum1, sum2)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Register Excess Cash Accumulation & Transit Need Evaluation
+    local regReady = {
+        register_id = "reg_unicorn_main",
+        faction_id = "corp_vanilla_unicorn",
+        clean_cash_balance = 25000.00,
+        transit_threshold = 10000.00,
+        pending_transit_box_id = nil,
+        is_active = 1,
+        is_frozen = 0
+    }
+    local regLow = {
+        register_id = "reg_carwash_01",
+        clean_cash_balance = 4500.00,
+        transit_threshold = 10000.00,
+        is_active = 1,
+        is_frozen = 0
+    }
+    local regFrozen = {
+        register_id = "reg_frozen_01",
+        clean_cash_balance = 35000.00,
+        transit_threshold = 10000.00,
+        is_active = 1,
+        is_frozen = 1
+    }
+    local regPending = {
+        register_id = "reg_pending_01",
+        clean_cash_balance = 35000.00,
+        transit_threshold = 10000.00,
+        pending_transit_box_id = "BOX-CIT-999999",
+        is_active = 1,
+        is_frozen = 0
+    }
+
+    local okReady, dataReady = CashTransit.EvaluateRegisterTransitNeed(regReady)
+    local okLow, errLow = CashTransit.EvaluateRegisterTransitNeed(regLow)
+    local okFrz, errFrz = CashTransit.EvaluateRegisterTransitNeed(regFrozen)
+    local okPnd, errPnd = CashTransit.EvaluateRegisterTransitNeed(regPending)
+
+    local testC_ok = (okReady == true and dataReady.suggestedBoxAmount == 24000.00) and
+                     (okLow == false and errLow == "BELOW_TRANSIT_THRESHOLD") and
+                     (okFrz == false and errFrz == "REGISTER_FROZEN") and
+                     (okPnd == false and errPnd == "TRANSIT_ALREADY_PENDING")
+
+    if assertTest(testC_ok == true,
+        "Register Excess Cash Threshold Evaluation, Float Floor ($1k) & Pending Lock Guard",
+        string.format("readyOk=%s (suggested=$%.2f), lowBlocked=%s, frozenBlocked=%s, pendingBlocked=%s",
+            tostring(okReady), dataReady and dataReady.suggestedBoxAmount or 0,
+            tostring(not okLow), tostring(not okFrz), tostring(not okPnd))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Armored Cash Box Creation Validation & Statutory Bounds
+    local mockReg = { is_active = 1, is_frozen = 0, clean_cash_balance = 50000.00 }
+    local okCreateVal, amtVal = CashTransit.ValidateBoxCreation(mockReg, 25000.00, "CIT-ALICE")
+    local okBelowMin, _ = CashTransit.ValidateBoxCreation(mockReg, 500.00, "CIT-ALICE")
+    local okAboveMax, _ = CashTransit.ValidateBoxCreation(mockReg, 300000.00, "CIT-ALICE")
+    local okExceedsBal, _ = CashTransit.ValidateBoxCreation(mockReg, 75000.00, "CIT-ALICE")
+    local okNoCit, _ = CashTransit.ValidateBoxCreation(mockReg, 15000.00, "")
+
+    local testD_ok = (okCreateVal == true and amtVal == 25000.00) and
+                     (okBelowMin == false) and (okAboveMax == false) and
+                     (okExceedsBal == false) and (okNoCit == false)
+
+    if assertTest(testD_ok == true,
+        "Cash Box Creation Validation, Statutory Bounds ($1k-$250k) & Liquidity Enforcement",
+        string.format("createOk=%s, belowMinBlocked=%s, aboveMaxBlocked=%s, exceedsBlocked=%s, noCitBlocked=%s",
+            tostring(okCreateVal), tostring(not okBelowMin), tostring(not okAboveMax), tostring(not okExceedsBal), tostring(not okNoCit))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Bank Vault Deposit Validation, Inactive Vault Guards & State Checks
+    local mockVault = { vault_id = "vault:pacific_standard", is_active = 1 }
+    local mockInactiveVault = { vault_id = "vault:closed", is_active = 0 }
+    local validBox = { status = "in_transit", tamper_state = "sealed", cash_amount = 25000.00 }
+    local depositedBox = { status = "deposited", tamper_state = "sealed", cash_amount = 25000.00 }
+    local breachedBox = { status = "in_transit", tamper_state = "breached", cash_amount = 25000.00 }
+
+    local okDepVal, _ = CashTransit.ValidateVaultDeposit(validBox, mockVault, "CIT-BOB")
+    local okDepInactive, _ = CashTransit.ValidateVaultDeposit(validBox, mockInactiveVault, "CIT-BOB")
+    local okDepAlready, _ = CashTransit.ValidateVaultDeposit(depositedBox, mockVault, "CIT-BOB")
+    local okDepBreached, _ = CashTransit.ValidateVaultDeposit(breachedBox, mockVault, "CIT-BOB")
+
+    local testE_ok = (okDepVal == true) and (okDepInactive == false) and
+                     (okDepAlready == false) and (okDepBreached == false)
+
+    if assertTest(testE_ok == true,
+        "Municipal Bank Vault Deposit Validation, Inactive Vault & Tamper State Guards",
+        string.format("depositOk=%s, inactiveBlocked=%s, alreadyDepBlocked=%s, breachedBlocked=%s",
+            tostring(okDepVal), tostring(not okDepInactive), tostring(not okDepAlready), tostring(not okDepBreached))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Criminal Breach Mechanics, Tool Profiles, Dye Pack Explosion & Glove Immunity
+    local okBrGrind, resGrind = CashTransit.CalculateBreachOutcome("tool_angle_grinder", 0.50, 0.50, true)
+    local okBrThermite, resThermite = CashTransit.CalculateBreachOutcome("thermite_charge", 0.90, 0.60, false)
+    local okBrUnknown, _ = CashTransit.CalculateBreachOutcome("unknown_tool", 0.50, 0.50, false)
+
+    local testF_ok = (okBrGrind == true and resGrind.success == true and resGrind.dyeTriggered == false and resGrind.fingerprintLeft == false) and
+                     (okBrThermite == true and resThermite.success == false and resThermite.dyeTriggered == true and resThermite.fingerprintLeft == true) and
+                     (okBrUnknown == false)
+
+    if assertTest(testF_ok == true,
+        "Criminal Box Breaching Math, Dye-Pack Taint Simulation & Forensic Glove Immunity",
+        string.format("grinderSuccess=%s (dye=%s, fp=%s); thermiteSuccess=%s (dye=%s, fp=%s)",
+            tostring(resGrind and resGrind.success), tostring(resGrind and resGrind.dyeTriggered), tostring(resGrind and resGrind.fingerprintLeft),
+            tostring(resThermite and resThermite.success), tostring(resThermite and resThermite.dyeTriggered), tostring(resThermite and resThermite.fingerprintLeft))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Unique Serial and UUID Generators
+    local bUuid = CashTransit.GenerateBoxUuid()
+    local sSerial = CashTransit.GenerateSealSerial()
+    local mUuid = CashTransit.GenerateManifestUuid()
+
+    local testG_ok = (type(bUuid) == "string" and bUuid:find("^BOX%-CIT%-") ~= nil) and
+                     (type(sSerial) == "string" and sSerial:find("^SEAL%-CIT%-") ~= nil) and
+                     (type(mUuid) == "string" and mUuid:find("^MNF%-CIT%-") ~= nil)
+
+    if assertTest(testG_ok == true,
+        "Unique Box UUID, Biometric Tamper Seal & Manifest Serial Generators",
+        string.format("boxUuid=%s, sealSerial=%s, manifestUuid=%s", bUuid, sSerial, mUuid)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test H: Zero-Trust Payload Sanitizers & Formatter Badges
+    local okPayVal, cleanPay = CashTransit.ValidateCreationPayload({ registerId = "reg_unicorn_main", amount = "15000.5" })
+    local okPayBad, _ = CashTransit.ValidateCreationPayload({ registerId = "", amount = -50 })
+    local badgeSealed = CashTransit.FormatBoxStatusBadge("in_transit", "sealed")
+    local badgeBreached = CashTransit.FormatBoxStatusBadge("intercepted", "breached")
+    local badgeCurr = CashTransit.FormatCurrency(25000)
+
+    local testH_ok = (okPayVal == true and cleanPay.amount == 15000.50 and okPayBad == false) and
+                     (badgeSealed:find("IN TRANSIT") ~= nil and badgeBreached:find("BREACHED") ~= nil and badgeCurr == "$25000.00")
+
+    if assertTest(testH_ok == true,
+        "Zero-Trust Payload Sanitizers, Numerical Decimal Clamping & Transit Badges",
+        string.format("payOk=%s, cleanAmt=%.2f, badgeSealed=%s, badgeCurr=%s",
+            tostring(okPayVal), cleanPay and cleanPay.amount or 0, badgeSealed, badgeCurr)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 45. Master Test Runner (Suite 1 - Suite 48)
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -10166,9 +10356,10 @@ function Nyx.Tests.RunAll()
     local t45 = Nyx.Tests.TestWeaponSerialGrindingAndAcidEtchForensics()
     local t46 = Nyx.Tests.TestCommercialMoneyLaunderingAndSubpoenaAuditing()
     local t47 = Nyx.Tests.TestCorporateEquityOfferingAndDividends()
+    local t48 = Nyx.Tests.TestArmoredCashTransitAndBankingFreight()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 and t41 and t42 and t43 and t44 and t45 and t46 and t47 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 and t41 and t42 and t43 and t44 and t45 and t46 and t47 and t48 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

@@ -99,7 +99,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Corporate Equity Public Offering & Dividend Distribution Engine (`nyx_factions` & `nyx_treasury`)**
   - **Implementation:** Enable corporations to sell `equity_shares` to outside investors for capital raising, executing automated weekly dividend payouts via double-entry treasury ledgers.
 
-- [ ] **Feature: Armored Cash Transit & High-Value Banking Freight (`nyx_factions` & `nyx_treasury`)**
+- [x] **Feature: Armored Cash Transit & High-Value Banking Freight (`nyx_factions` & `nyx_treasury`)**
   - **Implementation:** Retail store registers accumulating excess cash generate physical armored cash box items requiring secure transit to central municipal bank vaults.
 
 - [ ] **Testing: End-to-End Stress Simulation Across All 14 Resources (`nyx_core/server/tests.lua`)**
@@ -107,6 +107,41 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Armored Cash Transit & High-Value Banking Freight (`nyx_factions` & `nyx_treasury`)**
+  - **Database Migrations (`053_armored_cash_transit_and_banking_freight.sql`)**:
+    - Created migration file and registered Step 53 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Mirrored migration to `FiveM/nyx_factions/sql/migrations/` and `FiveM/nyx_treasury/sql/migrations/`.
+    - Extended `nyx_factions_commercial_registers` with `transit_threshold` (DECIMAL(15,2) default 10000.00) and `pending_transit_box_id` (VARCHAR(36) NULL).
+    - Created `nyx_treasury_bank_vaults` table (`vault_id` PK, `label`, `treasury_account_id`, `coords`, `security_level`, `deposit_fee_pct`, `courier_reward_pct`, `is_active`, `created_at`) with index on `is_active`.
+    - Created `nyx_treasury_cash_transit_boxes` table (`box_id` PK, `box_uuid` UNIQUE, `register_id`, `faction_id`, `carrier_citizen_id`, `cash_amount`, `seal_serial`, `tamper_state`, `status`, `origin_coords`, `destination_vault_id`, `dispatched_at`, `deposited_at`, `deposited_by_citizen_id`, `treasury_tx_id`, `breached_at`, `breached_by_citizen_id`, `evidence_id`, timestamps) with B-tree indexes on `register_id`, `faction_id`, `carrier_citizen_id`, `status`, and `destination_vault_id`.
+    - Created `nyx_treasury_cash_transit_audits` immutable audit ledger (`audit_id` PK, `audit_uuid` UNIQUE, `box_id`, `action`, `actor_citizen_id`, `cash_amount`, `faction_id`, `vault_id`, `notes`, `coords`, `created_at`).
+    - Seeded clearing transit pool account `pool:cash_transit:clearing` into `nyx_treasury_accounts`.
+    - Seeded canonical Municipal Bank Vaults: Pacific Standard Central Vault (`vault:pacific_standard`), Blaine County Savings Vault (`vault:blaine_county`), and Legion Square Commercial Vault (`vault:legion_square`).
+  - **Item Registry Integration (`FiveM/nyx_inventory/shared/items.lua`)**:
+    - Registered `armored_cash_box` (Armored High-Value Cash Box, 12kg, heavy freight, isHeavyFreight = true, freight type, decayRate 0.00).
+    - Registered `cash_transit_manifest` (Cash-In-Transit Security Manifest, 50g, document type, decayRate 0.00).
+    - Extended `CreateDefaultMetadata` to auto-populate `boxUuid` (`BOX-CIT-%06d`), `registerId`, `factionId`, `cashAmount`, `sealSerial` (`SEAL-CIT-%07d`), `destinationVault`, `tamperState`, `dispatchedAt` for armored cash boxes, and `manifestUuid`, `carrierCitizenId`, `issuedAt` for manifests.
+  - **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_treasury/shared/cash_transit.lua`)**:
+    - Configured statutory bounds: minimum box parcel ($1,000.00), maximum parcel ($250,000.00), till float retention floor ($1,000.00), default transit trigger threshold ($10,000.00), standard municipal bank handling fee (1.00%), and standard courier commission (2.00%).
+    - Implemented `Nyx.CashTransit.CalculateTransitSplit` strictly guaranteeing closed-loop double-entry zero-cent conservation ($\Delta = 0.00$) between corporate deposit, municipal handling fee, and courier commission payout.
+    - Implemented `Nyx.CashTransit.EvaluateRegisterTransitNeed` evaluating excess cash accumulation against statutory threshold, till float floor, active status, freeze state, and active pending transit locks.
+    - Implemented `Nyx.CashTransit.ValidateBoxCreation` enforcing register liquidity and statutory amount bounds [$1,000 - $250,000].
+    - Implemented `Nyx.CashTransit.ValidateVaultDeposit` guarding against duplicate deposits, inactive vaults, and breached box states.
+    - Implemented `Nyx.CashTransit.CalculateBreachOutcome` modeling criminal heist attempts with angle grinders, thermite charges, and crowbars, including tool durability loss, noise radii, dye-pack discharge probability, and forensic glove immunity.
+    - Implemented unique serial generators (`GenerateBoxUuid`, `GenerateSealSerial`, `GenerateManifestUuid`), zero-trust payload sanitizers (`ValidateCreationPayload`, `ValidateDepositPayload`), and UI formatters (`FormatBoxStatusBadge`, `FormatCurrency`).
+  - **Authoritative Server Subsystems & RPCs**:
+    - `FiveM/nyx_factions/server/cash_transit.lua`: Authoritative cash packing engine (`CreateCashTransitBox`) deducting register clean cash, locking `pending_transit_box_id`, inserting transit box and audit records, delivering physical `armored_cash_box` and `cash_transit_manifest` items, and query endpoint (`GetRegistersNeedingTransit`). RPCs: `factions:createCashTransitBox`, `factions:getRegistersNeedingTransit`.
+    - `FiveM/nyx_treasury/server/cash_transit.lua`: Authoritative bank vault deposit engine (`DepositCashTransitBox`) verifying vault proximity, deducting physical items, executing 3-way double-entry treasury settlement transfers from clearing pool (`pool:cash_transit:clearing`) to corporate account, municipal master, and courier citizen personal account, clearing register pending lock, and logging to audit trail. Authoritative heist breach processor (`BreachCashTransitBox`) executing criminal cracking, dye-pack explosion handling (`marked_bills`), MDT 10-90 dispatch alarm alerts, and depositing forensic evidence into `nyx_judiciary`. RPCs: `treasury:getBankVaults`, `treasury:depositCashTransitBox`, `treasury:breachCashTransitBox`, `treasury:getCashTransitBox`, `treasury:getTransitHistory`.
+    - Exported public APIs in `FiveM/nyx_factions/server/exports.lua` (`CreateCashTransitBox`, `GetRegistersNeedingTransit`) and `FiveM/nyx_treasury/server/exports.lua` (`DepositCashTransitBox`, `BreachCashTransitBox`, `GetBankVaults`, `GetCashTransitBox`, `GetTransitHistory`).
+  - **Client Implementations & Spatial Interactions**:
+    - `FiveM/nyx_treasury/client/cash_transit.lua`: Third-Eye (LALT) target options on all municipal bank vaults ("Páncélozott Készpénzdoboz Leadása (Széf)", "Banki Széf Tranzakciós Napló"), deposit animation, `/depositcashbox`, and `/breachcashbox`.
+    - `FiveM/nyx_factions/client/cash_transit.lua`: Packing cash animation, interactive commands `/createtransitbox` and `/transitstatus`.
+  - **Manifests & Verification**:
+    - Updated `fxmanifest.lua` in both `nyx_treasury` and `nyx_factions` declaring all shared, server, and client scripts.
+    - Added in-engine integration test Test 48 (`Nyx.Tests.TestArmoredCashTransitAndBankingFreight`) to `FiveM/nyx_core/server/tests.lua` and wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_armored_cash_transit_and_banking_freight.py` (10/10 tests passing).
+    - Full pytest suite: 441/441 passed (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 262 Lua files, 53 migrations (100% clean verification).
 - **[2026-10-18] Feature: Corporate Equity Public Offering & Dividend Distribution Engine (`nyx_factions` & `nyx_treasury`)**
   - **Database Migrations (`052_corporate_equity_public_offerings_and_dividend_distribution.sql`)**:
     - Created migration file and registered Step 52 in `FiveM/nyx_core/sql/migrations/index.json`.

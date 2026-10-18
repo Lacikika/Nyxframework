@@ -119,3 +119,24 @@ end)
 exports("FreezeCommercialTarget", function(src, warrantId, targetType, targetId, reason)
     return Nyx.Treasury.FreezeCommercialTarget(src, warrantId, targetType, targetId, reason)
 end)
+
+-- Armored Cash Transit & Bank Vault Exports
+exports("DepositCashTransitBox", function(src, boxUuid, vaultId)
+    return Nyx.Treasury.DepositCashTransitBox(src, boxUuid, vaultId)
+end)
+
+exports("BreachCashTransitBox", function(src, toolName)
+    return Nyx.Treasury.BreachCashTransitBox(src, toolName)
+end)
+
+exports("GetBankVaults", function()
+    return Nyx.Treasury.GetBankVaults()
+end)
+
+exports("GetCashTransitBox", function(boxUuid)
+    return Nyx.Treasury.GetCashTransitBox(boxUuid)
+end)
+
+exports("GetTransitHistory", function(factionId)
+    return Nyx.Treasury.GetTransitHistory(factionId)
+end)
