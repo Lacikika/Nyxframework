@@ -40,13 +40,18 @@ Nyx.RPC.Register("treasury:getPublicOverview", function(src)
     return {
         masterReserve = currentMaster,
         targetReserve = Config.TargetReserve or 5000000.00,
+        cautionReserve = Config.CautionReserve or 2500000.00,
+        recoveryReserve = Config.RecoveryReserve or 1000000.00,
         criticalReserve = Config.CriticalReserve or 500000.00,
         fiscalStatus = status,
+        fiscalState = Nyx.Treasury.GetFiscalState(),
         wageMultiplier = multiplier,
         salesTaxRate = Nyx.Treasury.ActiveSalesTax,
         transferTaxRate = Nyx.Treasury.ActiveTransferTax,
         accounts = accountsSummary,
-        conservation = conservation
+        conservation = conservation,
+        circuitBreaker = Nyx.Treasury.GetCircuitTelemetry(),
+        municipalDegraded = (Nyx.Treasury.GetFiscalState() == "CRITICAL_DEFICIT" or Nyx.Treasury.IsCircuitTripped())
     }
 end)
 
@@ -116,5 +121,23 @@ Nyx.RPC.Register("treasury:getMarketIndex", function(src)
         zones = {},
         salesTaxRate = Nyx.Treasury.ActiveSalesTax,
         transferTaxRate = Nyx.Treasury.ActiveTransferTax
+    }
+end)
+
+-- Dedicated Fiscal Circuit Breaker Telemetry RPC
+Nyx.RPC.Register("treasury:getCircuitStatus", function(src)
+    return {
+        success = true,
+        telemetry = Nyx.Treasury.GetCircuitTelemetry()
+    }
+end)
+
+-- Public Service Payroll History RPC
+Nyx.RPC.Register("treasury:getPayrollHistory", function(src, limit)
+    limit = math.min(50, math.max(1, tonumber(limit) or 10))
+    local rows = MySQL.query.await("SELECT * FROM `nyx_treasury_payroll_runs` ORDER BY `run_id` DESC LIMIT ?", { limit })
+    return {
+        success = true,
+        runs = rows or {}
     }
 end)

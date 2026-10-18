@@ -49,5 +49,34 @@ exports("GetConsumerPriceIndex", function()
 end)
 
 exports("TriggerPayroll", function()
-    Nyx.Treasury.ProcessPublicPayroll()
+    return Nyx.Treasury.ProcessPublicPayroll()
+end)
+
+exports("GetFiscalState", function()
+    return Nyx.Treasury.GetFiscalState()
+end)
+
+exports("IsCircuitBreakerTripped", function()
+    return Nyx.Treasury.IsCircuitTripped()
+end)
+
+exports("TripFiscalCircuit", function(reason, authorizedBy)
+    return Nyx.Treasury.TripCircuitBreaker(reason, authorizedBy)
+end)
+
+exports("ResetFiscalCircuit", function(authorizedBy, reason)
+    return Nyx.Treasury.ResetCircuitBreaker(authorizedBy, reason)
+end)
+
+exports("GetDrainVelocity", function()
+    return Nyx.Treasury.GetDrainVelocity()
+end)
+
+exports("GetCircuitTelemetry", function()
+    return Nyx.Treasury.GetCircuitTelemetry()
+end)
+
+exports("IsMunicipalDegraded", function()
+    local state = Nyx.Treasury.GetFiscalState()
+    return (state == "CRITICAL_DEFICIT" or Nyx.Treasury.IsCircuitTripped())
 end)

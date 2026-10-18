@@ -101,6 +101,24 @@ function Nyx.Treasury.ExecuteTransfer(debitAcc, creditAcc, amount, category, aut
     Nyx.Treasury.EnsureAccount(debitAcc, debitAcc, "department", 0.00)
     Nyx.Treasury.EnsureAccount(creditAcc, creditAcc, "department", 0.00)
 
+    -- Fiscal Circuit Breaker Protection for municipal accounts
+    if debitAcc:find("^gov:") then
+        if Nyx.Treasury.IsCircuitTripped and Nyx.Treasury.IsCircuitTripped() then
+            local isExempt = Config.Circuit and Config.Circuit.ExemptCategories and Config.Circuit.ExemptCategories[category]
+            if not isExempt and authorizedBy ~= "EXECUTIVE_OVERRIDE" then
+                return false, "FISCAL_CIRCUIT_BREAKER_ACTIVE"
+            end
+        end
+
+        local maxSingle = Config.Circuit and Config.Circuit.MaxSingleTransaction
+        if maxSingle and amount > maxSingle and category ~= "emergency_subvention" and authorizedBy ~= "EXECUTIVE_OVERRIDE" then
+            if Nyx.Treasury.TripCircuitBreaker then
+                Nyx.Treasury.TripCircuitBreaker("SINGLE_TRANSACTION_CAP_EXCEEDED", authorizedBy)
+            end
+            return false, "SINGLE_TRANSACTION_CAP_EXCEEDED"
+        end
+    end
+
     -- Pre-transaction liquidity check
     local currentDebitBalance = Nyx.Treasury.GetBalance(debitAcc)
     if currentDebitBalance < amount then
@@ -150,6 +168,11 @@ function Nyx.Treasury.ExecuteTransfer(debitAcc, creditAcc, amount, category, aut
     -- Update in-memory balances
     Nyx.Treasury.SyncCache(debitAcc)
     Nyx.Treasury.SyncCache(creditAcc)
+
+    -- Track municipal outflow velocity
+    if debitAcc:find("^gov:") and Nyx.Treasury.RecordMunicipalOutflow then
+        Nyx.Treasury.RecordMunicipalOutflow(debitAcc, creditAcc, amount, category, authorizedBy)
+    end
 
     -- Emit internal server event
     TriggerEvent("nyx:treasury:ledgerUpdate", txUuid, debitAcc, creditAcc, amount, category)

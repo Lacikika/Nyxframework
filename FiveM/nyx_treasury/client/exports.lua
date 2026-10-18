@@ -17,3 +17,21 @@ end)
 exports("IsTreasuryDashboardOpen", function()
     return Nyx.Treasury.IsOpen
 end)
+
+exports("GetFiscalState", function()
+    return GlobalState.fiscalState or "SOLVENT"
+end)
+
+exports("IsCircuitBreakerTripped", function()
+    local cb = GlobalState.fiscalCircuitBreaker
+    return (cb and cb.tripped == true) or false
+end)
+
+exports("IsMunicipalDegraded", function()
+    return GlobalState.municipalDegraded == true
+end)
+
+exports("GetWageMultiplier", function()
+    local cb = GlobalState.fiscalCircuitBreaker
+    return (cb and cb.wageMultiplier) or 1.00
+end)

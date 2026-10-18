@@ -5,7 +5,26 @@ Config.Debug = false
 
 -- Closed-Loop Reserve Thresholds
 Config.TargetReserve = 5000000.00   -- Target operating reserve for 100% full wage payouts
+Config.CautionReserve = 2500000.00  -- Warning threshold (50% target) where austerity measures begin
+Config.RecoveryReserve = 1000000.00 -- Solvency threshold required to automatically reset a tripped circuit breaker
 Config.CriticalReserve = 500000.00  -- Emergency threshold below which public payrolls freeze
+
+-- Fiscal Circuit Protection Parameters
+Config.Circuit = {
+    Enabled = true,
+    RollingWindowSeconds = 600,       -- 10-minute rolling outflow velocity observation window
+    MaxRollingOutflow = 750000.00,    -- Max permissible municipal outflow within rolling window ($750k)
+    MaxSingleTransaction = 500000.00, -- Max single transaction cap on municipal debits without emergency flag
+    AusterityWageFloor = 0.10,        -- 10% minimum safety-net wage scale while above CriticalReserve
+    CriticalWageMultiplier = 0.00,    -- 0% wage scale when reserves are at or below CriticalReserve
+    AutoResetCooldown = 300,          -- Minimum 5 minutes after tripping before automated reset can occur
+    HysteresisRecoveryMargin = 0.75,  -- Outflow must drop below 75% of max threshold for automated reset
+    ExemptCategories = {              -- Transaction categories exempt from circuit trip blocks
+        ["payroll"] = true,
+        ["emergency_subvention"] = true,
+        ["tax_sweep"] = true
+    }
+}
 
 -- Designated Municipal Account Identifiers
 Config.Accounts = {

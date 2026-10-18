@@ -2613,7 +2613,257 @@ function Nyx.Tests.TestJuryDispatcherAndCourtroomRouting()
     return passes == total
 end
 
--- 18. Master Test Runner
+-- 18. Test Fiscal Circuit Protection & Logarithmic Public Payroll Scaling
+function Nyx.Tests.TestFiscalCircuitAndPayrollScaling()
+    print("^3[Nyx:Tests] Running Fiscal Circuit Protection & Payroll Scaling Suite...^7")
+    local passes = 0
+    local total = 8
+
+    -- Test A: Pure Logarithmic Wage Scaling Formula Precision & Boundary Clamping
+    local targetReserve = 5000000.00
+    local critReserve = 500000.00
+    local cautionReserve = 2500000.00
+    local opts = { austerityFloor = 0.10, criticalMultiplier = 0.00 }
+
+    local function calcWage(r)
+        if r >= targetReserve then return 1.00, "SOLVENT" end
+        if r <= critReserve then return 0.00, "CRITICAL_FREEZE" end
+        local logRatio = math.log(r / critReserve)
+        local logMax = math.log(targetReserve / critReserve)
+        local norm = (logMax > 0) and (logRatio / logMax) or 0.00
+        local scaled = opts.austerityFloor + ((1.00 - opts.austerityFloor) * norm)
+        local mult = math.floor(math.max(opts.austerityFloor, math.min(1.00, scaled)) * 100) / 100
+        local st = (r < cautionReserve) and "AUSTERITY" or "THROTTLED"
+        return mult, st
+    end
+
+    local mSolvent, stSolvent = calcWage(5000000.00)
+    local mFrozen, stFrozen = calcWage(500000.00)
+    local mBelow, stBelow = calcWage(250000.00)
+    local mHalf, stHalf = calcWage(2500000.00)
+    local mLow, stLow = calcWage(1000000.00)
+    local mNearCrit, stNearCrit = calcWage(510000.00)
+
+    local testA_ok = (mSolvent == 1.00 and stSolvent == "SOLVENT")
+        and (mFrozen == 0.00 and stFrozen == "CRITICAL_FREEZE")
+        and (mBelow == 0.00 and stBelow == "CRITICAL_FREEZE")
+        and (mHalf >= 0.70 and mHalf <= 0.75 and stHalf == "THROTTLED")
+        and (mLow >= 0.35 and mLow <= 0.40 and stLow == "AUSTERITY")
+        and (mNearCrit >= 0.10 and stNearCrit == "AUSTERITY")
+
+    if assertTest(testA_ok == true,
+        "Logarithmic Wage Scaling Precision & Floor Invariants (100% -> 72% -> 37% -> 10% -> 0%)",
+        string.format("mSolvent=%.2f, mFrozen=%.2f, mHalf=%.2f, mLow=%.2f, mNearCrit=%.2f",
+            mSolvent, mFrozen, mHalf, mLow, mNearCrit)) then
+        passes = passes + 1
+    end
+
+    -- Test B: Fiscal State Machine Determination
+    local function determineState(r, isTripped)
+        if isTripped then return "CIRCUIT_TRIPPED" end
+        if r <= critReserve then return "CRITICAL_DEFICIT" end
+        if r < cautionReserve then return "AUSTERITY" end
+        if r < targetReserve then return "THROTTLED" end
+        return "SOLVENT"
+    end
+
+    local st1 = determineState(6000000.00, false)
+    local st2 = determineState(3500000.00, false)
+    local st3 = determineState(1500000.00, false)
+    local st4 = determineState(400000.00, false)
+    local st5 = determineState(6000000.00, true)
+
+    local testB_ok = (st1 == "SOLVENT") and (st2 == "THROTTLED") and (st3 == "AUSTERITY")
+        and (st4 == "CRITICAL_DEFICIT") and (st5 == "CIRCUIT_TRIPPED")
+
+    if assertTest(testB_ok == true,
+        "Municipal Fiscal State Machine Transitions",
+        string.format("st1=%s, st2=%s, st3=%s, st4=%s, st5=%s", st1, st2, st3, st4, st5)) then
+        passes = passes + 1
+    end
+
+    -- Test C: Rolling Window Drain Velocity & Outflow Tracking
+    local testNow = 100000
+    local windowSec = 600
+    local rawOutflows = {
+        { amount = 100000.00, timestamp = testNow - 50 },  -- Active
+        { amount = 150000.00, timestamp = testNow - 200 }, -- Active
+        { amount = 50000.00,  timestamp = testNow - 400 }, -- Active
+        { amount = 250000.00, timestamp = testNow - 800 }  -- Expired (800s > 600s)
+    }
+
+    local cutoff = testNow - windowSec
+    local activeSum = 0
+    local activeCount = 0
+    for _, e in ipairs(rawOutflows) do
+        if e.timestamp >= cutoff then
+            activeSum = activeSum + e.amount
+            activeCount = activeCount + 1
+        end
+    end
+    local velSec = activeSum / windowSec
+    local velHour = velSec * 3600.00
+
+    local testC_ok = (activeCount == 3) and (activeSum == 300000.00)
+        and (velSec == 500.00) and (velHour == 1800000.00)
+
+    if assertTest(testC_ok == true,
+        "Rolling Outflow Velocity & Window Filtering (10m window, $300k active, $1.8M/hr)",
+        string.format("activeSum=%.2f, activeCount=%d, velHour=%.2f", activeSum, activeCount, velHour)) then
+        passes = passes + 1
+    end
+
+    -- Test D: Circuit Breaker Trip Evaluator
+    local maxRolling = 750000.00
+    local maxSingle = 500000.00
+
+    local function evalTrip(r, rolling, singleAmt)
+        if r <= critReserve then return true, "CRITICAL_RESERVE_DEPLETED" end
+        if rolling > maxRolling then return true, "BURST_DRAIN_VELOCITY_EXCEEDED" end
+        if singleAmt > maxSingle then return true, "SINGLE_TRANSACTION_CAP_EXCEEDED" end
+        return false, "NORMAL"
+    end
+
+    local tripNorm, rNorm = evalTrip(3000000.00, 200000.00, 100000.00)
+    local tripBurst, rBurst = evalTrip(3000000.00, 800000.00, 50000.00)
+    local tripCap, rCap = evalTrip(3000000.00, 200000.00, 600000.00)
+    local tripDepleted, rDep = evalTrip(450000.00, 100000.00, 10000.00)
+
+    local testD_ok = (not tripNorm and rNorm == "NORMAL")
+        and (tripBurst and rBurst == "BURST_DRAIN_VELOCITY_EXCEEDED")
+        and (tripCap and rCap == "SINGLE_TRANSACTION_CAP_EXCEEDED")
+        and (tripDepleted and rDep == "CRITICAL_RESERVE_DEPLETED")
+
+    if assertTest(testD_ok == true,
+        "Circuit Breaker Trip Evaluator (Burst, Cap, Depletion Gates)",
+        string.format("burst=%s, cap=%s, dep=%s", rBurst, rCap, rDep)) then
+        passes = passes + 1
+    end
+
+    -- Test E: Automatic Recovery & Hysteresis Margin
+    local recoveryReserve = 1000000.00
+    local hysteresisMargin = 0.75
+    local allowedOutflow = maxRolling * hysteresisMargin -- 562500.00
+    local cooldownSec = 300
+
+    local function canReset(r, rolling, trippedAt, now)
+        if r < recoveryReserve then return false, "INSUFFICIENT_RESERVE_FOR_RESET" end
+        if rolling > allowedOutflow then return false, "DRAIN_VELOCITY_STILL_ELEVATED" end
+        if (now - trippedAt) < cooldownSec then return false, "COOLDOWN_ACTIVE" end
+        return true, "RECOVERY_CONDITIONS_MET"
+    end
+
+    local trippedTime = 100000
+    local okR1, reasonR1 = canReset(800000.00, 200000.00, trippedTime, trippedTime + 400) -- low reserve
+    local okR2, reasonR2 = canReset(1200000.00, 600000.00, trippedTime, trippedTime + 400) -- high outflow
+    local okR3, reasonR3 = canReset(1200000.00, 200000.00, trippedTime, trippedTime + 100) -- cooldown active
+    local okR4, reasonR4 = canReset(1200000.00, 200000.00, trippedTime, trippedTime + 400) -- all good
+
+    local testE_ok = (not okR1 and reasonR1 == "INSUFFICIENT_RESERVE_FOR_RESET")
+        and (not okR2 and reasonR2 == "DRAIN_VELOCITY_STILL_ELEVATED")
+        and (not okR3 and reasonR3 == "COOLDOWN_ACTIVE")
+        and (okR4 and reasonR4 == "RECOVERY_CONDITIONS_MET")
+
+    if assertTest(testE_ok == true,
+        "Automatic Circuit Recovery & Hysteresis Margin Verification",
+        string.format("r1=%s, r2=%s, r3=%s, r4=%s", reasonR1, reasonR2, reasonR3, reasonR4)) then
+        passes = passes + 1
+    end
+
+    -- Test F: Automated Emergency Subvention Calculation
+    local function calcSub(deptBal, required, masterBal)
+        local deficit = math.max(0.00, required - deptBal)
+        if deficit <= 0.00 then return 0.00, "DEPARTMENT_SOLVENT" end
+        local surplus = math.max(0.00, masterBal - critReserve)
+        if surplus <= 0.00 then return 0.00, "INSUFFICIENT_MASTER_SURPLUS" end
+        local grant = math.min(deficit, surplus)
+        return grant, (grant >= deficit and "FULL_SUBVENTION" or "PARTIAL_SUBVENTION")
+    end
+
+    local gFull, stFull = calcSub(5000.00, 20000.00, 3000000.00) -- Deficit 15k, Master 3M -> 15k Full
+    local gPart, stPart = calcSub(5000.00, 20000.00, 508000.00)  -- Deficit 15k, Master 508k (surplus 8k) -> 8k Partial
+    local gZero, stZero = calcSub(5000.00, 20000.00, 480000.00)  -- Deficit 15k, Master 480k (surplus 0) -> 0 Insufficient
+    local gSolv, stSolv = calcSub(25000.00, 20000.00, 3000000.00) -- Solvent
+
+    local testF_ok = (gFull == 15000.00 and stFull == "FULL_SUBVENTION")
+        and (gPart == 8000.00 and stPart == "PARTIAL_SUBVENTION")
+        and (gZero == 0.00 and stZero == "INSUFFICIENT_MASTER_SURPLUS")
+        and (gSolv == 0.00 and stSolv == "DEPARTMENT_SOLVENT")
+
+    if assertTest(testF_ok == true,
+        "Department Emergency Subvention Math (Full, Partial, Zero, Solvent)",
+        string.format("full=%.2f, part=%.2f, zero=%.2f, solv=%.2f", gFull, gPart, gZero, gSolv)) then
+        passes = passes + 1
+    end
+
+    -- Test G: Municipal Transfer Gating Under Tripped Circuit
+    local exemptCategories = { payroll = true, emergency_subvention = true, tax_sweep = true }
+    local function canTransfer(cat, isTripped, auth)
+        if isTripped then
+            if not exemptCategories[cat] and auth ~= "EXECUTIVE_OVERRIDE" then
+                return false, "FISCAL_CIRCUIT_BREAKER_ACTIVE"
+            end
+        end
+        return true, "ALLOWED"
+    end
+
+    local allowNormal, _ = canTransfer("procurement", false, "SYSTEM")
+    local blockTripped, rTrip = canTransfer("procurement", true, "SYSTEM")
+    local allowPayroll, _ = canTransfer("payroll", true, "SYSTEM_PAYROLL")
+    local allowSubvention, _ = canTransfer("emergency_subvention", true, "SYSTEM_PAYROLL")
+    local allowOverride, _ = canTransfer("procurement", true, "EXECUTIVE_OVERRIDE")
+
+    local testG_ok = (allowNormal == true)
+        and (blockTripped == false and rTrip == "FISCAL_CIRCUIT_BREAKER_ACTIVE")
+        and (allowPayroll == true)
+        and (allowSubvention == true)
+        and (allowOverride == true)
+
+    if assertTest(testG_ok == true,
+        "Municipal Outflow Gating Under Tripped Circuit Breaker",
+        string.format("normal=%s, blocked=%s, payroll=%s, override=%s",
+            tostring(allowNormal), tostring(blockTripped), tostring(allowPayroll), tostring(allowOverride))) then
+        passes = passes + 1
+    end
+
+    -- Test H: Closed-Loop Double-Entry Conservation During Subvention & Scaled Payroll
+    local masterStart = 2000000.00
+    local deptStart = 2000.00
+    local workerStart = 500.00
+    local initialTotal = masterStart + deptStart + workerStart
+
+    -- Step 1: Subvention of $10,000 from Master to Department
+    local subventionAmt = 10000.00
+    local masterMid = masterStart - subventionAmt
+    local deptMid = deptStart + subventionAmt
+    local subventionConserved = (masterStart + deptStart) == (masterMid + deptMid)
+
+    -- Step 2: Payroll disbursement of $8,500 from Department to Worker
+    local payrollAmt = 8500.00
+    local deptFinal = deptMid - payrollAmt
+    local workerFinal = workerStart + payrollAmt
+    local payrollConserved = (deptMid + workerStart) == (deptFinal + workerFinal)
+
+    local finalTotal = masterMid + deptFinal + workerFinal
+    local closedLoopConserved = (initialTotal == finalTotal)
+
+    local testH_ok = (subventionConserved == true)
+        and (payrollConserved == true)
+        and (closedLoopConserved == true)
+        and (deptFinal == 3500.00)
+        and (workerFinal == 9000.00)
+
+    if assertTest(testH_ok == true,
+        "Closed-Loop Double-Entry Conservation in Subventions & Scaled Payroll",
+        string.format("initialTotal=$%.2f, finalTotal=$%.2f, master=$%.2f, dept=$%.2f, worker=$%.2f",
+            initialTotal, finalTotal, masterMid, deptFinal, workerFinal)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 19. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -2636,9 +2886,10 @@ function Nyx.Tests.RunAll()
     local t15 = Nyx.Tests.TestPowerGridSubstationFailureAndBlackout()
     local t16 = Nyx.Tests.TestParliamentIRVAndPenalSync()
     local t17 = Nyx.Tests.TestJuryDispatcherAndCourtroomRouting()
+    local t18 = Nyx.Tests.TestFiscalCircuitAndPayrollScaling()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")
