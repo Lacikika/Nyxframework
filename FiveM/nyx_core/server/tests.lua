@@ -7559,7 +7559,272 @@ function Nyx.Tests.TestVehicleDiagnosticsAndCivicImpoundUI()
     return passes == total
 end
 
--- 35. Master Test Runner
+-- 35. Test Citizen OS Master Smartphone Framework Subsystem
+function Nyx.Tests.TestCitizenOSSmartphoneFramework()
+    print("^3[Nyx:Tests] Running Citizen OS Master Smartphone Framework Test Suite...^7")
+    local passes = 0
+    local total = 6
+
+    local PhoneMod = (Nyx and Nyx.Phone) or {}
+
+    -- Sub-test A: Currency, Deterministic Phone Formatting & Number Derivation
+    local formatCurrency = PhoneMod.FormatCurrency or function(amount)
+        local n = tonumber(amount) or 0.0
+        local isNegative = (n < 0)
+        n = math.abs(n)
+        local formatted = string.format("%.2f", n)
+        local integerPart, decimalPart = formatted:match("^(%d+)%.(%d+)$")
+        local k
+        while true do
+            integerPart, k = string.gsub(integerPart, "^(-?%d+)(%d%d%d)", '%1,%2')
+            if k == 0 then break end
+        end
+        if isNegative then
+            return string.format("-$%s.%s", integerPart, decimalPart)
+        else
+            return string.format("$%s.%s", integerPart, decimalPart)
+        end
+    end
+
+    local formatPhone = PhoneMod.FormatPhoneNumber or function(raw)
+        local clean = string.gsub(tostring(raw or ""), "[^%d]", "")
+        local len = #clean
+        if len == 7 then
+            return string.format("%s-%s", clean:sub(1, 3), clean:sub(4, 7))
+        elseif len == 10 then
+            return string.format("(%s) %s-%s", clean:sub(1, 3), clean:sub(4, 6), clean:sub(7, 10))
+        elseif len >= 4 then
+            return string.format("555-%s", clean:sub(-4))
+        else
+            return "555-0100"
+        end
+    end
+
+    local genPhone = PhoneMod.GeneratePhoneNumber or function(citizenId)
+        if not citizenId or #tostring(citizenId) == 0 then
+            return "555-0199"
+        end
+        local hash = 0
+        local str = tostring(citizenId)
+        for i = 1, #str do
+            hash = (hash * 31 + string.byte(str, i)) % 9000
+        end
+        local num = 1000 + hash
+        return string.format("555-%04d", num)
+    end
+
+    local c1 = formatCurrency(1250000.50)
+    local p1 = formatPhone("5551234")
+    local p2 = formatPhone("2125550199")
+    local p3 = formatPhone("88")
+    local g1 = genPhone("CIT-1001")
+    local g2 = genPhone("CIT-1001")
+
+    local testA_ok = (c1 == "$1,250,000.50") and
+                     (p1 == "555-1234") and
+                     (p2 == "(212) 555-0199") and
+                     (p3 == "555-0100") and
+                     (g1 == g2) and
+                     (g1:sub(1, 4) == "555-")
+
+    if assertTest(testA_ok == true,
+        "Currency & Deterministic Phone Formatting/Derivation Invariant",
+        string.format("c1=%s, p1=%s, p2=%s, g1=%s", c1, p1, p2, g1)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Wire Transfer Tax Math & Closed-Loop Debit Calculation
+    local calcTax = PhoneMod.CalculateTransferTax or function(amount, taxRate)
+        local amt = tonumber(amount) or 0.0
+        if amt <= 0.0 then return 0.0, 0.0 end
+        local rate = tonumber(taxRate)
+        if rate == nil then rate = 0.02 end
+        rate = math.max(0.0, math.min(0.25, rate))
+        local fee = math.floor((amt * rate) * 100 + 0.5) / 100
+        local totalDebit = math.floor((amt + fee) * 100 + 0.5) / 100
+        return fee, totalDebit
+    end
+
+    local fee1, debit1 = calcTax(1000.0, 0.02)
+    local fee2, debit2 = calcTax(2500.50, 0.05)
+    local fee3, debit3 = calcTax(0.0, 0.02)
+    local fee4, debit4 = calcTax(100.0, 0.50) -- clamped to 0.25 (25.0)
+
+    local testB_ok = (fee1 == 20.00 and debit1 == 1020.00) and
+                     (fee2 == 125.03 and debit2 == 2625.53) and
+                     (fee3 == 0.0 and debit3 == 0.0) and
+                     (fee4 == 25.00 and debit4 == 125.00)
+
+    if assertTest(testB_ok == true,
+        "P2P Wire Transfer Tax Math & Rate Clamping Invariant",
+        string.format("fee1=%.2f, debit1=%.2f, fee4=%.2f", fee1, debit1, fee4)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Zero-Trust Wire Transfer Payload Validator & Self-Transfer Guard
+    local validateTransfer = PhoneMod.ValidateTransferPayload or function(payload, senderCitizenId)
+        if type(payload) ~= "table" then return false, "INVALID_PAYLOAD" end
+        local recipient = tostring(payload.recipientCitizenId or ""):gsub("^%s*(.-)%s*$", "%1")
+        if #recipient < 2 or #recipient > 64 then return false, "INVALID_RECIPIENT" end
+        if senderCitizenId and recipient == tostring(senderCitizenId) then return false, "CANNOT_TRANSFER_TO_SELF" end
+        local amount = tonumber(payload.amount)
+        if not amount or amount < 1.0 or amount > 10000000.0 then return false, "AMOUNT_OUT_OF_BOUNDS" end
+        amount = math.floor(amount * 100) / 100
+        local memo = tostring(payload.memo or "")
+        if #memo > 128 then return false, "MEMO_TOO_LONG" end
+        return true, { recipientCitizenId = recipient, amount = amount, memo = memo }
+    end
+
+    local okT1, resT1 = validateTransfer({ recipientCitizenId = "CIT-9999", amount = 500.0, memo = "Rent payment" }, "CIT-1001")
+    local okT2, errT2 = validateTransfer({ recipientCitizenId = "CIT-1001", amount = 500.0 }, "CIT-1001")
+    local okT3, errT3 = validateTransfer({ recipientCitizenId = "CIT-9999", amount = 0.50 }, "CIT-1001")
+    local okT4, errT4 = validateTransfer({ recipientCitizenId = "CIT-9999", amount = 500.0, memo = string.rep("x", 150) }, "CIT-1001")
+
+    local testC_ok = (okT1 == true and resT1.amount == 500.0) and
+                     (okT2 == false and errT2 == "CANNOT_TRANSFER_TO_SELF") and
+                     (okT3 == false and errT3 == "AMOUNT_OUT_OF_BOUNDS") and
+                     (okT4 == false and errT4 == "MEMO_TOO_LONG")
+
+    if assertTest(testC_ok == true,
+        "Zero-Trust Wire Transfer Payload Validation & Self-Transfer Prevention",
+        string.format("ok1=%s, err2=%s, err3=%s, err4=%s", tostring(okT1), tostring(errT2), tostring(errT3), tostring(errT4))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Citizen Emergency Alert Payload Validator & Boundary Handling
+    local validateAlert = PhoneMod.ValidateEmergencyAlertPayload or function(payload)
+        if type(payload) ~= "table" then return false, "INVALID_PAYLOAD" end
+        local validCategories = { police = true, medical = true, fire = true, traffic = true, general = true }
+        local cat = tostring(payload.category or ""):lower():gsub("^%s*(.-)%s*$", "%1")
+        if not validCategories[cat] then return false, "INVALID_CATEGORY" end
+        local msg = tostring(payload.message or ""):gsub("^%s*(.-)%s*$", "%1")
+        if #msg < 5 then return false, "MESSAGE_TOO_SHORT" end
+        if #msg > 500 then return false, "MESSAGE_TOO_LONG" end
+        local validPriorities = { low = true, medium = true, high = true, critical = true }
+        local priority = tostring(payload.priority or "medium"):lower():gsub("^%s*(.-)%s*$", "%1")
+        if not validPriorities[priority] then priority = "medium" end
+        local loc = tostring(payload.locationLabel or "Los Santos"):gsub("^%s*(.-)%s*$", "%1")
+        if #loc == 0 then loc = "Los Santos" end
+        if #loc > 128 then loc = loc:sub(1, 128) end
+        return true, { category = cat, message = msg, priority = priority, locationLabel = loc }
+    end
+
+    local okA1, resA1 = validateAlert({ category = "police", message = "Armed robbery in progress at Legion Bank", priority = "critical" })
+    local okA2, errA2 = validateAlert({ category = "alien_invasion", message = "Help me!" })
+    local okA3, errA3 = validateAlert({ category = "medical", message = "Help" })
+    local okA4, resA4 = validateAlert({ category = "fire", message = "Structure fire at warehouse", priority = "invalid_level" })
+
+    local testD_ok = (okA1 == true and resA1.priority == "critical" and resA1.category == "police") and
+                     (okA2 == false and errA2 == "INVALID_CATEGORY") and
+                     (okA3 == false and errA3 == "MESSAGE_TOO_SHORT") and
+                     (okA4 == true and resA4.priority == "medium")
+
+    if assertTest(testD_ok == true,
+        "Citizen Emergency Alert Payload Validation & Category/Priority Filtering",
+        string.format("ok1=%s, err2=%s, err3=%s, a4Priority=%s", tostring(okA1), tostring(errA2), tostring(errA3), tostring(resA4 and resA4.priority))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Emergency Alert Badge Taxonomy
+    local formatAlertBadge = PhoneMod.FormatAlertBadge or function(priority, category)
+        local p = tostring(priority or "medium"):lower()
+        local cat = tostring(category or "general"):lower()
+        local pMap = {
+            critical = { badgeClass = "badge-danger", label = "KRITIKUS", icon = "fa-solid fa-triangle-exclamation" },
+            high     = { badgeClass = "badge-danger", label = "SÜRGŐS", icon = "fa-solid fa-bell" },
+            medium   = { badgeClass = "badge-warning", label = "FIGYELMEZTETÉS", icon = "fa-solid fa-circle-exclamation" },
+            low      = { badgeClass = "badge-info", label = "TÁJÉKOZTATÁS", icon = "fa-solid fa-circle-info" }
+        }
+        local cMap = {
+            police  = { label = "Rendőrség (911)", icon = "fa-solid fa-shield-halved", color = "#3B82F6" },
+            medical = { label = "Mentőszolgálat", icon = "fa-solid fa-truck-medical", color = "#EF4444" },
+            fire    = { label = "Katasztrófavédelem", icon = "fa-solid fa-fire-extinguisher", color = "#F97316" },
+            traffic = { label = "Közlekedésrendészet", icon = "fa-solid fa-car-burst", color = "#F59E0B" },
+            general = { label = "Polgári Riasztás", icon = "fa-solid fa-bullhorn", color = "#10B981" }
+        }
+        local badgeInfo = pMap[p] or pMap.medium
+        local catInfo = cMap[cat] or cMap.general
+        return {
+            priorityBadgeClass = badgeInfo.badgeClass,
+            priorityLabel = badgeInfo.label,
+            categoryLabel = catInfo.label,
+            categoryColor = catInfo.color
+        }
+    end
+
+    local bCrit = formatAlertBadge("critical", "police")
+    local bMed = formatAlertBadge("medium", "medical")
+    local bLow = formatAlertBadge("low", "general")
+
+    local testE_ok = (bCrit.priorityBadgeClass == "badge-danger" and bCrit.categoryColor == "#3B82F6") and
+                     (bMed.priorityBadgeClass == "badge-warning" and bMed.categoryLabel == "Mentőszolgálat") and
+                     (bLow.priorityBadgeClass == "badge-info" and bLow.categoryLabel == "Polgári Riasztás")
+
+    if assertTest(testE_ok == true,
+        "Emergency Alert Priority Badges & Inter-Agency Color Hierarchy Invariant",
+        string.format("critClass=%s, medLabel=%s, lowLabel=%s", bCrit.priorityBadgeClass, bMed.categoryLabel, bLow.categoryLabel)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Mobile Freight Contract Formatting & Filtering
+    local formatCard = PhoneMod.FormatContractCard or function(contract)
+        if type(contract) ~= "table" then return nil end
+        local totalPayout = tonumber(contract.total_payout or contract.totalPayout or 0.0)
+        local escrowBond = tonumber(contract.escrow_deposit or contract.escrowDeposit or 0.0)
+        local status = tostring(contract.status or "available")
+        return {
+            id = contract.contract_id or contract.id,
+            totalPayout = totalPayout,
+            escrowDeposit = escrowBond,
+            formattedPayout = formatCurrency(totalPayout),
+            status = status
+        }
+    end
+
+    local filterContracts = PhoneMod.FilterFreightContracts or function(contracts, filterType, search)
+        if type(contracts) ~= "table" then return {} end
+        local query = tostring(search or ""):lower():gsub("^%s*(.-)%s*$", "%1")
+        local filter = tostring(filterType or "all"):lower()
+        local filtered = {}
+        for _, c in ipairs(contracts) do
+            local matchesFilter = (filter == "all") or (c.status == filter)
+            local matchesSearch = true
+            if #query > 0 then
+                local item = tostring(c.item_id or c.itemId or ""):lower()
+                local cid = tostring(c.contract_id or c.id or ""):lower()
+                matchesSearch = (item:find(query, 1, true) ~= nil) or (cid:find(query, 1, true) ~= nil)
+            end
+            if matchesFilter and matchesSearch then
+                table.insert(filtered, c)
+            end
+        end
+        return filtered
+    end
+
+    local sampleContracts = {
+        { contract_id = "FC-101", item_id = "electronics_box", status = "available", total_payout = 4500.0, escrow_deposit = 500.0 },
+        { contract_id = "FC-102", item_id = "steel_beam", status = "in_transit", total_payout = 8200.0, escrow_deposit = 1200.0 },
+        { contract_id = "FC-103", item_id = "medical_supplies", status = "completed", total_payout = 3100.0, escrow_deposit = 300.0 }
+    }
+
+    local card1 = formatCard(sampleContracts[1])
+    local fAvail = filterContracts(sampleContracts, "available", "")
+    local fSearch = filterContracts(sampleContracts, "all", "steel")
+
+    local testF_ok = (card1 ~= nil and card1.formattedPayout == "$4,500.00" and card1.status == "available") and
+                     (#fAvail == 1 and fAvail[1].contract_id == "FC-101") and
+                     (#fSearch == 1 and fSearch[1].contract_id == "FC-102")
+
+    if assertTest(testF_ok == true,
+        "Mobile Freight Contract Formatting & Multi-Criteria Filtering Invariant",
+        string.format("card1Payout=%s, fAvail=%d, fSearch=%d", tostring(card1 and card1.formattedPayout), #fAvail, #fSearch)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 36. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -7599,9 +7864,10 @@ function Nyx.Tests.RunAll()
     local t32 = Nyx.Tests.TestPropertyBlindAuctionAndStewardshipUI()
     local t33 = Nyx.Tests.TestWarehouseMatrixAndElasticMarketMonitorUI()
     local t34 = Nyx.Tests.TestVehicleDiagnosticsAndCivicImpoundUI()
+    local t35 = Nyx.Tests.TestCitizenOSSmartphoneFramework()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

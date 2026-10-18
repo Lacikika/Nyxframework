@@ -60,7 +60,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Mechanical Diagnostics & Civic Impound Terminal (`nyx_ui` & `nyx_vehicles`)**
   - **Implementation:** Vehicle wear inspection interface (oil, brake pads, gearbox, suspension telemetry) and automated civic impound lot release terminal.
 
-- [ ] **Feature: Citizen OS Master Smartphone Framework (`nyx_ui`)**
+- [x] **Feature: Citizen OS Master Smartphone Framework (`nyx_ui`)**
   - **Implementation:** Unified single-frame CEF smartphone OS integrating mobile banking (`nyx_treasury`), freight dispatch board (`nyx_logistics`), and emergency alerts (`nyx_mdt`).
 
 - [ ] **Feature: Anatomical Trauma & Organ-Specific Medical Injury Engine (`nyx_services`)**
@@ -107,6 +107,41 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Citizen OS Master Smartphone Framework (`nyx_ui`)**
+  - **Database Migration (`040_citizen_os_smartphone_framework.sql`, `index.json`)**:
+    - Created `nyx_phone_emergency_alerts` table (`alert_id`, `alert_uuid`, `citizen_id`, `category`, `priority`, `message`, `location_label`, `created_at_unix`) for real-time and historical citizen distress and municipal broadcasts.
+    - Created `nyx_phone_settings` table (`citizen_id`, `wallpaper`, `dark_mode`, `airplane_mode`, `notifications_enabled`, `updated_at_unix`) for persistent personalized device configurations.
+    - Extended `nyx_characters` with `phone_number` (VARCHAR(32) NULL UNIQUE) for deterministic mobile telephony.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 40) and mirrored to `FiveM/nyx_ui/sql/migrations/`.
+  - **Shared Pure Lua 5.4 Logic Engine (`nyx_ui/shared/phone.lua`, `fxmanifest.lua`)**:
+    - Implemented `Nyx.Phone.FormatCurrency` for standard US dollar representations with thousand separators.
+    - Implemented `Nyx.Phone.FormatPhoneNumber` and `Nyx.Phone.GeneratePhoneNumber` providing deterministic, collision-free telephone numbers derived from citizen IDs.
+    - Implemented `Nyx.Phone.CalculateTransferTax` calculating P2P wire transfer taxes clamped between 0% and 25% with closed-loop balance debit conservation ($T = \text{amt} + \text{fee}$).
+    - Implemented `Nyx.Phone.ValidateTransferPayload` with zero-trust validation preventing self-transfers (`CANNOT_TRANSFER_TO_SELF`), bounding amounts ($1 to $10,000,000), and memo sanitization.
+    - Implemented `Nyx.Phone.ValidateEmergencyAlertPayload` with category whitelisting (`police`, `medical`, `fire`, `traffic`, `general`), priority clamping, and message length guards.
+    - Implemented `Nyx.Phone.FormatAlertBadge` providing visual taxonomy badges and inter-agency color coding (Police `#3B82F6`, Medical `#EF4444`, Fire `#F97316`, Traffic `#F59E0B`, General `#10B981`).
+    - Implemented `Nyx.Phone.FormatContractCard` and `Nyx.Phone.FilterFreightContracts` for mobile courier logistics operations.
+    - Declared `shared/phone.lua` in `FiveM/nyx_ui/fxmanifest.lua`.
+  - **Server-Side Subsystem & RPCs (`nyx_ui/server/phone.lua`, `server/exports.lua`)**:
+    - Implemented `phone:getOverview` aggregating personal finances, bank account numbers, phone settings, active emergency broadcasts, and courier freight opportunities into a single low-overhead payload.
+    - Implemented `phone:transferMoney` executing zero-trust P2P wire transfers with closed-loop atomic double-entry accounting in `nyx_treasury` (`TransferFunds`), transferring tax cut to municipal reserves (`gov:city:master`).
+    - Implemented `phone:getFreightBoard` and `phone:claimContract` bridging mobile logistics to `nyx_logistics` freight contract engine.
+    - Implemented `phone:sendEmergencyAlert` and `phone:getEmergencyAlerts` persisting citizen distress signals and broadcasting real-time push alerts (`nyx:phone:emergencyAlertBroadcast`) to all connected devices.
+    - Implemented `phone:updateSettings` saving wallpaper, dark mode, airplane mode, and notification preferences.
+    - Exported `GetCitizenPhoneData` and `SendPublicEmergencyAlert` in `FiveM/nyx_ui/server/exports.lua`.
+  - **Client-Side Dispatch & UI Bridge (`nyx_ui/client/phone.lua`, `client/bridge.lua`, `client/exports.lua`)**:
+    - Created `nyx_ui/client/phone.lua` registering `/phone`, `/smartphone`, `/citizenphone` commands and `F1` keymapping via `RegisterKeyMapping`. Added mobile notification listener and audio triggers.
+    - Updated `nyx_ui/client/bridge.lua` whitelisting smartphone parameters (`recipientCitizenId`, `amount`, `memo`, `category`, `message`, `priority`, `locationLabel`, `contractId`, `wallpaper`, `darkMode`, `airplaneMode`, `notificationsEnabled`) and registering safe NUI callbacks for all phone operations.
+    - Updated `nyx_ui/client/exports.lua` exporting `OpenPhone`, `ClosePhone`, `TogglePhone`, and mapping `phone`/`mobile` aliases in `OpenView`.
+  - **Web Single-Frame CEF SPA (`nyx_ui/web/`)**:
+    - *HTML (`index.html`)*: Section 8H `#phone-overlay` featuring realistic smartphone chassis, dynamic island camera cutout, status bar (carrier, Wi-Fi, battery, clock), home launcher app grid, and 5 native mobile applications: CivicPay (P2P wire transfers & balances), HaulExpress (mobile freight logistics board), CivicAlert (emergency broadcast dispatcher & archive), CivicID (digital citizen credential & phone number), and Settings (wallpaper, dark mode, airplane mode, sound toggles). Added `#dev-btn-phone` to dev mode bar.
+    - *CSS (`css/app.css`)*: Section 22 styling adhering strictly to CEF render budget (high-opacity dark chassis `rgba(15, 23, 42, 0.98)`, touch targets $\ge 40$px, zero `backdrop-filter`, zero `blur()`, compositor-accelerated slide-up animations).
+    - *JavaScript (`js/app.js`)*: Added `NyxState.phone` reactive state, message listeners (`PHONE_OPEN`, `PHONE_CLOSE`, `PHONE_NOTIFICATION`), home grid app switching, real-time status bar clock sync, P2P wire transfer form handler with fee preview, freight contract claim handler with button locking, emergency alert dispatch dialog, settings toggle handlers, hierarchical escape key handling (returning to home launcher before closing phone), and browser dev mode mock telemetry.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestCitizenOSSmartphoneFramework()` (Test 35) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_citizen_os_smartphone_framework.py` with 10 test cases covering deterministic phone generation, tax math, transfer validation, alert taxonomy, freight filtering, migration 040 schema, web HTML structure, CEF CSS render budget, JS state handlers, and in-engine registration (10/10 passing).
+    - Full pytest suite: 310/310 tests passing (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 222 Lua files, 40 migrations, 100% clean verification.
 - **[2026-10-18] Feature: Mechanical Diagnostics & Civic Impound Terminal (`nyx_ui` & `nyx_vehicles`)**
   - **Database Migration (`039_vehicles_diagnostics_and_civic_impound_terminal.sql`, `index.json`)**:
     - Created `nyx_vehicles_diagnostic_scans` table (`scan_id`, `scan_uuid`, `vin`, `inspector_citizen_id`, `mileage`, `engine_health`, `overall_grade`, `composite_score`, `dtc_codes_json`, `is_roadworthy`, `scanned_at`) for immutable OBD-II diagnostic scan logging.

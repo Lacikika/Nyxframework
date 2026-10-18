@@ -140,6 +140,18 @@ function Nyx.UI.SanitizePayload(data)
     if data.plate and type(data.plate) == "string" then sanitized.plate = string.sub(data.plate, 1, 16) end
     if data.serviceType and type(data.serviceType) == "string" then sanitized.serviceType = string.sub(data.serviceType, 1, 32) end
     if data.lotId and type(data.lotId) == "string" then sanitized.lotId = string.sub(data.lotId, 1, 64) end
+    -- Citizen OS Master Smartphone Framework parameters
+    if data.recipientCitizenId and type(data.recipientCitizenId) == "string" then sanitized.recipientCitizenId = string.sub(data.recipientCitizenId, 1, 64) end
+    if data.transferAmount and type(data.transferAmount) == "number" then sanitized.transferAmount = math.max(0.01, math.min(10000000.0, data.transferAmount)) end
+    if data.transferMemo and type(data.transferMemo) == "string" then sanitized.transferMemo = string.sub(data.transferMemo, 1, 128) end
+    if data.alertCategory and type(data.alertCategory) == "string" then sanitized.alertCategory = string.sub(data.alertCategory, 1, 32) end
+    if data.alertMessage and type(data.alertMessage) == "string" then sanitized.alertMessage = string.sub(data.alertMessage, 1, 500) end
+    if data.alertPriority and type(data.alertPriority) == "string" then sanitized.alertPriority = string.sub(data.alertPriority, 1, 16) end
+    if data.locationLabel and type(data.locationLabel) == "string" then sanitized.locationLabel = string.sub(data.locationLabel, 1, 128) end
+    if data.wallpaper and type(data.wallpaper) == "string" then sanitized.wallpaper = string.sub(data.wallpaper, 1, 64) end
+    if data.darkMode ~= nil then sanitized.darkMode = (data.darkMode == true or data.darkMode == 1) end
+    if data.airplaneMode ~= nil then sanitized.airplaneMode = (data.airplaneMode == true or data.airplaneMode == 1) end
+    if data.appId and type(data.appId) == "string" then sanitized.appId = string.sub(data.appId, 1, 32) end
     if data.payload and type(data.payload) == "table" then
         sanitized.payload = Nyx.UI.SanitizePayload(data.payload)
     end
@@ -869,6 +881,97 @@ Nyx.UI.SafeNUICallback("vehicle:getImpoundLots", function(_, cb)
     end
     cb({ success = false, lots = {} })
 end)
+
+-- Citizen OS Master Smartphone NUI Callbacks
+Nyx.UI.SafeNUICallback("closePhone", function(_, cb)
+    if Nyx.UI.ClosePhone then
+        Nyx.UI.ClosePhone()
+    else
+        Nyx.UI.SetFocus(false, false)
+    end
+    cb({ success = true })
+end)
+
+Nyx.UI.SafeNUICallback("phone:getOverview", function(_, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("phone:getOverview")
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("phone:transferMoney", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("phone:transferMoney", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("phone:getFreightBoard", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("phone:getFreightBoard", data and data.filterType, data and data.search)
+        return cb(res or { success = false, contracts = {} })
+    end
+    cb({ success = false, contracts = {} })
+end)
+
+Nyx.UI.SafeNUICallback("phone:claimContract", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("phone:claimContract", data and data.contractId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("phone:loadFreightPallet", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("logistics:loadFreightPallet", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("phone:deliverContract", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("logistics:deliverContract", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("phone:abandonContract", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("logistics:abandonContract", data and data.contractId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("phone:sendEmergencyAlert", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("phone:sendEmergencyAlert", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("phone:getEmergencyAlerts", function(_, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("phone:getEmergencyAlerts")
+        return cb(res or { success = false, alerts = {} })
+    end
+    cb({ success = false, alerts = {} })
+end)
+
+Nyx.UI.SafeNUICallback("phone:updateSettings", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("phone:updateSettings", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
 
 
 

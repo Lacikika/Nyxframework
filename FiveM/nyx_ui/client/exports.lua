@@ -80,8 +80,43 @@ exports('CloseVehicleTerminalUI', function()
     Nyx.UI.Send("vehicle", "VEHICLE_TERMINAL_CLOSE", {})
 end)
 
+exports('OpenPhone', function(initialApp)
+    if Nyx.UI.OpenPhone then
+        Nyx.UI.OpenPhone(initialApp)
+    else
+        Nyx.UI.SetFocus(true, true)
+        Nyx.UI.Send("phone", "PHONE_OPEN", { initialApp = initialApp or "home" })
+    end
+end)
+
+exports('ClosePhone', function()
+    if Nyx.UI.ClosePhone then
+        Nyx.UI.ClosePhone()
+    else
+        Nyx.UI.SetFocus(false, false)
+        Nyx.UI.Send("phone", "PHONE_CLOSE", {})
+    end
+end)
+
+exports('TogglePhone', function(initialApp)
+    if Nyx.UI.TogglePhone then
+        Nyx.UI.TogglePhone(initialApp)
+    else
+        Nyx.UI.SetFocus(true, true)
+        Nyx.UI.Send("phone", "PHONE_OPEN", { initialApp = initialApp or "home" })
+    end
+end)
+
 exports('OpenView', function(viewName, data)
-    if viewName == "faction_commerce_terminal" or viewName == "corporate" or viewName == "factions" or viewName == "union" then
+    if viewName == "phone" or viewName == "smartphone" or viewName == "citizenphone" or viewName == "mobile" then
+        if Nyx.UI.OpenPhone then
+            Nyx.UI.OpenPhone(data and data.initialApp)
+        else
+            Nyx.UI.SetFocus(true, true)
+            Nyx.UI.Send("phone", "PHONE_OPEN", data or {})
+        end
+        return true
+    elseif viewName == "faction_commerce_terminal" or viewName == "corporate" or viewName == "factions" or viewName == "union" then
         Nyx.UI.SetFocus(true, true)
         Nyx.UI.Send("faction", "FACTION_DASHBOARD_OPEN", data or {})
         return true
@@ -120,3 +155,4 @@ exports('OpenView', function(viewName, data)
     end
     return false
 end)
+

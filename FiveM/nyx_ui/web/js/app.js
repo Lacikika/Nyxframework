@@ -1077,6 +1077,92 @@ function handleDevMockNui(action, data) {
             }
         };
     }
+    // Citizen OS Smartphone Mock Handlers
+    if (action === 'closePhone') {
+        return { success: true };
+    }
+    if (action === 'phone:getOverview') {
+        return {
+            success: true,
+            citizen: {
+                citizenId: 'NYX1024',
+                fullName: 'Kovács István',
+                job: 'Futár & Logisztikus',
+                phoneNumber: '555-0428'
+            },
+            settings: {
+                wallpaper: 'default_dark',
+                darkMode: true,
+                airplaneMode: false,
+                notificationsEnabled: true
+            },
+            banking: {
+                accountId: 'char:NYX1024:bank',
+                balance: 14250.75,
+                formattedBalance: '$14,250.75',
+                fiscalState: 'SOLVENT',
+                transferTaxRate: 0.02,
+                transactions: [
+                    { txUuid: 'tx_pay_01', isDebit: false, amount: 2400.0, formattedAmount: '+ $2,400.00', category: 'payroll', memo: 'Kincstári Munkabér', createdAt: '2026-10-18 09:30' },
+                    { txUuid: 'tx_wire_02', isDebit: true, amount: 350.0, formattedAmount: '- $350.00', category: 'p2p_wire', memo: 'Alkatrész vásárlás', createdAt: '2026-10-17 18:12' }
+                ]
+            },
+            logistics: {
+                activeHaul: {
+                    id: 104,
+                    uuid: 'haul_mock_104',
+                    itemId: 'Ipari Acéllemez',
+                    quantity: 40,
+                    totalPayout: 1850.0,
+                    escrowDeposit: 277.5,
+                    formattedPayout: '$1,850.00',
+                    formattedEscrow: '$277.50',
+                    status: 'in_transit',
+                    statusBadge: 'badge-warning',
+                    statusLabel: 'FOLYAMATBAN'
+                },
+                availableHaulsCount: 3
+            },
+            alerts: [
+                {
+                    id: 1,
+                    uuid: 'alert_mock_1',
+                    caller: 'KÖZÉRDEKŰ KÖZLÉNY',
+                    category: 'traffic',
+                    message: 'Karambol az Olympic Freeway déli lehajtójánál. Sávlezárás érvényben.',
+                    location: 'Olympic Freeway',
+                    priority: 'high',
+                    createdAt: Date.now() - 3600000,
+                    badge: { priorityBadgeClass: 'badge-danger', priorityLabel: 'SÜRGŐS', priorityIcon: 'fa-solid fa-triangle-exclamation', categoryLabel: 'Közlekedés', categoryIcon: 'fa-solid fa-car-burst', categoryColor: '#F59E0B' }
+                }
+            ]
+        };
+    }
+    if (action === 'phone:transferMoney') {
+        showNotification({ type: 'success', title: 'CIVICPAY ÁTUTALÁS', message: `Sikeresen átutaltál $${data.amount} összeget ${data.recipientCitizenId} részére!` });
+        return { success: true, amount: data.amount, fee: Math.round(data.amount * 0.02 * 100) / 100, newBalance: 13800.00 };
+    }
+    if (action === 'phone:getFreightBoard') {
+        return {
+            success: true,
+            contracts: [
+                { id: 105, uuid: 'haul_105', itemId: 'Orvosi Fertőtlenítő', quantity: 25, totalPayout: 1200.0, escrowDeposit: 180.0, formattedPayout: '$1,200.00', formattedEscrow: '$180.00', status: 'available', statusBadge: 'badge-info', statusLabel: 'ELÉRHETŐ' },
+                { id: 106, uuid: 'haul_106', itemId: 'Finomított Rézhuzal', quantity: 60, totalPayout: 2450.0, escrowDeposit: 367.5, formattedPayout: '$2,450.00', formattedEscrow: '$367.50', status: 'available', statusBadge: 'badge-info', statusLabel: 'ELÉRHETŐ' }
+            ]
+        };
+    }
+    if (action === 'phone:claimContract') {
+        showNotification({ type: 'success', title: 'HAULEXPRESS', message: `Fuvarmegbízás #${data.contractId} sikeresen felvéve!` });
+        return { success: true };
+    }
+    if (action === 'phone:sendEmergencyAlert') {
+        showNotification({ type: 'success', title: '911 SEGÉLYHÍVÓ', message: 'Segélykérésed továbbítva a hatóságok felé!' });
+        return { success: true, alertId: 99 };
+    }
+    if (action === 'phone:updateSettings') {
+        showNotification({ type: 'info', title: 'BEÁLLÍTÁSOK', message: 'Okostelefon beállításaid sikeresen elmentve.' });
+        return { success: true };
+    }
     return { success: true, devMode: true };
 }
 
@@ -1224,6 +1310,40 @@ const NyxState = {
         impoundLotFilter: 'all',
         selectedService: null,
         selectedImpound: null
+    },
+    phone: {
+        isOpen: false,
+        activeApp: 'home',
+        citizen: {
+            citizenId: 'NYX1000',
+            fullName: 'Állampolgár',
+            job: 'Polgár',
+            phoneNumber: '555-0100'
+        },
+        settings: {
+            wallpaper: 'default_dark',
+            darkMode: true,
+            airplaneMode: false,
+            notificationsEnabled: true
+        },
+        banking: {
+            accountId: 'char:NYX:bank',
+            balance: 0.00,
+            formattedBalance: '$0.00',
+            fiscalState: 'SOLVENT',
+            transferTaxRate: 0.02,
+            transactions: []
+        },
+        logistics: {
+            activeHaul: null,
+            availableHaulsCount: 0,
+            availableContracts: [],
+            searchQuery: ''
+        },
+        alerts: {
+            feed: [],
+            badgeCount: 0
+        }
     },
     activeDialog: null
 };
@@ -5651,6 +5771,446 @@ async function resetVehicleTripOdometer() {
     });
 }
 
+// ============================================================================
+// 12C. CITIZEN OS MASTER SMARTPHONE FRAMEWORK (`nyx_ui`)
+// ============================================================================
+
+async function openPhone(payload = {}) {
+    const overlay = document.getElementById('phone-overlay');
+    if (!overlay) return;
+
+    NyxState.phone.isOpen = true;
+    overlay.classList.remove('hidden');
+
+    // Update real-time status clock
+    updatePhoneClock();
+
+    const targetApp = payload.initialApp || 'home';
+    switchPhoneApp(targetApp);
+
+    await refreshPhoneOverview();
+}
+
+function closePhone() {
+    const overlay = document.getElementById('phone-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    NyxState.phone.isOpen = false;
+    postNui('closePhone', {});
+}
+
+function updatePhoneClock() {
+    const timeEl = document.getElementById('phone-status-time');
+    if (timeEl) {
+        const now = new Date();
+        const hrs = String(now.getHours()).padStart(2, '0');
+        const mins = String(now.getMinutes()).padStart(2, '0');
+        timeEl.textContent = `${hrs}:${mins}`;
+    }
+}
+
+function switchPhoneApp(appId) {
+    NyxState.phone.activeApp = appId;
+
+    const screenHome = document.getElementById('phone-screen-home');
+    const screenApp = document.getElementById('phone-screen-app');
+    const titleEl = document.getElementById('phone-app-title');
+
+    if (appId === 'home') {
+        if (screenHome) screenHome.classList.remove('hidden');
+        if (screenApp) screenApp.classList.add('hidden');
+        return;
+    }
+
+    if (screenHome) screenHome.classList.add('hidden');
+    if (screenApp) screenApp.classList.remove('hidden');
+
+    // Hide all panes
+    document.querySelectorAll('.phone-app-pane').forEach(p => p.classList.add('hidden'));
+
+    const titles = {
+        banking: 'CivicPay Bank',
+        logistics: 'HaulExpress Tőzsde',
+        alerts: 'CivicAlert (911)',
+        profile: 'CivicID Igazolvány',
+        settings: 'Beállítások'
+    };
+
+    if (titleEl) titleEl.textContent = titles[appId] || 'Alkalmazás';
+
+    const targetPane = document.getElementById(`phone-app-${appId}`);
+    if (targetPane) targetPane.classList.remove('hidden');
+
+    if (appId === 'banking') {
+        renderPhoneBanking();
+    } else if (appId === 'logistics') {
+        renderPhoneLogistics();
+        fetchPhoneFreightBoard();
+    } else if (appId === 'alerts') {
+        renderPhoneAlerts();
+    } else if (appId === 'profile') {
+        renderPhoneProfile();
+    } else if (appId === 'settings') {
+        renderPhoneSettings();
+    }
+}
+
+async function refreshPhoneOverview() {
+    updatePhoneClock();
+    const res = await postNui('phone:getOverview', {});
+    if (res && res.success) {
+        if (res.citizen) NyxState.phone.citizen = res.citizen;
+        if (res.settings) NyxState.phone.settings = res.settings;
+        if (res.banking) NyxState.phone.banking = res.banking;
+        if (res.logistics) NyxState.phone.logistics = res.logistics;
+        if (res.alerts) NyxState.phone.alerts.feed = res.alerts;
+
+        renderPhoneHome();
+
+        if (NyxState.phone.activeApp !== 'home') {
+            switchPhoneApp(NyxState.phone.activeApp);
+        }
+    }
+}
+
+function renderPhoneHome() {
+    const greetingEl = document.getElementById('phone-home-greeting');
+    const ownerEl = document.getElementById('phone-home-owner');
+    const dateEl = document.getElementById('phone-home-date');
+    const badgeLogistics = document.getElementById('phone-badge-logistics');
+    const badgeAlerts = document.getElementById('phone-badge-alerts');
+
+    if (greetingEl) greetingEl.textContent = `Üdvözlünk, ${escapeHtml(NyxState.phone.citizen.fullName || 'Polgár')}!`;
+    if (ownerEl) ownerEl.textContent = `ID: ${escapeHtml(NyxState.phone.citizen.citizenId || 'NYX')} | Tel: ${escapeHtml(NyxState.phone.citizen.phoneNumber || '555-0100')}`;
+
+    if (dateEl) {
+        const now = new Date();
+        const days = ['VASÁRNAP', 'HÉTFŐ', 'KEDD', 'SZERDA', 'CSÜTÖRTÖK', 'PÉNTEK', 'SZOMBAT'];
+        const months = ['JANUÁR', 'FEBRUÁR', 'MÁRCIUS', 'ÁPRILIS', 'MÁJUS', 'JÚNIUS', 'JÚLIUS', 'AUGUSZTUS', 'SZEPTEMBER', 'OKTÓBER', 'NOVEMBER', 'DECEMBER'];
+        dateEl.textContent = `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`;
+    }
+
+    if (badgeLogistics) {
+        const count = NyxState.phone.logistics.availableHaulsCount || 0;
+        if (count > 0) {
+            badgeLogistics.textContent = count;
+            badgeLogistics.classList.remove('hidden');
+        } else {
+            badgeLogistics.classList.add('hidden');
+        }
+    }
+
+    if (badgeAlerts) {
+        const count = NyxState.phone.alerts.feed ? NyxState.phone.alerts.feed.length : 0;
+        if (count > 0) {
+            badgeAlerts.classList.remove('hidden');
+        } else {
+            badgeAlerts.classList.add('hidden');
+        }
+    }
+}
+
+function renderPhoneBanking() {
+    const balEl = document.getElementById('phone-bank-balance');
+    const accEl = document.getElementById('phone-bank-account');
+    const pillEl = document.getElementById('phone-bank-fiscal-pill');
+    const txCont = document.getElementById('phone-bank-transactions');
+
+    const b = NyxState.phone.banking;
+    if (balEl) balEl.textContent = b.formattedBalance || `$${(b.balance || 0).toFixed(2)}`;
+    if (accEl) accEl.textContent = b.accountId || `char:${NyxState.phone.citizen.citizenId}:bank`;
+
+    if (pillEl) {
+        const state = b.fiscalState || 'SOLVENT';
+        pillEl.textContent = state;
+        pillEl.className = 'badge ' + (state === 'SOLVENT' ? 'badge-success' : 'badge-danger');
+    }
+
+    if (txCont) {
+        const txs = b.transactions || [];
+        if (txs.length === 0) {
+            txCont.innerHTML = '<div class="empty-state" style="padding: 10px; font-size: 11px;">Nincs rögzített számlatörténet.</div>';
+        } else {
+            txCont.innerHTML = txs.map(tx => `
+                <div class="phone-tx-row">
+                    <div class="phone-tx-meta">
+                        <span class="phone-tx-memo">${escapeHtml(tx.memo || 'Átutalás')}</span>
+                        <span class="phone-tx-sub">${escapeHtml(tx.category || 'general')} &bull; ${escapeHtml(String(tx.createdAt || ''))}</span>
+                    </div>
+                    <span class="phone-tx-val ${tx.isDebit ? 'debit' : 'credit'}">${escapeHtml(tx.formattedAmount || (tx.isDebit ? '-$' : '+$') + tx.amount)}</span>
+                </div>
+            `).join('');
+        }
+    }
+}
+
+async function handlePhoneTransferSubmit() {
+    const recipientInput = document.getElementById('phone-transfer-recipient');
+    const amountInput = document.getElementById('phone-transfer-amount');
+    const memoInput = document.getElementById('phone-transfer-memo');
+
+    const recipient = recipientInput ? recipientInput.value.trim() : '';
+    const amount = amountInput ? parseFloat(amountInput.value) : 0;
+    const memo = memoInput ? memoInput.value.trim() : '';
+
+    if (!recipient) {
+        showNotification({ type: 'warning', title: 'HIÁNYZÓ ADAT', message: 'Kérlek add meg a kedvezményezett Citizen ID-t!' });
+        return;
+    }
+    if (isNaN(amount) || amount <= 0) {
+        showNotification({ type: 'warning', title: 'ÉRVÉNYTELEN ÖSSZEG', message: 'Kérlek adj meg egy érvényes összeget!' });
+        return;
+    }
+
+    const btn = document.getElementById('phone-transfer-submit-btn');
+    lockButtonAction(btn, async () => {
+        const res = await postNui('phone:transferMoney', {
+            recipientCitizenId: recipient,
+            amount: amount,
+            memo: memo
+        });
+
+        if (res && res.success) {
+            playWebBeep(1000, 'sine', 0.12);
+            showNotification({
+                type: 'success',
+                title: 'ÁTUTALÁS SIKERES',
+                message: `$${amount.toFixed(2)} sikeresen átutalva (${recipient}) részére! Tranzakciós illeték: $${(res.fee || 0).toFixed(2)}.`
+            });
+            if (recipientInput) recipientInput.value = '';
+            if (amountInput) amountInput.value = '';
+            if (memoInput) memoInput.value = '';
+            const feePreview = document.getElementById('phone-transfer-fee-preview');
+            if (feePreview) feePreview.textContent = '$0.00';
+            await refreshPhoneOverview();
+        } else {
+            showNotification({
+                type: 'error',
+                title: 'ÁTUTALÁS MEGSZAKADT',
+                message: res?.error || 'A tranzakció elutasításra került.'
+            });
+        }
+    });
+}
+
+function renderPhoneLogistics() {
+    const banner = document.getElementById('phone-haul-active-banner');
+    const haul = NyxState.phone.logistics.activeHaul;
+
+    if (banner) {
+        if (haul && haul.status === 'in_transit') {
+            banner.classList.remove('hidden');
+            const itemEl = document.getElementById('phone-haul-active-item');
+            const payoutEl = document.getElementById('phone-haul-active-payout');
+            const escrowEl = document.getElementById('phone-haul-active-escrow');
+
+            if (itemEl) itemEl.textContent = `${escapeHtml(haul.itemId || 'Fuvar')} (${haul.quantity || 1} db)`;
+            if (payoutEl) payoutEl.textContent = haul.formattedPayout || `$${haul.totalPayout || 0}`;
+            if (escrowEl) escrowEl.textContent = haul.formattedEscrow || `$${haul.escrowDeposit || 0}`;
+        } else {
+            banner.classList.add('hidden');
+        }
+    }
+}
+
+async function fetchPhoneFreightBoard() {
+    const searchInput = document.getElementById('phone-haul-search-input');
+    const search = searchInput ? searchInput.value.trim() : '';
+
+    const res = await postNui('phone:getFreightBoard', { filterType: 'all', search: search });
+    const listCont = document.getElementById('phone-haul-available-list');
+    if (!listCont) return;
+
+    if (res && res.contracts && res.contracts.length > 0) {
+        listCont.innerHTML = res.contracts.map(c => `
+            <div class="phone-contract-item">
+                <div class="phone-contract-header">
+                    <strong>${escapeHtml(c.itemId || 'Szállítmány')} &times; ${c.quantity || 1}</strong>
+                    <span class="badge ${c.statusBadge || 'badge-info'}">${c.statusLabel || 'ELÉRHETŐ'}</span>
+                </div>
+                <div class="phone-haul-specs">
+                    <div><span class="sub">Díj:</span> <b>${c.formattedPayout || '$' + c.totalPayout}</b></div>
+                    <div><span class="sub">Kaució:</span> <b>${c.formattedEscrow || '$' + c.escrowDeposit}</b></div>
+                </div>
+                <button class="phone-btn phone-btn-secondary btn-claim-phone-haul" data-contract-id="${c.id}">
+                    <i class="fa-solid fa-hand-holding-dollar"></i> Megbízás Elfogadása
+                </button>
+            </div>
+        `).join('');
+
+        listCont.querySelectorAll('.btn-claim-phone-haul').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const cid = btn.dataset.contractId;
+                lockButtonAction(btn, async () => {
+                    const cRes = await postNui('phone:claimContract', { contractId: cid });
+                    if (cRes && cRes.success) {
+                        playWebBeep(920, 'sine', 0.1);
+                        showNotification({
+                            type: 'success',
+                            title: 'FUVAR FELVÉVE',
+                            message: `Megbízás #${cid} aktiválva! A rakomány átvehető a logisztikai telephelyen.`
+                        });
+                        await refreshPhoneOverview();
+                        fetchPhoneFreightBoard();
+                    } else {
+                        showNotification({
+                            type: 'error',
+                            title: 'SIKERTELEN FELVÉTEL',
+                            message: cRes?.error || 'A megbízást nem sikerült zárolni.'
+                        });
+                    }
+                });
+            });
+        });
+    } else {
+        listCont.innerHTML = '<div class="empty-state" style="padding: 12px; font-size: 11px;">Jelenleg nincs elérhető fuvarmegbízás a tőzsdén.</div>';
+    }
+}
+
+function renderPhoneAlerts() {
+    const listCont = document.getElementById('phone-alerts-feed');
+    if (!listCont) return;
+
+    const alerts = NyxState.phone.alerts.feed || [];
+    if (alerts.length === 0) {
+        listCont.innerHTML = '<div class="empty-state" style="padding: 12px; font-size: 11px;">Nincs aktív közérdekű riasztás a városban.</div>';
+        return;
+    }
+
+    listCont.innerHTML = alerts.map(a => {
+        const badge = a.badge || { priorityBadgeClass: 'badge-danger', priorityLabel: 'RIASZTÁS', categoryLabel: '911', categoryIcon: 'fa-solid fa-triangle-exclamation' };
+        return `
+            <div class="phone-alert-card">
+                <div class="phone-alert-header">
+                    <span><i class="${badge.categoryIcon || 'fa-solid fa-bullhorn'}"></i> ${escapeHtml(badge.categoryLabel || a.category || '911')}</span>
+                    <span class="badge ${badge.priorityBadgeClass || 'badge-danger'}">${escapeHtml(badge.priorityLabel || a.priority || 'RIASZTÁS')}</span>
+                </div>
+                <div class="phone-alert-msg">${escapeHtml(a.message || '')}</div>
+                <div class="phone-tx-sub"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(a.location || 'Los Santos')} &bull; ${escapeHtml(a.caller || 'Állampolgár')}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function handlePhoneAlertSubmit() {
+    const catEl = document.getElementById('phone-alert-category');
+    const priEl = document.getElementById('phone-alert-priority');
+    const locEl = document.getElementById('phone-alert-location');
+    const msgEl = document.getElementById('phone-alert-message');
+
+    const cat = catEl ? catEl.value : 'police';
+    const pri = priEl ? priEl.value : 'medium';
+    const loc = locEl ? locEl.value.trim() : 'Los Santos';
+    const msg = msgEl ? msgEl.value.trim() : '';
+
+    if (!msg || msg.length < 5) {
+        showNotification({ type: 'warning', title: 'TÚL RÖVID LEÍRÁS', message: 'Kérlek adj meg legalább 5 karakteres leírást a vészhelyzetről!' });
+        return;
+    }
+
+    const btn = document.getElementById('phone-alert-submit-btn');
+    lockButtonAction(btn, async () => {
+        const res = await postNui('phone:sendEmergencyAlert', {
+            category: cat,
+            priority: pri,
+            locationLabel: loc,
+            message: msg
+        });
+
+        if (res && res.success) {
+            playWebBeep(1200, 'square', 0.15);
+            showNotification({
+                type: 'success',
+                title: '911 SEGÉLYKÉRÉS RÖGZÍTVE',
+                message: 'A diszpécserközpont továbbította a bejelentésedet a járőregységeknek!'
+            });
+            if (msgEl) msgEl.value = '';
+            await refreshPhoneOverview();
+        } else {
+            showNotification({
+                type: 'error',
+                title: 'BEJELENTÉS ELUTASÍTVA',
+                message: res?.error || 'A segélykérés leadása meghiúsult.'
+            });
+        }
+    });
+}
+
+function renderPhoneProfile() {
+    const c = NyxState.phone.citizen;
+    const nameEl = document.getElementById('phone-profile-name');
+    const cidEl = document.getElementById('phone-profile-cid');
+    const phoneEl = document.getElementById('phone-profile-phone');
+    const jobEl = document.getElementById('phone-profile-job');
+
+    if (nameEl) nameEl.textContent = c.fullName || 'Állampolgár';
+    if (cidEl) cidEl.textContent = `ID: ${c.citizenId || 'NYX1000'}`;
+    if (phoneEl) phoneEl.textContent = c.phoneNumber || '555-0100';
+    if (jobEl) jobEl.textContent = c.job || 'Polgár';
+}
+
+function renderPhoneSettings() {
+    const s = NyxState.phone.settings;
+    const dmEl = document.getElementById('phone-setting-darkmode');
+    const amEl = document.getElementById('phone-setting-airplanemode');
+    const wpEl = document.getElementById('phone-setting-wallpaper');
+
+    if (dmEl) dmEl.checked = (s.darkMode !== false);
+    if (amEl) amEl.checked = (s.airplaneMode === true);
+    if (wpEl && s.wallpaper) wpEl.value = s.wallpaper;
+}
+
+async function handlePhoneSettingsSave() {
+    const dmEl = document.getElementById('phone-setting-darkmode');
+    const amEl = document.getElementById('phone-setting-airplanemode');
+    const wpEl = document.getElementById('phone-setting-wallpaper');
+
+    const darkMode = dmEl ? dmEl.checked : true;
+    const airplaneMode = amEl ? amEl.checked : false;
+    const wallpaper = wpEl ? wpEl.value : 'default_dark';
+
+    const btn = document.getElementById('phone-settings-save-btn');
+    lockButtonAction(btn, async () => {
+        const res = await postNui('phone:updateSettings', {
+            darkMode,
+            airplaneMode,
+            wallpaper
+        });
+
+        if (res && res.success) {
+            playWebBeep(880, 'sine', 0.08);
+            showNotification({
+                type: 'info',
+                title: 'BEÁLLÍTÁSOK MENTVE',
+                message: 'Okostelefon konfiguráció sikeresen elmentve.'
+            });
+            NyxState.phone.settings.darkMode = darkMode;
+            NyxState.phone.settings.airplaneMode = airplaneMode;
+            NyxState.phone.settings.wallpaper = wallpaper;
+        } else {
+            showNotification({
+                type: 'error',
+                title: 'MENTÉS SIKERTELEN',
+                message: res?.error || 'A beállítások mentése meghiúsult.'
+            });
+        }
+    });
+}
+
+function handleIncomingPhoneNotification(alertData) {
+    if (!alertData) return;
+    if (NyxState.phone.settings.airplaneMode) return;
+
+    if (!NyxState.phone.alerts.feed) NyxState.phone.alerts.feed = [];
+    NyxState.phone.alerts.feed.unshift(alertData);
+
+    const badge = document.getElementById('phone-badge-alerts');
+    if (badge) badge.classList.remove('hidden');
+
+    if (NyxState.phone.isOpen && NyxState.phone.activeApp === 'alerts') {
+        renderPhoneAlerts();
+    }
+}
+
 // 13. Global NUI Envelope Dispatcher
 window.addEventListener('message', (event) => {
     const packet = event.data;
@@ -5759,6 +6319,15 @@ window.addEventListener('message', (event) => {
         openVehicleTerminal(packet.payload);
     } else if (action === 'VEHICLE_TERMINAL_CLOSE') {
         closeVehicleTerminal();
+    }
+
+    // Citizen OS Master Smartphone Framework
+    else if (action === 'PHONE_OPEN') {
+        openPhone(packet.payload);
+    } else if (action === 'PHONE_CLOSE') {
+        closePhone();
+    } else if (action === 'PHONE_NOTIFICATION') {
+        handleIncomingPhoneNotification(packet.payload);
     }
 });
 
@@ -6308,6 +6877,90 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('vehicle-impound-search')?.addEventListener('input', renderVehicleImpounds);
     document.getElementById('vehicle-impound-lot-filter')?.addEventListener('change', renderVehicleImpounds);
 
+    // Citizen OS Master Smartphone Listeners
+    document.querySelectorAll('.phone-app-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const app = btn.getAttribute('data-app');
+            if (app) switchPhoneApp(app);
+        });
+    });
+
+    document.getElementById('phone-home-bar')?.addEventListener('click', () => {
+        switchPhoneApp('home');
+    });
+
+    document.getElementById('phone-back-btn')?.addEventListener('click', () => {
+        switchPhoneApp('home');
+    });
+
+    document.getElementById('phone-refresh-btn')?.addEventListener('click', refreshPhoneOverview);
+
+    // Banking wire transfer listeners
+    document.getElementById('phone-transfer-amount')?.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value) || 0;
+        const rate = (NyxState.phone && NyxState.phone.banking && NyxState.phone.banking.transferTaxRate) || 0.02;
+        const fee = Math.round(val * rate * 100) / 100;
+        const feeEl = document.getElementById('phone-transfer-fee-preview');
+        if (feeEl) feeEl.textContent = `$${fee.toFixed(2)} (Összesen: $${(val + fee).toFixed(2)})`;
+    });
+
+    document.getElementById('phone-transfer-submit-btn')?.addEventListener('click', handlePhoneTransferSubmit);
+
+    // Logistics freight board listeners
+    document.getElementById('phone-haul-search-input')?.addEventListener('input', fetchPhoneFreightBoard);
+
+    document.getElementById('phone-haul-load-btn')?.addEventListener('click', async () => {
+        const haul = NyxState.phone.logistics.activeHaul;
+        if (!haul) return;
+        const btn = document.getElementById('phone-haul-load-btn');
+        lockButtonAction(btn, async () => {
+            const res = await postNui('phone:loadFreightPallet', { contractId: haul.id });
+            if (res && res.success) {
+                playWebBeep(920, 'sine', 0.1);
+                showNotification({ type: 'success', title: 'RAKOMÁNY BERAKODVA', message: 'A rakomány sikeresen felrakodva a járműre!' });
+            } else {
+                showNotification({ type: 'error', title: 'BERAKODÁS SIKERTELEN', message: res?.error || 'A rakodás sikertelen.' });
+            }
+        });
+    });
+
+    document.getElementById('phone-haul-deliver-btn')?.addEventListener('click', async () => {
+        const haul = NyxState.phone.logistics.activeHaul;
+        if (!haul) return;
+        const btn = document.getElementById('phone-haul-deliver-btn');
+        lockButtonAction(btn, async () => {
+            const res = await postNui('phone:deliverContract', { contractId: haul.id });
+            if (res && res.success) {
+                playWebBeep(1100, 'sine', 0.15);
+                showNotification({ type: 'success', title: 'FUVAR TELJESÍTVE', message: 'A rakomány sikeresen leadva a rendeltetési helyen! Kifizetés jóváírva.' });
+                await refreshPhoneOverview();
+            } else {
+                showNotification({ type: 'error', title: 'ÁTADÁS SIKERTELEN', message: res?.error || 'A célállomáson nem sikerült az átadás.' });
+            }
+        });
+    });
+
+    document.getElementById('phone-haul-abandon-btn')?.addEventListener('click', async () => {
+        const haul = NyxState.phone.logistics.activeHaul;
+        if (!haul) return;
+        const btn = document.getElementById('phone-haul-abandon-btn');
+        lockButtonAction(btn, async () => {
+            const res = await postNui('phone:abandonContract', { contractId: haul.id });
+            if (res && res.success) {
+                showNotification({ type: 'warning', title: 'FUVAR MEGSZAKÍTVA', message: 'Fuvarmegbízás feladva. A kaució elveszett.' });
+                await refreshPhoneOverview();
+            } else {
+                showNotification({ type: 'error', title: 'HIBA', message: res?.error || 'Nem sikerült megszakítani.' });
+            }
+        });
+    });
+
+    // 911 SOS Alert authoring listener
+    document.getElementById('phone-alert-submit-btn')?.addEventListener('click', handlePhoneAlertSubmit);
+
+    // Settings save listener
+    document.getElementById('phone-settings-save-btn')?.addEventListener('click', handlePhoneSettingsSave);
+
     // Dialog Confirm & Cancel
     document.getElementById('dialog-confirm-btn')?.addEventListener('click', () => closeDialog(true));
     document.getElementById('dialog-cancel-btn')?.addEventListener('click', () => closeDialog(false));
@@ -6429,6 +7082,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (NyxState.vehicle && NyxState.vehicle.isOpen) {
                 closeVehicleTerminal();
+                return;
+            }
+            if (NyxState.phone && NyxState.phone.isOpen) {
+                if (NyxState.phone.activeApp !== 'home') {
+                    switchPhoneApp('home');
+                } else {
+                    closePhone();
+                }
                 return;
             }
             if (NyxState.mdt.isOpen) {
@@ -6620,6 +7281,14 @@ function initBrowserDevMode() {
             closeVehicleTerminal();
         } else {
             openVehicleTerminal({ activeTab: 'diagnostics' });
+        }
+    });
+
+    document.getElementById('dev-btn-phone')?.addEventListener('click', () => {
+        if (NyxState.phone && NyxState.phone.isOpen) {
+            closePhone();
+        } else {
+            openPhone({ initialApp: 'home' });
         }
     });
 

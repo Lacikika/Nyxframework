@@ -27,6 +27,7 @@
             <button id="dev-btn-freight"><i class="fa-solid fa-truck"></i> Freight</button>
             <button id="dev-btn-logistics"><i class="fa-solid fa-boxes-stacked"></i> Warehouse/Market</button>
             <button id="dev-btn-vehicle"><i class="fa-solid fa-wrench"></i> Vehicles/Impound</button>
+            <button id="dev-btn-phone"><i class="fa-solid fa-mobile-screen"></i> Phone</button>
             <button id="dev-btn-interact"><i class="fa-solid fa-crosshairs"></i> Target</button>
             <button id="dev-btn-place"><i class="fa-solid fa-arrows-up-down-left-right"></i> Place</button>
             <button id="dev-btn-toast"><i class="fa-solid fa-bell"></i> Toast</button>
@@ -2194,6 +2195,287 @@
                 <div class="modal-footer">
                     <button id="vehicle-release-cancel-btn" class="btn btn-secondary">Mégse</button>
                     <button id="vehicle-release-confirm-btn" class="btn btn-primary"><i class="fa-solid fa-dollar-sign"></i> Díj Megfizetése & Kiváltás</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================
+             8H. CITIZEN OS MASTER SMARTPHONE FRAMEWORK (`nyx_ui`)
+             ================================================================ -->
+        <div id="phone-overlay" class="phone-backdrop hidden">
+            <div id="phone-chassis" class="phone-chassis">
+                <!-- Phone Top Dynamic Island & Speaker -->
+                <div class="phone-notch-container">
+                    <div id="phone-dynamic-island" class="phone-dynamic-island">
+                        <span class="island-camera"></span>
+                        <span class="island-speaker"></span>
+                    </div>
+                </div>
+
+                <!-- Status Bar -->
+                <div id="phone-status-bar" class="phone-status-bar">
+                    <div class="status-left">
+                        <span id="phone-status-time">12:00</span>
+                    </div>
+                    <div class="status-right">
+                        <i class="fa-solid fa-signal phone-status-icon"></i>
+                        <span class="phone-network-tag">5G</span>
+                        <i class="fa-solid fa-wifi phone-status-icon"></i>
+                        <span id="phone-status-battery" class="phone-battery-tag"><i class="fa-solid fa-battery-full"></i> 100%</span>
+                    </div>
+                </div>
+
+                <!-- Phone Screen Content Body -->
+                <div id="phone-screen-body" class="phone-screen-body">
+                    <!-- Screen 1: Home Launcher Grid -->
+                    <div id="phone-screen-home" class="phone-screen-view">
+                        <div class="phone-home-header">
+                            <span id="phone-home-date" class="phone-home-date">VASÁRNAP, OKTÓBER 18</span>
+                            <h2 id="phone-home-greeting" class="phone-home-greeting">Üdvözlünk!</h2>
+                            <span id="phone-home-owner" class="phone-home-sub">Citizen ID: NYX1000</span>
+                        </div>
+
+                        <!-- App Grid -->
+                        <div id="phone-app-grid" class="phone-app-grid">
+                            <button class="phone-app-btn" data-app="banking">
+                                <div class="app-icon-box emerald">
+                                    <i class="fa-solid fa-building-columns"></i>
+                                </div>
+                                <span class="app-label">CivicPay</span>
+                            </button>
+
+                            <button class="phone-app-btn" data-app="logistics">
+                                <div class="app-icon-box amber">
+                                    <i class="fa-solid fa-truck-fast"></i>
+                                    <span id="phone-badge-logistics" class="app-badge hidden">0</span>
+                                </div>
+                                <span class="app-label">HaulExpress</span>
+                            </button>
+
+                            <button class="phone-app-btn" data-app="alerts">
+                                <div class="app-icon-box crimson">
+                                    <i class="fa-solid fa-tower-broadcast"></i>
+                                    <span id="phone-badge-alerts" class="app-badge hidden">!</span>
+                                </div>
+                                <span class="app-label">CivicAlert</span>
+                            </button>
+
+                            <button class="phone-app-btn" data-app="profile">
+                                <div class="app-icon-box cyan">
+                                    <i class="fa-solid fa-id-card"></i>
+                                </div>
+                                <span class="app-label">CivicID</span>
+                            </button>
+
+                            <button class="phone-app-btn" data-app="settings">
+                                <div class="app-icon-box slate">
+                                    <i class="fa-solid fa-gear"></i>
+                                </div>
+                                <span class="app-label">Beállítások</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Screen 2: Active App Frame -->
+                    <div id="phone-screen-app" class="phone-screen-view hidden">
+                        <!-- Top App Bar -->
+                        <div id="phone-app-header" class="phone-app-header">
+                            <button id="phone-back-btn" class="phone-header-btn" title="Vissza a kezdőképernyőre"><i class="fa-solid fa-chevron-left"></i></button>
+                            <h3 id="phone-app-title">Alkalmazás</h3>
+                            <button id="phone-refresh-btn" class="phone-header-btn" title="Frissítés"><i class="fa-solid fa-arrows-rotate"></i></button>
+                        </div>
+
+                        <!-- App Content Container -->
+                        <div id="phone-app-content" class="phone-app-content">
+                            <!-- 1. CivicPay (Banking) -->
+                            <div id="phone-app-banking" class="phone-app-pane hidden">
+                                <div class="phone-card bank-card">
+                                    <div class="card-brand">
+                                        <i class="fa-solid fa-building-columns"></i>
+                                        <span>CIVIC TREASURY BANK</span>
+                                    </div>
+                                    <div class="card-balance-block">
+                                        <span class="card-sub-label">ELÉRHETŐ EGYENLEG</span>
+                                        <h2 id="phone-bank-balance">$0.00</h2>
+                                    </div>
+                                    <div class="card-footer-info">
+                                        <span id="phone-bank-account" class="mono">char:NYX:bank</span>
+                                        <span id="phone-bank-fiscal-pill" class="badge badge-success">SOLVENT</span>
+                                    </div>
+                                </div>
+
+                                <!-- Wire Transfer Form -->
+                                <div class="phone-section">
+                                    <h4 class="phone-section-title"><i class="fa-solid fa-paper-plane"></i> P2P Átutalás Indítása</h4>
+                                    <div class="phone-form">
+                                        <div class="phone-form-group">
+                                            <label>Kedvezményezett Citizen ID</label>
+                                            <input type="text" id="phone-transfer-recipient" class="phone-input" placeholder="Pl. NYX2048" maxlength="64">
+                                        </div>
+                                        <div class="phone-form-group">
+                                            <label>Átutalandó Összeg ($)</label>
+                                            <input type="number" id="phone-transfer-amount" class="phone-input" min="1" max="10000000" step="1" placeholder="Pl. 500">
+                                        </div>
+                                        <div class="phone-form-group">
+                                            <label>Közlemény / Megjegyzés</label>
+                                            <input type="text" id="phone-transfer-memo" class="phone-input" placeholder="Pl. Szolgáltatás díja" maxlength="128">
+                                        </div>
+                                        <div class="phone-fee-box">
+                                            <span>Tranzakciós Illeték (2.00%):</span>
+                                            <span id="phone-transfer-fee-preview">$0.00</span>
+                                        </div>
+                                        <button id="phone-transfer-submit-btn" class="phone-btn phone-btn-primary"><i class="fa-solid fa-arrow-right-arrow-left"></i> Átutalás Jóváhagyása</button>
+                                    </div>
+                                </div>
+
+                                <!-- Recent Transactions -->
+                                <div class="phone-section">
+                                    <h4 class="phone-section-title"><i class="fa-solid fa-clock-rotate-left"></i> Legutóbbi Tranzakciók</h4>
+                                    <div id="phone-bank-transactions" class="phone-list">
+                                        <!-- Dynamic transactions -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 2. HaulExpress (Logistics Freight Board) -->
+                            <div id="phone-app-logistics" class="phone-app-pane hidden">
+                                <!-- Active Haul Banner -->
+                                <div id="phone-haul-active-banner" class="phone-haul-card hidden">
+                                    <div class="phone-card-top">
+                                        <span class="tag"><i class="fa-solid fa-truck"></i> FOLYAMATBAN</span>
+                                        <span id="phone-haul-active-status" class="badge badge-warning">IN TRANSIT</span>
+                                    </div>
+                                    <h4 id="phone-haul-active-item">Acél Gerenda (50 egység)</h4>
+                                    <div class="phone-haul-specs">
+                                        <div><span class="sub">Várható Díj:</span> <b id="phone-haul-active-payout">$0.00</b></div>
+                                        <div><span class="sub">Zárolt Kaució:</span> <b id="phone-haul-active-escrow">$0.00</b></div>
+                                    </div>
+                                    <div class="phone-haul-actions">
+                                        <button id="phone-haul-load-btn" class="phone-btn phone-btn-secondary"><i class="fa-solid fa-dolly"></i> Rakodás</button>
+                                        <button id="phone-haul-deliver-btn" class="phone-btn phone-btn-primary"><i class="fa-solid fa-check"></i> Átadás</button>
+                                        <button id="phone-haul-abandon-btn" class="phone-btn phone-btn-danger"><i class="fa-solid fa-xmark"></i> Feladás</button>
+                                    </div>
+                                </div>
+
+                                <!-- Available Contracts -->
+                                <div class="phone-section">
+                                    <div class="phone-section-header">
+                                        <h4 class="phone-section-title"><i class="fa-solid fa-list-check"></i> Elérhető Megbízások</h4>
+                                        <input type="text" id="phone-haul-search-input" class="phone-search-input" placeholder="Keresés...">
+                                    </div>
+                                    <div id="phone-haul-available-list" class="phone-list">
+                                        <!-- Dynamic freight items -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 3. CivicAlert (Emergency 911 & Alerts) -->
+                            <div id="phone-app-alerts" class="phone-app-pane hidden">
+                                <!-- 911 SOS Alert Authoring -->
+                                <div class="phone-section">
+                                    <h4 class="phone-section-title"><i class="fa-solid fa-triangle-exclamation"></i> Sürgősségi 911 Bejelentés</h4>
+                                    <div class="phone-form">
+                                        <div class="phone-form-group">
+                                            <label>Szolgálat / Kategória</label>
+                                            <select id="phone-alert-category" class="phone-input">
+                                                <option value="police">Rendőrség (Bűncselekmény / Támadás)</option>
+                                                <option value="medical">Mentőszolgálat (Sérülés / Trauma)</option>
+                                                <option value="fire">Katasztrófavédelem (Tűz / Műszaki mentés)</option>
+                                                <option value="traffic">Közlekedésrendészet (Baleset / Akadály)</option>
+                                                <option value="general">Közérdekű / Polgári Jelzés</option>
+                                            </select>
+                                        </div>
+                                        <div class="phone-form-group">
+                                            <label>Prioritás</label>
+                                            <select id="phone-alert-priority" class="phone-input">
+                                                <option value="critical">KRITIKUS - Életveszély</option>
+                                                <option value="high">SÜRGŐS - Folyamatban lévő cselekmény</option>
+                                                <option value="medium" selected>NORMÁL - Általános bejelentés</option>
+                                                <option value="low">ALACSONY - Utólagos tájékoztatás</option>
+                                            </select>
+                                        </div>
+                                        <div class="phone-form-group">
+                                            <label>Helyszín Megnevezése</label>
+                                            <input type="text" id="phone-alert-location" class="phone-input" placeholder="Pl. Legion Square, Főbejárat" maxlength="128">
+                                        </div>
+                                        <div class="phone-form-group">
+                                            <label>Bejelentés Szövege</label>
+                                            <textarea id="phone-alert-message" class="phone-input" rows="3" placeholder="Írd le a vészhelyzet részleteit..." maxlength="500"></textarea>
+                                        </div>
+                                        <button id="phone-alert-submit-btn" class="phone-btn phone-btn-danger"><i class="fa-solid fa-phone"></i> 911 Segélykérés Leadása</button>
+                                    </div>
+                                </div>
+
+                                <!-- Public Broadcasts Feed -->
+                                <div class="phone-section">
+                                    <h4 class="phone-section-title"><i class="fa-solid fa-bullhorn"></i> Közérdekű Riasztási Hírcsatorna</h4>
+                                    <div id="phone-alerts-feed" class="phone-list">
+                                        <!-- Dynamic alerts -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 4. CivicID (Profile) -->
+                            <div id="phone-app-profile" class="phone-app-pane hidden">
+                                <div class="phone-card id-card">
+                                    <div class="id-card-top">
+                                        <i class="fa-solid fa-id-card-clip"></i>
+                                        <span>SAN ANDREAS CIVIC ID</span>
+                                    </div>
+                                    <div class="id-profile-grid">
+                                        <div class="id-avatar"><i class="fa-solid fa-user-astronaut"></i></div>
+                                        <div class="id-info">
+                                            <h3 id="phone-profile-name">Polgár Neve</h3>
+                                            <span id="phone-profile-cid" class="mono">ID: NYX1000</span>
+                                        </div>
+                                    </div>
+                                    <div class="id-specs">
+                                        <div><span class="sub">Telefonszám:</span> <b id="phone-profile-phone">555-0100</b></div>
+                                        <div><span class="sub">Hivatalos Munka:</span> <b id="phone-profile-job">Polgár</b></div>
+                                        <div><span class="sub">Állampolgári Jogállás:</span> <b class="status-ok">TELJES JOGÚ</b></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 5. Settings -->
+                            <div id="phone-app-settings" class="phone-app-pane hidden">
+                                <div class="phone-section">
+                                    <h4 class="phone-section-title"><i class="fa-solid fa-sliders"></i> Készülék Beállításai</h4>
+                                    <div class="phone-settings-list">
+                                        <div class="phone-setting-row">
+                                            <div>
+                                                <b>Sötét Mód (Dark Theme)</b>
+                                                <span class="sub">Optimalizált nagy kontrasztú felület</span>
+                                            </div>
+                                            <input type="checkbox" id="phone-setting-darkmode" checked class="phone-toggle">
+                                        </div>
+                                        <div class="phone-setting-row">
+                                            <div>
+                                                <b>Repülőgép Mód (Offline)</b>
+                                                <span class="sub">Bejövő értesítések felfüggesztése</span>
+                                            </div>
+                                            <input type="checkbox" id="phone-setting-airplanemode" class="phone-toggle">
+                                        </div>
+                                        <div class="phone-setting-row column">
+                                            <b>Háttérkép Téma</b>
+                                            <select id="phone-setting-wallpaper" class="phone-input">
+                                                <option value="default_dark">Éjszakai Los Santos (Sötétkék)</option>
+                                                <option value="emerald_glow">Kincstári Smaragd (Zöld)</option>
+                                                <option value="amber_logistics">Logisztikai Narancs (Borostyán)</option>
+                                                <option value="crimson_alert">Készenléti Vörös (Bíbor)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <button id="phone-settings-save-btn" class="phone-btn phone-btn-secondary"><i class="fa-solid fa-floppy-disk"></i> Beállítások Mentése</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phone Bottom Navigation / Home Bar -->
+                <div class="phone-bottom-nav">
+                    <button id="phone-home-bar" class="phone-home-pill" title="Kezdőképernyő"></button>
                 </div>
             </div>
         </div>
