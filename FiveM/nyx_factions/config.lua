@@ -96,3 +96,24 @@ Config.FleetDepots = {
         spawnPoint = vector4(815.2, -2150.8, 29.5, 350.0)
     }
 }
+
+-- Trade Unions & Collective Bargaining Configuration
+Config.Unions = {
+    DefaultDuesFlat = 50.00,
+    DefaultDuesRate = 0.025,
+    DefaultStrikePayRate = 150.00,
+    MinFoundingSignatures = 3,
+    StrikeVoteDurationHours = 24,
+    StrikeVoteQuorumPct = 0.50,
+    StrikeVoteMajorityPct = 0.50,
+    ArbitrationStatutoryPenaltyRate = 0.10,
+    StrikePayCooldownSeconds = 86400,
+    Sectors = {
+        ['logistics'] = "Logistics, Hauling & Transportation",
+        ['manufacturing'] = "Heavy Industry, Assembly & Manufacturing",
+        ['mining'] = "Raw Resource Extraction & Mining",
+        ['services'] = "Public Utilities, Maintenance & Services",
+        ['healthcare'] = "Medical, Pharmaceutical & Health",
+        ['civil'] = "Civil Administration & Municipal Staff"
+    }
+}

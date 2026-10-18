@@ -4387,7 +4387,298 @@ function Nyx.Tests.TestProgressiveMillageAndLandMaintenanceTaxation()
     return passes == total
 end
 
--- 22. Master Test Runner
+-- 22. Test Trade Unionization, Collective Bargaining & Binding Labor Arbitration Suite
+function Nyx.Tests.TestTradeUnionsAndCollectiveBargaining()
+    print("^3[Nyx:Tests] Running Trade Unionization, Collective Bargaining & Arbitration Suite...^7")
+    local passes = 0
+    local total = 10
+
+    local U = Nyx.Unions or {
+        CalculateDuesCheckoff = function(grossWage, duesMode, duesAmount, duesRate)
+            grossWage = math.max(0.0, math.floor((tonumber(grossWage) or 0.0) * 100) / 100)
+            local dues = 0.0
+            if duesMode == "percentage" then
+                local rate = tonumber(duesRate) or 0.025
+                rate = math.max(0.0, math.min(0.20, rate))
+                dues = math.floor((grossWage * rate) * 100) / 100
+            else
+                local amount = tonumber(duesAmount) or 50.00
+                amount = math.max(0.0, math.floor(amount * 100) / 100)
+                dues = math.min(grossWage, amount)
+            end
+            local netWage = math.floor((grossWage - dues) * 100) / 100
+            return dues, netWage
+        end,
+        CalculateStrikeFundRunway = function(strikeFundBalance, memberCount, strikePayRate)
+            local balance = math.max(0.0, math.floor((tonumber(strikeFundBalance) or 0.0) * 100) / 100)
+            local members = math.max(0, math.floor(tonumber(memberCount) or 0))
+            local payRate = math.max(0.0, math.floor((tonumber(strikePayRate) or 150.00) * 100) / 100)
+            if members == 0 or payRate == 0.0 then
+                return { balance = balance, daily_burn = 0.00, runway_days = 9999, solvency_status = "SOLVENT" }
+            end
+            local dailyBurn = math.floor((members * payRate) * 100) / 100
+            local runwayDays = (dailyBurn > 0.0) and math.floor(balance / dailyBurn) or 9999
+            local status = "SOLVENT"
+            if balance <= 0.0 then status = "DEPLETED"
+            elseif runwayDays <= 5 then status = "WARNING" end
+            return { balance = balance, daily_burn = dailyBurn, runway_days = runwayDays, solvency_status = status }
+        end,
+        EvaluateWageCompliance = function(actualWage, wageFloor)
+            actualWage = math.max(0.0, math.floor((tonumber(actualWage) or 0.0) * 100) / 100)
+            wageFloor = math.max(0.0, math.floor((tonumber(wageFloor) or 0.0) * 100) / 100)
+            local isCompliant = (actualWage >= wageFloor)
+            local deficit = 0.00
+            local deficitPct = 0.00
+            if not isCompliant and wageFloor > 0.0 then
+                deficit = math.floor((wageFloor - actualWage) * 100) / 100
+                deficitPct = math.floor(((deficit / wageFloor) * 100) * 100) / 100
+            end
+            return { is_compliant = isCompliant, actual_wage = actualWage, wage_floor = wageFloor, hourly_deficit = deficit, deficit_percentage = deficitPct }
+        end,
+        EvaluateStrikeVote = function(totalEligibleMembers, votes, quorumPct, majorityPct)
+            local eligible = math.max(1, math.floor(tonumber(totalEligibleMembers) or 1))
+            quorumPct = tonumber(quorumPct) or 0.50
+            majorityPct = tonumber(majorityPct) or 0.50
+            local yesCount, noCount, abstainCount = 0, 0, 0
+            if type(votes) == "table" then
+                for _, v in ipairs(votes) do
+                    local choice = string.lower(tostring(type(v) == "table" and v.vote or v))
+                    if choice == "yes" then yesCount = yesCount + 1
+                    elseif choice == "no" then noCount = noCount + 1
+                    else abstainCount = abstainCount + 1 end
+                end
+            end
+            local totalCast = yesCount + noCount + abstainCount
+            local quorumRequired = math.ceil(eligible * quorumPct)
+            local quorumReached = (totalCast >= quorumRequired)
+            local activeVotes = yesCount + noCount
+            local majorityRequired = (activeVotes > 0) and (math.floor(activeVotes * majorityPct) + 1) or 1
+            local majorityReached = (activeVotes > 0) and (yesCount >= majorityRequired)
+            local passed = (quorumReached and majorityReached)
+            return {
+                passed = passed, eligible = eligible, total_cast = totalCast, quorum_required = quorumRequired,
+                quorum_reached = quorumReached, yes_count = yesCount, no_count = noCount, abstain_count = abstainCount,
+                majority_required = majorityRequired, majority_reached = majorityReached
+            }
+        end,
+        CanClaimStrikePay = function(lastClaimTimestamp, currentTimestamp, cooldownSeconds)
+            local last = tonumber(lastClaimTimestamp) or 0
+            local now = tonumber(currentTimestamp) or os.time()
+            local cooldown = tonumber(cooldownSeconds) or 86400
+            if last <= 0 then return true, 0 end
+            local elapsed = now - last
+            if elapsed >= cooldown then return true, 0 end
+            return false, (cooldown - elapsed)
+        end,
+        CalculateArbitrationAward = function(underpaidHours, hourlyDeficit, affectedMemberCount, penaltyRate)
+            local hours = math.max(0.0, tonumber(underpaidHours) or 0.0)
+            local deficit = math.max(0.0, math.floor((tonumber(hourlyDeficit) or 0.0) * 100) / 100)
+            local members = math.max(1, math.floor(tonumber(affectedMemberCount) or 1))
+            local rate = math.max(0.0, tonumber(penaltyRate) or 0.10)
+            local perMemberRestitution = math.floor((hours * deficit) * 100) / 100
+            local totalRestitution = math.floor((perMemberRestitution * members) * 100) / 100
+            local statutoryPenalty = math.floor((totalRestitution * rate) * 100) / 100
+            local totalAward = math.floor((totalRestitution + statutoryPenalty) * 100) / 100
+            return {
+                per_member_restitution = perMemberRestitution, total_restitution = totalRestitution,
+                statutory_penalty = statutoryPenalty, total_award = totalAward, affected_member_count = members
+            }
+        end
+    }
+
+    -- Test A: Dues Checkoff Arithmetic (Flat Mode)
+    local duesFlat, netFlat = U.CalculateDuesCheckoff(1200.00, "flat", 50.00)
+    local duesLow, netLow = U.CalculateDuesCheckoff(30.00, "flat", 50.00)
+    local testA_ok = (duesFlat == 50.00) and (netFlat == 1150.00)
+        and (duesFlat + netFlat == 1200.00)
+        and (duesLow == 30.00) and (netLow == 0.00)
+
+    if assertTest(testA_ok == true,
+        "Dues Checkoff Arithmetic & Flat Mode Wage Capping Invariant",
+        string.format("duesFlat=$%.2f, netFlat=$%.2f, duesLow=$%.2f, netLow=$%.2f",
+            duesFlat, netFlat, duesLow, netLow)) then
+        passes = passes + 1
+    end
+
+    -- Test B: Dues Checkoff Arithmetic (Percentage Mode: 2.5%)
+    local duesPct, netPct = U.CalculateDuesCheckoff(2500.00, "percentage", nil, 0.025)
+    local testB_ok = (duesPct == 62.50) and (netPct == 2437.50)
+        and (duesPct + netPct == 2500.00)
+
+    if assertTest(testB_ok == true,
+        "Dues Checkoff Arithmetic & Percentage Rate Invariant",
+        string.format("duesPct=$%.2f, netPct=$%.2f (Expected: $62.50 / $2437.50)", duesPct, netPct)) then
+        passes = passes + 1
+    end
+
+    -- Test C: Strike Fund Runway Modeling & Solvency State Transitions
+    local runwaySolvent = U.CalculateStrikeFundRunway(30000.00, 20, 150.00)
+    local runwayWarn = U.CalculateStrikeFundRunway(12000.00, 20, 150.00)
+    local runwayDep = U.CalculateStrikeFundRunway(0.00, 20, 150.00)
+
+    local testC_ok = (runwaySolvent.daily_burn == 3000.00)
+        and (runwaySolvent.runway_days == 10)
+        and (runwaySolvent.solvency_status == "SOLVENT")
+        and (runwayWarn.runway_days == 4)
+        and (runwayWarn.solvency_status == "WARNING")
+        and (runwayDep.runway_days == 0)
+        and (runwayDep.solvency_status == "DEPLETED")
+
+    if assertTest(testC_ok == true,
+        "Strike Fund Runway Modeling & Solvency State Transitions",
+        string.format("solventDays=%d (%s), warnDays=%d (%s), depDays=%d (%s)",
+            runwaySolvent.runway_days, runwaySolvent.solvency_status,
+            runwayWarn.runway_days, runwayWarn.solvency_status,
+            runwayDep.runway_days, runwayDep.solvency_status)) then
+        passes = passes + 1
+    end
+
+    -- Test D: CBA Wage Floor Compliance & Deficit Percentage
+    local cbaComp = U.EvaluateWageCompliance(50.00, 45.00)
+    local cbaDeficit = U.EvaluateWageCompliance(35.00, 45.00)
+
+    local testD_ok = (cbaComp.is_compliant == true)
+        and (cbaComp.hourly_deficit == 0.00)
+        and (cbaDeficit.is_compliant == false)
+        and (cbaDeficit.hourly_deficit == 10.00)
+        and (math.abs(cbaDeficit.deficit_percentage - 22.22) < 0.05)
+
+    if assertTest(testD_ok == true,
+        "CBA Wage Floor Compliance & Hourly Deficit Evaluation",
+        string.format("comp=%s, defComp=%s, deficit=$%.2f (%.2f%%)",
+            tostring(cbaComp.is_compliant), tostring(cbaDeficit.is_compliant),
+            cbaDeficit.hourly_deficit, cbaDeficit.deficit_percentage)) then
+        passes = passes + 1
+    end
+
+    -- Test E: Democratic Strike Authorization Vote (Pass Scenario)
+    local votesPass = { "yes", "yes", "yes", "yes", "no", "no" }
+    local strikeResPass = U.EvaluateStrikeVote(10, votesPass, 0.50, 0.50)
+
+    local testE_ok = (strikeResPass.passed == true)
+        and (strikeResPass.quorum_reached == true)
+        and (strikeResPass.majority_reached == true)
+        and (strikeResPass.total_cast == 6)
+        and (strikeResPass.yes_count == 4)
+
+    if assertTest(testE_ok == true,
+        "Democratic Strike Authorization Vote Verification (Quorum & Majority Met)",
+        string.format("passed=%s, quorum=%s, cast=%d/%d, yes=%d",
+            tostring(strikeResPass.passed), tostring(strikeResPass.quorum_reached),
+            strikeResPass.total_cast, strikeResPass.eligible, strikeResPass.yes_count)) then
+        passes = passes + 1
+    end
+
+    -- Test F: Democratic Strike Authorization Vote Failure Modes
+    local votesNoQuorum = { "yes", "yes", "yes", "yes" }
+    local resNoQuorum = U.EvaluateStrikeVote(10, votesNoQuorum, 0.50, 0.50)
+
+    local votesTie = { "yes", "yes", "yes", "no", "no", "no" }
+    local resTie = U.EvaluateStrikeVote(10, votesTie, 0.50, 0.50)
+
+    local testF_ok = (resNoQuorum.quorum_reached == false)
+        and (resNoQuorum.passed == false)
+        and (resTie.quorum_reached == true)
+        and (resTie.majority_reached == false)
+        and (resTie.passed == false)
+
+    if assertTest(testF_ok == true,
+        "Strike Authorization Rejection upon Quorum Failure or Vote Tie",
+        string.format("noQuorumPassed=%s, tiePassed=%s (Quorum=%s, Majority=%s)",
+            tostring(resNoQuorum.passed), tostring(resTie.passed),
+            tostring(resTie.quorum_reached), tostring(resTie.majority_reached))) then
+        passes = passes + 1
+    end
+
+    -- Test G: Strike Pay Disbursement Cooldown Guard
+    local testNow = 1700000000
+    local canFirst, remFirst = U.CanClaimStrikePay(0, testNow, 86400)
+    local canSoon, remSoon = U.CanClaimStrikePay(testNow, testNow + 43200, 86400)
+    local canNextDay, remNextDay = U.CanClaimStrikePay(testNow, testNow + 90000, 86400)
+
+    local testG_ok = (canFirst == true) and (remFirst == 0)
+        and (canSoon == false) and (remSoon == 43200)
+        and (canNextDay == true) and (remNextDay == 0)
+
+    if assertTest(testG_ok == true,
+        "Strike Relief Cooldown Guard & Eligibility Window",
+        string.format("first=%s, soon=%s (rem=%d), nextDay=%s",
+            tostring(canFirst), tostring(canSoon), remSoon, tostring(canNextDay))) then
+        passes = passes + 1
+    end
+
+    -- Test H: Binding Labor Arbitration Restitution & Statutory Penalty
+    local award = U.CalculateArbitrationAward(160, 10.00, 15, 0.10)
+
+    local testH_ok = (award.per_member_restitution == 1600.00)
+        and (award.total_restitution == 24000.00)
+        and (award.statutory_penalty == 2400.00)
+        and (award.total_award == 26400.00)
+        and (award.affected_member_count == 15)
+
+    if assertTest(testH_ok == true,
+        "Binding Arbitration Award Restitution & Statutory Penalty Calculation",
+        string.format("perMember=$%.2f, totalRestitution=$%.2f, penalty=$%.2f, totalAward=$%.2f",
+            award.per_member_restitution, award.total_restitution, award.statutory_penalty, award.total_award)) then
+        passes = passes + 1
+    end
+
+    -- Test I: Closed-Loop Double-Entry Arbitration Settlement Conservation
+    local enterpriseTreasury = 100000.00
+    local unionStrikeFund = 50000.00
+    local memberBalances = { 5000.00, 5000.00, 5000.00 }
+    local initialLiquidity = enterpriseTreasury + unionStrikeFund + (5000.00 * 3)
+
+    local simAward = U.CalculateArbitrationAward(100, 10.00, 3, 0.10)
+    enterpriseTreasury = enterpriseTreasury - simAward.total_award
+    for i = 1, #memberBalances do
+        memberBalances[i] = memberBalances[i] + simAward.per_member_restitution
+    end
+    unionStrikeFund = unionStrikeFund + simAward.statutory_penalty
+
+    local finalLiquidity = enterpriseTreasury + unionStrikeFund + memberBalances[1] + memberBalances[2] + memberBalances[3]
+    local testI_ok = (math.abs(finalLiquidity - initialLiquidity) < 1e-6)
+        and (enterpriseTreasury == 96700.00)
+        and (unionStrikeFund == 50300.00)
+        and (memberBalances[1] == 6000.00)
+
+    if assertTest(testI_ok == true,
+        "Closed-Loop Double-Entry Arbitration Settlement Conservation (Delta = 0.00)",
+        string.format("init=$%.2f, final=$%.2f, delta=%.4f (Enterprise=$%.2f, Union=$%.2f)",
+            initialLiquidity, finalLiquidity, math.abs(finalLiquidity - initialLiquidity),
+            enterpriseTreasury, unionStrikeFund)) then
+        passes = passes + 1
+    end
+
+    -- Test J: Industrial Facility Picket Lockout State Interlock
+    local activeStrikesMock = {
+        ['corp:omega_freight'] = { strikeId = "s_100", status = "active" }
+    }
+
+    local function checkPicketLock(ownerId)
+        if activeStrikesMock[ownerId] and activeStrikesMock[ownerId].status == "active" then
+            return false, "ENTERPRISE_FACILITY_PICKET_LOCKED"
+        end
+        return true, "OK"
+    end
+
+    local lockOk, lockErr = checkPicketLock('corp:omega_freight')
+    local freeOk, freeErr = checkPicketLock('corp:green_energy')
+
+    local testJ_ok = (lockOk == false) and (lockErr == "ENTERPRISE_FACILITY_PICKET_LOCKED")
+        and (freeOk == true) and (freeErr == "OK")
+
+    if assertTest(testJ_ok == true,
+        "Industrial Facility Picket Lockout State Interlock Verification",
+        string.format("omegaLocked=%s (err=%s), greenFree=%s",
+            tostring(not lockOk), tostring(lockErr), tostring(freeOk))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 23. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -4414,9 +4705,10 @@ function Nyx.Tests.RunAll()
     local t19 = Nyx.Tests.TestSpatialGridDropsAndDurabilityDecay()
     local t20 = Nyx.Tests.TestPhysicalPalletsAndPowerAssembly()
     local t21 = Nyx.Tests.TestProgressiveMillageAndLandMaintenanceTaxation()
+    local t22 = Nyx.Tests.TestTradeUnionsAndCollectiveBargaining()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

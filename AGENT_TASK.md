@@ -67,10 +67,42 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] Feature: Physical freight pallets & power-dependent industrial assembly (`nyx_logistics` / `nyx_services`)
 - [x] QA: Add concurrency unit tests for inventory mutex locks and treasury double-entry conservation (`nyx_core/server/tests.lua`)
 - [x] Feature: Progressive property millage & dynamic land maintenance taxation (`nyx_properties` / `nyx_treasury`)
+- [x] Feature: Trade unionization framework, collective bargaining agreements & binding labor arbitration (`nyx_factions` / `nyx_treasury` / `nyx_judiciary`)
 
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Trade unionization framework, collective bargaining agreements & binding labor arbitration (`nyx_factions` / `nyx_treasury` / `nyx_judiciary`)**
+  - **Database Migration & Schema Extensions (`028_factions_trade_unions_and_collective_bargaining.sql`, `index.json`)**:
+    - Created `nyx_factions_unions` table storing trade union charters, legal names, industry sectors (`logistics`, `manufacturing`, `mining`, `services`, `healthcare`, `civil`), treasury accounts (`union:<union_id>`), dues mode (`flat` vs `percentage`), strike fund balances, and daily strike pay rates ($150/day).
+    - Created `nyx_factions_union_members` table managing citizen union membership, role hierarchy (`steward`, `delegate`, `member`), standing (`good_standing`, `arrears`, `exempt`), employer enterprise binding, and strike pay claim timestamps.
+    - Created `nyx_factions_cba` table persisting Collective Bargaining Agreements (CBAs) with guaranteed wage floors, overtime multipliers (1.5x), hazard bonuses, strike grace periods, and lifecycle transitions (`draft`, `proposed`, `ratified`, `breached`, `expired`, `arbitration`).
+    - Created `nyx_factions_strikes` table for industrial strike declarations, voting deadlines, and picket lock states.
+    - Created `nyx_factions_strike_votes` table for secret democratic strike authorization ballots per citizen.
+    - Created `nyx_factions_arbitration_awards` table recording binding judicial labor arbitration awards, restitution damages, 10% statutory punitive penalties, revised wage floors, and double-entry treasury transaction references.
+    - Seeded recognized trade unions (`union:transport_workers`, `union:industrial_miners`, `union:public_servants`). Registered in `FiveM/nyx_core/sql/migrations/index.json` (Step 28) and mirrored to `nyx_factions`.
+  - **Pure Lua 5.4 Shared Engine (`nyx_factions/shared/unions.lua`, `fxmanifest.lua`)**:
+    - *Cent-Precision Dues Checkoff Arithmetic (`Nyx.Unions.CalculateDuesCheckoff`)*: Formulated exact deduction math guaranteeing $\text{netWage} = \text{grossWage} - \text{dues}$ and $0 \le \text{dues} \le \text{grossWage}$ across flat and percentage modes.
+    - *Strike Fund Runway Modeling (`Nyx.Unions.CalculateStrikeFundRunway`)*: Formulated burn velocity ($V = N_{\text{members}} \times \text{DailyRate}$) and runway days ($D = \lfloor B / V \rfloor$) with solvency state classification (`SOLVENT`, `WARNING` <= 5 days, `DEPLETED` <= 0).
+    - *CBA Wage Floor Compliance Evaluator (`Nyx.Unions.EvaluateWageCompliance`)*: Evaluates offered wages against CBA wage floors, computing exact hourly deficits and deficit percentages.
+    - *Democratic Strike Authorization Vote Verification (`Nyx.Unions.EvaluateStrikeVote`)*: Enforces democratic participation quorum ($\ge 50\%$) and majority approval threshold ($\ge 50\% + 1$ of cast active votes), detecting tie votes and quorum failures.
+    - *Strike Relief Cooldown Guard (`Nyx.Unions.CanClaimStrikePay`)*: Enforces 24-hour (86,400s) cooldown intervals between strike relief disbursements.
+    - *Arbitration Damages & Penalty Calculator (`Nyx.Unions.CalculateArbitrationAward`)*: Computes back-pay restitution ($\text{hours} \times \text{deficit} \times \text{members}$), 10% statutory penalty, and total award breakdown.
+  - **Authoritative Server Union, CBA & Arbitration Subsystem (`nyx_factions/server/unions.lua`, `server/cba.lua`, `server/exports.lua`, `server/main.lua`, `server/fleet.lua`)**:
+    - *Union Registry & Dues Processing*: Implemented `RegisterUnion`, `JoinUnion`, `LeaveUnion`, `GetAllUnions`, `GetUnion`, and `ProcessUnionDues` with automatic treasury transfer into `union:<union_id>` and split contributions into the union strike fund.
+    - *CBA Lifecycle Management*: Implemented `ProposeCBA` (steward/delegate) and `RatifyCBA` (enterprise executive) with 30-day term limits and automatic strike settlement upon ratification.
+    - *Democratic Strike Machine*: Implemented `CallStrikeVote` and `CastStrikeVote`, automatically declaring active strikes and synchronizing `GlobalState.activeStrikes` across OneSync clients.
+    - *Strike Relief Payouts*: Implemented `ClaimStrikeRelief` validating active employer strikes, membership good standing, and cooldowns, executing closed-loop double-entry disbursements from union treasury to member wallets.
+    - *Binding Labor Arbitration Engine*: Implemented `PetitionLaborArbitration` (linking judicial dockets in `nyx_judiciary`) and `ExecuteArbitrationAward` atomically debiting enterprise treasuries, crediting per-worker restitution directly to affected employee bank accounts, and crediting statutory penalties to union strike funds ($\sum \text{Debits} == \sum \text{Credits}$).
+    - *Inter-Resource Picket Line Interlocks*: In `nyx_logistics/server/facilities.lua` (`startProduction`), blocks industrial manufacturing with `ENTERPRISE_FACILITY_PICKET_LOCKED` while the facility owner enterprise is on active strike. In `nyx_factions/server/fleet.lua` (`SpawnVehicle`), blocks commercial vehicle dispatch with `ENTERPRISE_ON_STRIKE`.
+  - **Client & Third-Eye (`LALT`) Integration (`nyx_factions/client/unions.lua`, `fxmanifest.lua`, `config.lua`)**:
+    - Added contextual Third-Eye entrance options at City Hall and civic commerce terminals: "Trade Union Registry & CBAs", "Vote on Strike Authorization", and "Claim Daily Strike Relief".
+    - Added chat notifications and commands: `/unionstatus` (telemetry showing union guild, role, standing, strike fund balance, burn velocity, runway days, and ratified CBA wage floor), `/strikevote <yes|no|abstain> [strikeId]`, and `/claimstrikepay`.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestTradeUnionsAndCollectiveBargaining()` (Test 22) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created standalone Python test suite `tests/test_trade_unions_and_collective_bargaining.py` validating 8 comprehensive test scenarios (dues checkoff flat/percentage math, strike fund burn runway modeling, CBA wage floor compliance, democratic strike authorization quorum & majority gates, strike pay cooldown enforcement, arbitration award calculation, double-entry settlement conservation, industrial facility picket lockout interlocks, and migration/manifest integrity).
+    - Full pytest suite: 176/176 tests passing (100% pass rate).
+    - Verified clean passes across all 13 resources, 180 Lua files, and all 28 SQL migrations via `scripts/validator.py` and `scripts/verify.ps1`.
 - **[2026-10-18] Feature: Progressive property millage & dynamic land maintenance taxation (`nyx_properties` / `nyx_treasury`)**
   - **Database Migration & Schema Extensions (`027_properties_progressive_millage_and_maintenance_taxation.sql`, `index.json`)**:
     - Extended `nyx_properties` with `land_area_sqm` (DECIMAL 10,2), `maintenance_condition` (DECIMAL 5,2), `last_maintenance_at`, `delinquency_tier` (TINYINT 0-4), `delinquent_amount` (DECIMAL 15,2), `consecutive_missed_cycles`, `zone_id`, and `reclaimed_for_auction`.

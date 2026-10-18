@@ -14,7 +14,8 @@ description 'Autonomous Player Organizations, Granular RBAC & Multi-Sig Vaults'
 version '1.0.0'
 
 shared_scripts {
-    'config.lua'
+    'config.lua',
+    'shared/unions.lua'
 }
 
 server_scripts {
@@ -24,6 +25,8 @@ server_scripts {
     'server/vaults.lua',
     'server/multisig.lua',
     'server/dividends.lua',
+    'server/unions.lua',
+    'server/cba.lua',
     'server/fleet.lua',
     'server/main.lua',
     'server/exports.lua'
@@ -32,6 +35,7 @@ server_scripts {
 client_scripts {
     'client/terminals.lua',
     'client/fleet_depot.lua',
+    'client/unions.lua',
     'client/main.lua',
     'client/exports.lua'
 }

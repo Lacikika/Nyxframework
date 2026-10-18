@@ -142,6 +142,14 @@ Nyx.RPC.Register("logistics:startProduction", function(src, facilityId, recipeKe
         return { success = false, error = "INCOMPATIBLE_FACILITY_TYPE" }
     end
 
+    -- Strike Picket Line Interlock: If facility owner faction is under active strike, reject production
+    if fac.owner and exports['nyx_factions'] and exports['nyx_factions'].IsEnterpriseOnStrike then
+        local onStrike = exports['nyx_factions']:IsEnterpriseOnStrike(fac.owner)
+        if onStrike then
+            return { success = false, error = "ENTERPRISE_FACILITY_PICKET_LOCKED" }
+        end
+    end
+
     batchCount = math.max(1, math.min(10, tonumber(batchCount) or 1))
 
     -- Power Grid Pre-flight Interlock: verify power availability before consuming items

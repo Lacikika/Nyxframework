@@ -137,3 +137,76 @@ end)
 exports("GetFactionFleet", function(factionId)
     return Nyx.Factions.GetFactionFleet(factionId)
 end)
+
+-- Trade Unions & Collective Bargaining
+exports("RegisterUnion", function(src, legalName, industrySector, duesAmount, duesMode)
+    return Nyx.Factions.RegisterUnion(src, legalName, industrySector, duesAmount, duesMode)
+end)
+
+exports("JoinUnion", function(src, unionId, enterpriseFactionId)
+    return Nyx.Factions.JoinUnion(src, unionId, enterpriseFactionId)
+end)
+
+exports("LeaveUnion", function(src, unionId)
+    return Nyx.Factions.LeaveUnion(src, unionId)
+end)
+
+exports("GetUnion", function(unionId)
+    return Nyx.Factions.GetUnion(unionId)
+end)
+
+exports("GetAllUnions", function()
+    return Nyx.Factions.GetAllUnions()
+end)
+
+exports("GetCitizenUnionMembership", function(citizenId)
+    return Nyx.Factions.GetCitizenUnionMembership(citizenId)
+end)
+
+exports("ProcessUnionDues", function(citizenId, grossWage, enterpriseFactionId)
+    return Nyx.Factions.ProcessUnionDues(citizenId, grossWage, enterpriseFactionId)
+end)
+
+exports("DepositStrikeFund", function(src, unionId, amount)
+    return Nyx.Factions.DepositStrikeFund(src, unionId, amount)
+end)
+
+exports("ClaimStrikeRelief", function(src, unionId)
+    return Nyx.Factions.ClaimStrikeRelief(src, unionId)
+end)
+
+exports("ProposeCBA", function(src, unionId, enterpriseFactionId, title, wageFloor, overtimeMultiplier, hazardBonus)
+    return Nyx.Factions.ProposeCBA(src, unionId, enterpriseFactionId, title, wageFloor, overtimeMultiplier, hazardBonus)
+end)
+
+exports("RatifyCBA", function(src, cbaId)
+    return Nyx.Factions.RatifyCBA(src, cbaId)
+end)
+
+exports("GetEnterpriseCBA", function(enterpriseFactionId)
+    return Nyx.Factions.GetEnterpriseCBA(enterpriseFactionId)
+end)
+
+exports("CallStrikeVote", function(src, unionId, enterpriseFactionId, reason)
+    return Nyx.Factions.CallStrikeVote(src, unionId, enterpriseFactionId, reason)
+end)
+
+exports("CastStrikeVote", function(src, strikeId, vote)
+    return Nyx.Factions.CastStrikeVote(src, strikeId, vote)
+end)
+
+exports("IsEnterpriseOnStrike", function(enterpriseFactionId)
+    return Nyx.Factions.IsEnterpriseOnStrike(enterpriseFactionId)
+end)
+
+exports("EndStrike", function(strikeId, resolutionReason)
+    return Nyx.Factions.EndStrike(strikeId, resolutionReason)
+end)
+
+exports("PetitionLaborArbitration", function(src, strikeId)
+    return Nyx.Factions.PetitionLaborArbitration(src, strikeId)
+end)
+
+exports("ExecuteArbitrationAward", function(arbitratorCitId, strikeId, underpaidHours, hourlyDeficit, penaltyRate, revisedWageFloor)
+    return Nyx.Factions.ExecuteArbitrationAward(arbitratorCitId, strikeId, underpaidHours, hourlyDeficit, penaltyRate, revisedWageFloor)
+end)

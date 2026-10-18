@@ -79,6 +79,10 @@ function Nyx.Factions.SpawnVehicle(src, factionId, vin, depotId)
         return false, "INSUFFICIENT_PERMISSIONS"
     end
 
+    if Nyx.Factions.IsEnterpriseOnStrike and Nyx.Factions.IsEnterpriseOnStrike(factionId) then
+        return false, "ENTERPRISE_ON_STRIKE"
+    end
+
     local vehRow = MySQL.single.await([[
         SELECT * FROM `nyx_factions_fleet`
         WHERE `vin` = ? AND `faction_id` = ?

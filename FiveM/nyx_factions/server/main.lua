@@ -216,6 +216,100 @@ CreateThread(function()
             local ok, res = Nyx.Factions.StoreVehicle(src, factionId, vin, depotId, condition)
             return { success = ok, data = res, error = (not ok and res or nil) }
         end)
+
+        -- 14. Trade Unions: Register Union
+        exports['nyx_core']:RegisterRPC("factions:registerUnion", function(src, payload)
+            local ok, res = Nyx.Factions.RegisterUnion(src, payload.legalName, payload.industrySector, payload.duesAmount, payload.duesMode)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- 15. Trade Unions: Join Union
+        exports['nyx_core']:RegisterRPC("factions:joinUnion", function(src, payload)
+            local ok, res = Nyx.Factions.JoinUnion(src, payload.unionId, payload.enterpriseFactionId)
+            return { success = ok, unionId = res, error = (not ok and res or nil) }
+        end)
+
+        -- 16. Trade Unions: Leave Union
+        exports['nyx_core']:RegisterRPC("factions:leaveUnion", function(src, unionId)
+            local ok, res = Nyx.Factions.LeaveUnion(src, unionId)
+            return { success = ok, error = (not ok and res or nil) }
+        end)
+
+        -- 17. Trade Unions: Get Union Overview
+        exports['nyx_core']:RegisterRPC("factions:getUnion", function(src, unionId)
+            local union = Nyx.Factions.GetUnion(unionId)
+            return { success = (union ~= nil), union = union }
+        end)
+
+        -- 18. Trade Unions: List All Unions
+        exports['nyx_core']:RegisterRPC("factions:getAllUnions", function(src)
+            local unions = Nyx.Factions.GetAllUnions()
+            return { success = true, unions = unions }
+        end)
+
+        -- 19. Trade Unions: Get Citizen Membership
+        exports['nyx_core']:RegisterRPC("factions:getCitizenUnion", function(src)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+            local membership = Nyx.Factions.GetCitizenUnionMembership(player.citizenId)
+            return { success = (membership ~= nil), membership = membership }
+        end)
+
+        -- 20. Trade Unions: Deposit to Strike Fund
+        exports['nyx_core']:RegisterRPC("factions:depositStrikeFund", function(src, payload)
+            local ok, res = Nyx.Factions.DepositStrikeFund(src, payload.unionId, payload.amount)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- 21. Trade Unions: Claim Daily Strike Pay
+        exports['nyx_core']:RegisterRPC("factions:claimStrikeRelief", function(src, unionId)
+            local ok, res = Nyx.Factions.ClaimStrikeRelief(src, unionId)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- 22. CBA: Propose Agreement
+        exports['nyx_core']:RegisterRPC("factions:proposeCBA", function(src, payload)
+            local ok, res = Nyx.Factions.ProposeCBA(src, payload.unionId, payload.enterpriseFactionId, payload.title, payload.wageFloor, payload.overtimeMultiplier, payload.hazardBonus)
+            return { success = ok, cba = res, error = (not ok and res or nil) }
+        end)
+
+        -- 23. CBA: Ratify Agreement
+        exports['nyx_core']:RegisterRPC("factions:ratifyCBA", function(src, cbaId)
+            local ok, res = Nyx.Factions.RatifyCBA(src, cbaId)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- 24. CBA: Get Enterprise Ratified CBA
+        exports['nyx_core']:RegisterRPC("factions:getEnterpriseCBA", function(src, enterpriseFactionId)
+            local cba = Nyx.Factions.GetEnterpriseCBA(enterpriseFactionId)
+            return { success = (cba ~= nil), cba = cba }
+        end)
+
+        -- 25. Strikes: Call Strike Vote
+        exports['nyx_core']:RegisterRPC("factions:callStrikeVote", function(src, payload)
+            local ok, res = Nyx.Factions.CallStrikeVote(src, payload.unionId, payload.enterpriseFactionId, payload.reason)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- 26. Strikes: Cast Strike Vote
+        exports['nyx_core']:RegisterRPC("factions:castStrikeVote", function(src, payload)
+            local ok, res = Nyx.Factions.CastStrikeVote(src, payload.strikeId, payload.vote)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- 27. Strikes: Petition Labor Arbitration
+        exports['nyx_core']:RegisterRPC("factions:petitionLaborArbitration", function(src, strikeId)
+            local ok, res = Nyx.Factions.PetitionLaborArbitration(src, strikeId)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- 28. Strikes: Execute Arbitration Award
+        exports['nyx_core']:RegisterRPC("factions:executeArbitrationAward", function(src, payload)
+            local player = Nyx.GetPlayer(src)
+            local arbitratorCitId = player and player.citizenId or "SYSTEM_ARBITRATOR"
+            local ok, res = Nyx.Factions.ExecuteArbitrationAward(arbitratorCitId, payload.strikeId, payload.underpaidHours, payload.hourlyDeficit, payload.penaltyRate, payload.revisedWageFloor)
+            return { success = ok, award = res, error = (not ok and res or nil) }
+        end)
     end
 
     -- Background Task: Sweep expired multi-sig requests (every 10 minutes)

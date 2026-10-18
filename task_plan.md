@@ -1,39 +1,50 @@
-# Task Plan: Automated Jury Pool Dispatcher with Fisher-Yates Shuffle & Courtroom Bucket Routing (`nyx_judiciary`)
+# Task Plan: Trade Unionization Framework, Collective Bargaining Agreements & Binding Labor Arbitration (`nyx_factions` / `nyx_treasury` / `nyx_judiciary`)
 
 ## Goal
-Implement a fully autonomous, unbiased civic jury pool selection engine using the Fisher-Yates shuffle algorithm, automated summons dispatch with no-show replacement, and OneSync Virtual Routing Bucket isolation for active trials and deliberation chambers in `nyx_judiciary`.
+Implement a comprehensive, autonomous Trade Unionization Framework and Collective Bargaining system for Nyxframework. Workers can organize trade unions across industry sectors, collect automated dues check-offs, ratify Collective Bargaining Agreements (CBAs) with enterprise wage floors, authorize strikes with facility picket lockouts and strike fund relief payouts, and resolve labor disputes through binding judicial arbitrations with double-entry restitution transfers.
 
 ## Architecture & Requirements
-1. **Pure Lua 5.4 Shared Engine (`nyx_judiciary/shared/jury.lua`)**:
-   - `Nyx.Jury.FisherYatesShuffle(list, rng)`: Mathematically unbiased $O(N)$ permutation generator.
-   - `Nyx.Jury.FilterCandidates(candidates, criteria)`: Disqualifies exempt jobs, active warrants, case participants, incarcerated citizens, and recent jury service fatigue cooldowns.
-   - `Nyx.Jury.CalculateDispatchPlan(eligiblePool, requiredCount, minQuorum, existingSeatedCount)`: Quorum checking, vacancy calculation, and selection.
-   - `Nyx.Jury.AssignSeats(seatedJurors, totalSeats)`: Dynamic seat allocation for jury box seats 1..6 without collisions.
-   - `Nyx.Jury.TabulateVotes(ballots, ruleType, minVotes)`: Deterministic vote tabulation (majority, unanimous, supermajority, hung jury).
-2. **Database Migration (`023_judiciary_jury_dispatcher_and_courtroom_routing.sql` & `index.json`)**:
-   - Enhance `nyx_judiciary_dockets` with `routing_bucket`, `deliberation_bucket`, `deliberation_started_at`, and new status values (`in_trial`, `mistrial`).
-   - Enhance `nyx_judiciary_juries` with `seat_index`, `summons_expires_at`, `stipend_paid`, `deliberation_entered_at`, and status values (`deliberating`, `dismissed`).
-   - Create `nyx_judiciary_jury_service_logs` for historical service tracking and cooldown enforcement.
-   - Mirror migration in `FiveM/nyx_core/sql/migrations/` and `FiveM/nyx_judiciary/sql/migrations/`, register in `index.json`.
-3. **Server Jury Dispatcher & Courtroom Routing Bucket Engine (`nyx_judiciary/server/jury.lua`, `courtroom.lua`, `dockets.lua`, `execution.lua`, `main.lua`, `exports.lua`)**:
-   - Automated jury dispatcher: `SummonJury`, `SeatJuror`, `ExcuseJuror`, `AutoReplaceNoShows`.
-   - Routing bucket manager: `AllocateCourtroomBucket`, `StartTrial` (routes participants to courtroom bucket), `StartDeliberation` (isolates jurors in deliberation chamber bucket), `DeliverVerdict`, and `ConcludeTrial` (restores bucket 0 and pays stipend via `nyx_treasury`).
-   - RPC routes and server exports.
-4. **Client Third-Eye Courtroom & Deliberation Integration (`nyx_judiciary/client/courtroom.lua`, `main.lua`)**:
-   - Third-Eye (`LALT`) check-in on jury seats.
-   - Deliberation ballot dialog / commands / controls in isolated chamber.
-   - GPS waypoint routing and notifications.
+1. **Database Migration (`028_factions_trade_unions_and_collective_bargaining.sql` & `index.json`)**:
+   - `nyx_factions_unions`: Union ID, legal name, industry sector, treasury account ID, founder, dues amount/rate/mode, strike fund balance, strike pay rate, status.
+   - `nyx_factions_union_members`: Member ID, union ID, citizen ID, employer enterprise faction ID, role (steward/delegate/member), standing, unpaid dues, last dues paid, last strike pay claimed.
+   - `nyx_factions_cba`: CBA UUID, union ID, enterprise faction ID, title, wage floor, overtime multiplier, hazard bonus, strike grace period, status (draft/proposed/ratified/breached/expired/arbitration).
+   - `nyx_factions_strikes`: Strike UUID, union ID, enterprise faction ID, CBA ID, reason, vote ratio, status (voting/active/settled/broken/arbitration).
+   - `nyx_factions_strike_votes`: Ballots per member with yes/no/abstain votes.
+   - `nyx_factions_arbitration_awards`: Award UUID, strike ID, CBA ID, docket ID, arbitrator citizen ID, restitution damages, statutory penalty, revised wage floor, settlement status, tx UUID.
+   - Mirror in `FiveM/nyx_core/sql/migrations/` and `FiveM/nyx_factions/sql/migrations/`, register in `index.json`.
+
+2. **Pure Lua 5.4 Shared Engine (`nyx_factions/shared/unions.lua`)**:
+   - `Nyx.Unions.CalculateDuesCheckoff(grossWage, duesMode, duesAmount, duesRate)`: Integer-cent dues calculation and wage deduction.
+   - `Nyx.Unions.CalculateStrikeFundRunway(strikeFundBalance, memberCount, strikePayRate)`: Daily burn velocity, days of runway, and solvency state.
+   - `Nyx.Unions.EvaluateWageCompliance(actualWage, wageFloor)`: CBA wage compliance, deficit calculation.
+   - `Nyx.Unions.EvaluateStrikeVote(votes, quorumThreshold, majorityThreshold)`: Participation quorum and majority threshold validation.
+   - `Nyx.Unions.CalculateArbitrationAward(underpaidHours, hourlyDeficit, penaltyRate, affectedMemberCount)`: Restitution damages, statutory penalty, and total award breakdown.
+   - `Nyx.Unions.CanClaimStrikePay(lastClaimTimestamp, currentTimestamp, cooldownSeconds)`: Cooldown validator for strike relief disbursements.
+
+3. **Server Union, CBA & Arbitration Engine (`nyx_factions/server/unions.lua`, `cba.lua`, `main.lua`, `exports.lua`)**:
+   - Union registry: `RegisterUnion`, `JoinUnion`, `LeaveUnion`, `GetUnion`, `GetMemberStanding`.
+   - CBA lifecycle: `ProposeCBA`, `RatifyCBA`, `EvaluateEnterpriseCompliance`.
+   - Strike state machine: `CallStrikeVote`, `CastStrikeVote`, `DeclareStrike`, `ClaimStrikeRelief`, `EndStrike`.
+   - Binding arbitration: `PetitionLaborArbitration`, `ExecuteArbitrationAward` with atomic double-entry treasury restitution transfers.
+   - OneSync state bag sync: `GlobalState.activeStrikes`.
+   - Interlocks: Facility manufacturing picket locks (`nyx_logistics`) and commercial fleet locks (`nyx_factions`).
+
+4. **Client & Third-Eye (`LALT`) Integration (`nyx_factions/client/unions.lua`, `fxmanifest.lua`)**:
+   - Third-Eye targets on civic union terminals and enterprise facility picket lines.
+   - `/unionstatus` command showing union membership, standing, strike runway, and CBA status.
+   - Sync manifest declarations across client, server, and shared scopes.
+
 5. **Testing & Verification**:
-   - Python unit test suite `tests/test_jury_dispatcher_and_courtroom_routing.py` testing shuffle uniformity, candidate filtering, quorum checks, seat assignment, vote tabulation, bucket transitions, and stipend payouts.
-   - Lua in-engine test suite `Nyx.Tests.TestJuryDispatcherAndCourtroomRouting()` in `FiveM/nyx_core/server/tests.lua` added to `RunAll()`.
-   - Complete verification run with `python scripts/validator.py`, `powershell -File scripts/verify.ps1`, and `pytest`.
+   - Python unit test suite `tests/test_trade_unions_and_collective_bargaining.py`.
+   - Lua in-engine test suite `Nyx.Tests.TestTradeUnionsAndCollectiveBargaining()` in `FiveM/nyx_core/server/tests.lua` (Test 22 in `RunAll()`).
+   - Run `python scripts/validator.py`, `powershell -File scripts/verify.ps1`, and `pytest`.
    - Update `AGENT_TASK.md` marking task completed.
 
 ## Phase Plan
-- [x] Phase 1: Test-Driven Design — Create failing Python test suite (`tests/test_jury_dispatcher_and_courtroom_routing.py`)
-- [x] Phase 2: Database Migration — Create `023_judiciary_jury_dispatcher_and_courtroom_routing.sql` & update `index.json`
-- [x] Phase 3: Pure Lua 5.4 Shared Engine — Implement `FiveM/nyx_judiciary/shared/jury.lua` & update `fxmanifest.lua`
-- [x] Phase 4: Server Dispatcher & Courtroom Routing — Implement server jury dispatching, bucket routing, trial lifecycle, and RPCs
-- [x] Phase 5: Client Courtroom & Deliberation UI — Enhance seating, third-eye targets, and deliberation voting
-- [x] Phase 6: In-Engine Lua Test Suite — Implement `Nyx.Tests.TestJuryDispatcherAndCourtroomRouting` in `tests.lua`
+- [x] Phase 1: Test-Driven Design — Create failing Python test suite (`tests/test_trade_unions_and_collective_bargaining.py`)
+- [x] Phase 2: Database Migration — Create `028_factions_trade_unions_and_collective_bargaining.sql` & update `index.json`
+- [x] Phase 3: Pure Lua 5.4 Shared Engine — Implement `FiveM/nyx_factions/shared/unions.lua` & update `fxmanifest.lua`
+- [x] Phase 4: Server Union, CBA & Arbitration Subsystem — Implement `server/unions.lua`, `server/cba.lua`, exports, and interlocks
+- [x] Phase 5: Client Third-Eye & Status UI — Implement `client/unions.lua` and command hooks
+- [x] Phase 6: In-Engine Lua Test Suite — Implement `Nyx.Tests.TestTradeUnionsAndCollectiveBargaining` in `tests.lua`
 - [x] Phase 7: Full Verification & Agent Task Completion — Run validator, verify.ps1, pytest, and update `AGENT_TASK.md`
