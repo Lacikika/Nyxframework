@@ -52,6 +52,29 @@ function Nyx.UI.SanitizePayload(data)
     if data.input and type(data.input) == "string" then
         sanitized.input = string.sub(data.input, 1, 256)
     end
+    -- Corporate RBAC, Multi-Sig & Union parameters
+    if data.factionId and type(data.factionId) == "string" then sanitized.factionId = string.sub(data.factionId, 1, 64) end
+    if data.targetCitizenId and type(data.targetCitizenId) == "string" then sanitized.targetCitizenId = string.sub(data.targetCitizenId, 1, 64) end
+    if data.roleTitle and type(data.roleTitle) == "string" then sanitized.roleTitle = string.sub(data.roleTitle, 1, 64) end
+    if data.permissionNodes and type(data.permissionNodes) == "table" then sanitized.permissionNodes = data.permissionNodes end
+    if data.equityShares and type(data.equityShares) == "number" then sanitized.equityShares = math.max(0.0, math.min(100.0, data.equityShares)) end
+    if data.wageHourly and type(data.wageHourly) == "number" then sanitized.wageHourly = math.max(0.0, math.min(10000.0, data.wageHourly)) end
+    if data.requestId and (type(data.requestId) == "string" or type(data.requestId) == "number") then sanitized.requestId = tostring(data.requestId) end
+    if data.cbaId and type(data.cbaId) == "string" then sanitized.cbaId = string.sub(data.cbaId, 1, 64) end
+    if data.unionId and type(data.unionId) == "string" then sanitized.unionId = string.sub(data.unionId, 1, 64) end
+    if data.vaultId and type(data.vaultId) == "string" then sanitized.vaultId = string.sub(data.vaultId, 1, 64) end
+    if data.reason and type(data.reason) == "string" then sanitized.reason = string.sub(data.reason, 1, 256) end
+    if data.note and type(data.note) == "string" then sanitized.note = string.sub(data.note, 1, 256) end
+    if data.vote and type(data.vote) == "string" then sanitized.vote = string.sub(data.vote, 1, 16) end
+    if data.title and type(data.title) == "string" then sanitized.title = string.sub(data.title, 1, 64) end
+    if data.wageFloor and type(data.wageFloor) == "number" then sanitized.wageFloor = data.wageFloor end
+    if data.overtimeMultiplier and type(data.overtimeMultiplier) == "number" then sanitized.overtimeMultiplier = data.overtimeMultiplier end
+    if data.hazardBonus and type(data.hazardBonus) == "number" then sanitized.hazardBonus = data.hazardBonus end
+    if data.netProfit and type(data.netProfit) == "number" then sanitized.netProfit = data.netProfit end
+    if data.rate and type(data.rate) == "number" then sanitized.rate = data.rate end
+    if data.legalName and type(data.legalName) == "string" then sanitized.legalName = string.sub(data.legalName, 1, 64) end
+    if data.charterType and type(data.charterType) == "string" then sanitized.charterType = string.sub(data.charterType, 1, 32) end
+    if data.initialDeposit and type(data.initialDeposit) == "number" then sanitized.initialDeposit = data.initialDeposit end
     if data.payload and type(data.payload) == "table" then
         sanitized.payload = Nyx.UI.SanitizePayload(data.payload)
     end
@@ -184,6 +207,133 @@ end)
 Nyx.UI.SafeNUICallback("deliverFreightContract", function(data, cb)
     TriggerEvent("nyx:logistics:client:deliverContract", data)
     cb({ success = true })
+end)
+
+-- 7. Corporate Multi-Sig, RBAC & Union Management NUI Callbacks
+Nyx.UI.SafeNUICallback("closeFactionDashboard", function(_, cb)
+    Nyx.UI.SetFocus(false, false)
+    TriggerEvent("nyx:ui:closed:faction", {})
+    cb({ success = true })
+end)
+
+Nyx.UI.SafeNUICallback("faction:getOverview", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:getOverview", data and data.factionId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("faction:getCitizenFactions", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:getCitizenFactions", data and data.targetCitizenId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("faction:addMember", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:addMember", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("faction:updateMember", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:updateMember", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("faction:removeMember", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:removeMember", data and data.factionId, data and data.targetCitizenId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("faction:initiateWithdrawal", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:initiateWithdrawal", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("faction:signMultiSig", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:signMultiSig", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("faction:rejectMultiSig", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:rejectMultiSig", data and data.requestId, data and data.reason)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("faction:cancelMultiSig", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:cancelMultiSig", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("faction:executeTimelocked", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:executeTimelocked", data and data.requestId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("faction:proposeCBA", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:proposeCBA", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("faction:ratifyCBA", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:ratifyCBA", data and data.cbaId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("faction:claimStrikeRelief", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:claimStrikeRelief", data and data.unionId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("faction:castStrikeVote", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:castStrikeVote", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("faction:distributeDividends", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("factions:distributeDividends", data and data.factionId, data and data.netProfit, data and data.rate)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
 end)
 
 -- 5. Intercept Universal Notification Triggers across All Framework Modules

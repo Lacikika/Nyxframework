@@ -57,11 +57,30 @@ CreateThread(function()
     end
 end)
 
--- Open Commerce Terminal Interface
+-- Open Commerce Terminal & Corporate Management Interface
 RegisterNetEvent("nyx:factions:client:openTerminal", function(data)
     local term = (type(data) == "table" and data.terminal) or data
+    local activeTab = (type(data) == "table" and data.activeTab) or "overview"
+    local factionId = (type(data) == "table" and data.factionId) or nil
+
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local factionsRes = exports['nyx_core']:TriggerRPCAwait("factions:getCitizenFactions")
+        local overviewRes = exports['nyx_core']:TriggerRPCAwait("factions:getOverview", factionId)
+        local overviewData = (overviewRes and overviewRes.success and overviewRes.overview) or nil
+
+        if exports['nyx_ui'] and exports['nyx_ui'].OpenFactionDashboard then
+            exports['nyx_ui']:OpenFactionDashboard({
+                terminal = term,
+                activeTab = activeTab,
+                factions = (factionsRes and factionsRes.success and factionsRes.factions) or {},
+                overview = overviewData
+            })
+            return
+        end
+    end
+
     if exports['nyx_ui'] then
-        exports['nyx_ui']:OpenView("faction_commerce_terminal", { terminal = term })
+        exports['nyx_ui']:OpenView("faction_commerce_terminal", { terminal = term, activeTab = activeTab })
     else
         TriggerEvent("nyx:ui:notify", {
             type = "info",
@@ -70,3 +89,19 @@ RegisterNetEvent("nyx:factions:client:openTerminal", function(data)
         })
     end
 end)
+
+-- Player Commands for Corporate Dashboard
+RegisterCommand("corporate", function(_, args)
+    local targetFactionId = args and args[1]
+    TriggerEvent("nyx:factions:client:openTerminal", { factionId = targetFactionId })
+end, false)
+
+RegisterCommand("faction", function(_, args)
+    local targetFactionId = args and args[1]
+    TriggerEvent("nyx:factions:client:openTerminal", { factionId = targetFactionId })
+end, false)
+
+RegisterCommand("org", function(_, args)
+    local targetFactionId = args and args[1]
+    TriggerEvent("nyx:factions:client:openTerminal", { factionId = targetFactionId })
+end, false)

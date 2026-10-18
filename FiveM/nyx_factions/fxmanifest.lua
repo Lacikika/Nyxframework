@@ -15,6 +15,7 @@ version '1.0.0'
 
 shared_scripts {
     'config.lua',
+    'shared/corporate_rbac.lua',
     'shared/unions.lua',
     'shared/succession.lua'
 }

@@ -86,6 +86,107 @@ function handleDevMockNui(action, data) {
         showNotification({ type: 'success', title: 'FREIGHT COMPLETED', message: `Delivery verified & payout transferred!` });
         return { success: true };
     }
+    if (action === 'faction:distributeDividends') {
+        showNotification({ type: 'success', title: 'OSZTALÉK KIFIZETVE', message: `$${(data.netProfit * data.rate).toFixed(2)} osztalék szétosztva a tagok között.` });
+        return { success: true };
+    }
+    if (action === 'faction:addMember') {
+        showNotification({ type: 'success', title: 'TAG FELVÉVE', message: `${data.targetCitizenId} hozzáadva ${data.roleTitle} pozícióban.` });
+        return { success: true };
+    }
+    if (action === 'faction:updateMember') {
+        showNotification({ type: 'success', title: 'RBAC FRISSÍTVE', message: `${data.targetCitizenId} jogosultságai sikeresen frissítve.` });
+        return { success: true };
+    }
+    if (action === 'faction:removeMember') {
+        showNotification({ type: 'warning', title: 'TAG ELTÁVOLÍTVA', message: `${data.targetCitizenId} munkaviszonya megszűnt.` });
+        return { success: true };
+    }
+    if (action === 'faction:signMultiSig') {
+        showNotification({ type: 'success', title: 'MULTI-SIG ALÁÍRVA', message: `Jóváhagyva a #${data.requestId} letéti kifizetés.` });
+        return { success: true };
+    }
+    if (action === 'faction:rejectMultiSig') {
+        showNotification({ type: 'error', title: 'MULTI-SIG ELUTASÍTVA', message: `Megtagadva a #${data.requestId} letét.` });
+        return { success: true };
+    }
+    if (action === 'faction:cancelMultiSig') {
+        showNotification({ type: 'warning', title: 'MULTI-SIG TÖRÖLVE', message: `Visszavonva a #${data.requestId} letét.` });
+        return { success: true };
+    }
+    if (action === 'faction:executeTimelocked') {
+        showNotification({ type: 'success', title: 'LETÉT VÉGREHAJTVA', message: `Kifizetés #${data.requestId} teljesítve a célfiókra!` });
+        return { success: true };
+    }
+    if (action === 'faction:proposeCBA') {
+        showNotification({ type: 'info', title: 'CBA JAVASLAT', message: `"${data.title}" javaslat benyújtva az igazgatótanácsnak.` });
+        return { success: true };
+    }
+    if (action === 'faction:ratifyCBA') {
+        showNotification({ type: 'success', title: 'CBA RATIFIKÁLVA', message: `A kollektív szerződés hatályba lépett!` });
+        return { success: true };
+    }
+    if (action === 'faction:claimStrikeRelief') {
+        showNotification({ type: 'success', title: 'SZTRÁJKSEGÉLY', message: `Napi $150.00 sztrájksegély jóváírva!` });
+        return { success: true };
+    }
+    if (action === 'faction:getOverview') {
+        return {
+            success: true,
+            overview: {
+                faction: {
+                    faction_id: data.factionId || 'corp_los_santos_logistics',
+                    legal_name: 'Los Santos Freight & Logistics Corp.',
+                    charter_type: 'corporation',
+                    treasury_account_id: 'CORP_VAULT_901',
+                    inactivity_status: 'active'
+                },
+                treasuryBalance: 245000.00,
+                fleetCount: 14,
+                members: [
+                    { citizenId: 'CIT_001', roleTitle: 'Chief Executive Officer', wageHourly: 120.00, equityShares: 45.00, permissionNodes: ['*'], isLeader: true, joinedAt: '2026-01-15' },
+                    { citizenId: 'CIT_002', roleTitle: 'Chief Financial Officer', wageHourly: 95.00, equityShares: 30.00, permissionNodes: ['treasury:*', 'roster:view'], isLeader: false, joinedAt: '2026-01-18' },
+                    { citizenId: 'CIT_003', roleTitle: 'Operations Director', wageHourly: 75.00, equityShares: 25.00, permissionNodes: ['roster:*', 'fleet:*', 'cba:ratify'], isLeader: false, joinedAt: '2026-02-01' }
+                ],
+                vaults: [
+                    { vault_id: 'master_vault', vault_label: 'Fő Széf (Treasury Master)', account_id: 'CORP_VAULT_901', daily_limit: 100000, is_frozen: false },
+                    { vault_id: 'payroll_vault', vault_label: 'Bérszámfejtési Széf', account_id: 'CORP_VAULT_902', daily_limit: 25000, is_frozen: false }
+                ],
+                signoffRules: [
+                    { rule_id: 1, min_amount: 10000, max_amount: 50000, required_signatures: 2, timelock_minutes: 0 },
+                    { rule_id: 2, min_amount: 50000, max_amount: null, required_signatures: 3, timelock_minutes: 60 }
+                ],
+                pendingMultiSig: [
+                    { request_id: 801, vault_id: 'master_vault', target_account: 'CIT_VEND_99', amount: 18500.00, reason: 'Új kamionflotta beszerzési előleg', current_signatures: 1, required_signatures: 2, hasSigned: false }
+                ],
+                timelockedMultiSig: [
+                    { request_id: 792, vault_id: 'master_vault', target_account: 'CORP_PROP_44', amount: 65000.00, reason: 'Paleto telephely bérleti díj', timelock_until: 'READY' }
+                ],
+                unions: [
+                    { union_id: 'union_teamsters', union_name: 'Nemzetközi Fuvarozók Szakszervezete', sector: 'logistics', strike_fund_balance: 85000, runwayDays: 24 }
+                ],
+                cba: {
+                    cba_id: 301,
+                    cba_title: '2026. Évi Logisztikai Kollektív Szerződés',
+                    status: 'ratified',
+                    guaranteed_min_wage: 42.00,
+                    overtime_multiplier: 1.50,
+                    hazard_pay_bonus: 10.00
+                },
+                rbacAudit: [
+                    { createdAt: '2026-10-18 09:30', actionType: 'EQUITY_GRANT', actorCitizenId: 'CIT_001', targetCitizenId: 'CIT_002', notes: 'Granted 30% equity' }
+                ]
+            }
+        };
+    }
+    if (action === 'faction:getCitizenFactions') {
+        return {
+            success: true,
+            factions: [
+                { factionId: 'corp_los_santos_logistics', legalName: 'Los Santos Freight & Logistics Corp.', charterType: 'corporation' }
+            ]
+        };
+    }
     return { success: true, devMode: true };
 }
 
@@ -141,6 +242,14 @@ const NyxState = {
         activeTab: 'dispatch',
         calls: [],
         activeCallId: null
+    },
+    faction: {
+        isOpen: false,
+        activeTab: 'overview',
+        currentFactionId: null,
+        factionsList: [],
+        data: null,
+        selectedMemberCitId: null
     },
     activeDialog: null
 };
@@ -759,6 +868,537 @@ function closeDialog(confirmed = false) {
     }
 }
 
+// 12B. Corporate Multi-Sig, RBAC & Union Management Subsystem (`nyx_factions`)
+function openFactionDashboard(payload = {}) {
+    NyxState.faction.isOpen = true;
+    if (isBrowserDev && (!payload.overview && !payload.faction)) {
+        const mock = handleDevMockNui('faction:getOverview', {});
+        payload = { overview: mock.overview, factions: [{ factionId: 'corp_los_santos_logistics', legalName: 'Los Santos Freight & Logistics Corp.', charterType: 'corporation' }] };
+    }
+    NyxState.faction.data = payload.overview || payload;
+    NyxState.faction.factionsList = payload.factions || [];
+    NyxState.faction.currentFactionId = (payload.overview && payload.overview.faction && payload.overview.faction.faction_id)
+        || (payload.factions && payload.factions[0] && payload.factions[0].factionId)
+        || null;
+
+    const overlay = document.getElementById('faction-overlay');
+    if (overlay) overlay.classList.remove('hidden');
+
+    // Organization selector dropdown
+    const selectEl = document.getElementById('faction-select');
+    if (selectEl) {
+        if (NyxState.faction.factionsList && NyxState.faction.factionsList.length > 1) {
+            selectEl.innerHTML = '';
+            NyxState.faction.factionsList.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f.factionId;
+                opt.textContent = `${f.legalName} (${f.charterType || 'corp'})`;
+                if (f.factionId === NyxState.faction.currentFactionId) opt.selected = true;
+                selectEl.appendChild(opt);
+            });
+            selectEl.classList.remove('hidden');
+            selectEl.onchange = () => {
+                const targetId = selectEl.value;
+                if (targetId && targetId !== NyxState.faction.currentFactionId) {
+                    NyxState.faction.currentFactionId = targetId;
+                    refreshFactionOverview(targetId);
+                }
+            };
+        } else {
+            selectEl.classList.add('hidden');
+        }
+    }
+
+    setFactionTab(payload.activeTab || 'overview');
+    renderFactionState(NyxState.faction.data);
+}
+
+function closeFactionDashboard() {
+    NyxState.faction.isOpen = false;
+    const overlay = document.getElementById('faction-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    document.getElementById('faction-submodal-member')?.classList.add('hidden');
+    document.getElementById('faction-submodal-withdraw')?.classList.add('hidden');
+    postNui('closeFactionDashboard', {});
+}
+
+function setFactionTab(tabName) {
+    NyxState.faction.activeTab = tabName;
+    document.querySelectorAll('.faction-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tabName);
+    });
+    document.querySelectorAll('.faction-tab-pane').forEach(p => {
+        p.classList.toggle('hidden', p.id !== `faction-tab-${tabName}`);
+    });
+}
+
+async function refreshFactionOverview(factionId = null) {
+    const fid = factionId || NyxState.faction.currentFactionId;
+    const res = await postNui('faction:getOverview', { factionId: fid });
+    if (res && res.success && res.overview) {
+        NyxState.faction.data = res.overview;
+        renderFactionState(res.overview);
+    }
+}
+
+function renderFactionState(overview) {
+    if (!overview) return;
+    const faction = overview.faction || {};
+
+    // Header updates
+    const titleEl = document.getElementById('faction-legal-name');
+    if (titleEl) titleEl.textContent = faction.legal_name || 'Vállalati Vezérlőpult';
+
+    const badgeEl = document.getElementById('faction-charter-badge');
+    if (badgeEl) badgeEl.textContent = (faction.charter_type || 'CORPORATION').toUpperCase();
+
+    const headerTreasury = document.getElementById('faction-header-treasury');
+    if (headerTreasury) headerTreasury.textContent = `$${(overview.treasuryBalance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    // Tab 1: Overview KPIs
+    const kpiBal = document.getElementById('faction-kpi-balance');
+    if (kpiBal) kpiBal.textContent = `$${(overview.treasuryBalance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const kpiAcct = document.getElementById('faction-kpi-account');
+    if (kpiAcct) kpiAcct.textContent = `Számlaszám: ${faction.treasury_account_id || '-'}`;
+
+    const members = overview.members || [];
+    let totalEquity = 0.0;
+    members.forEach(m => totalEquity += (m.equityShares || 0.0));
+
+    const kpiEq = document.getElementById('faction-kpi-equity');
+    if (kpiEq) kpiEq.textContent = `${totalEquity.toFixed(2)}% / 100.00%`;
+
+    const fillEq = document.getElementById('faction-equity-fill');
+    if (fillEq) fillEq.style.width = `${Math.min(100, Math.max(0, totalEquity))}%`;
+
+    const kpiMbr = document.getElementById('faction-kpi-members');
+    if (kpiMbr) kpiMbr.textContent = `${members.length} fő`;
+
+    const kpiInact = document.getElementById('faction-kpi-inactivity');
+    if (kpiInact) kpiInact.textContent = `Státusz: ${(faction.inactivity_status || 'AKTÍV').toUpperCase()}`;
+
+    const kpiFleet = document.getElementById('faction-kpi-fleet');
+    if (kpiFleet) kpiFleet.textContent = `${overview.fleetCount || 0} db`;
+
+    // Render Sub-components
+    renderFactionRBAC(members);
+    renderFactionMultiSig(overview.pendingMultiSig || [], overview.timelockedMultiSig || [], overview.vaults || [], overview.signoffRules || []);
+    renderFactionUnions(overview.unions || [], overview.cba, overview.userUnion);
+    renderFactionAudit(overview.rbacAudit || []);
+}
+
+function renderFactionRBAC(members) {
+    const tbody = document.getElementById('faction-roster-rows');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!members || members.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">Nincs regisztrált munkavállaló a vállalati névjegyzékben.</td></tr>';
+        return;
+    }
+
+    members.forEach(member => {
+        const tr = document.createElement('tr');
+        const nodes = member.permissionNodes || [];
+        const badgesHtml = nodes.map(node => {
+            let cat = 'general';
+            if (node === '*') cat = 'root';
+            else if (node.startsWith('treasury')) cat = 'treasury';
+            else if (node.startsWith('roster')) cat = 'roster';
+            else if (node.startsWith('fleet')) cat = 'fleet';
+            else if (node.startsWith('cba')) cat = 'cba';
+            return `<span class="node-badge ${cat}">${node}</span>`;
+        }).join('');
+
+        tr.innerHTML = `
+            <td><code>${member.citizenId}</code></td>
+            <td><strong>${member.roleTitle || 'Associate'}</strong></td>
+            <td>$${(member.wageHourly || 0).toFixed(2)}/h</td>
+            <td><strong style="color: var(--accent-cyan);">${(member.equityShares || 0).toFixed(2)}%</strong></td>
+            <td><div class="node-pill-stack">${badgesHtml || '<span class="node-badge">none</span>'}</div></td>
+            <td>
+                <div style="display: flex; gap: 6px;">
+                    <button class="btn btn-secondary btn-sm rbac-edit-btn" data-citid="${member.citizenId}"><i class="fa-solid fa-pen"></i></button>
+                    <button class="btn btn-danger btn-sm rbac-del-btn" data-citid="${member.citizenId}"><i class="fa-solid fa-user-xmark"></i></button>
+                </div>
+            </td>
+        `;
+
+        tr.querySelector('.rbac-edit-btn')?.addEventListener('click', () => openMemberModal(member));
+        tr.querySelector('.rbac-del-btn')?.addEventListener('click', () => {
+            openDialog({
+                title: 'Munkaviszony Megszüntetése',
+                message: `Biztosan elbocsátod a(z) ${member.citizenId} azonosítójú munkatársat?`,
+                onConfirm: async () => {
+                    const res = await postNui('faction:removeMember', {
+                        factionId: NyxState.faction.currentFactionId,
+                        targetCitizenId: member.citizenId
+                    });
+                    if (res && res.success) {
+                        showNotification({ type: 'warning', title: 'ELBOCSÁTVA', message: `${member.citizenId} munkaviszonya megszűnt.` });
+                        refreshFactionOverview();
+                    } else {
+                        showNotification({ type: 'error', title: 'HIBA', message: res?.error || 'Művelet sikertelen.' });
+                    }
+                }
+            });
+        });
+
+        tbody.appendChild(tr);
+    });
+}
+
+function openMemberModal(member = null) {
+    const modal = document.getElementById('faction-submodal-member');
+    if (!modal) return;
+    NyxState.faction.selectedMemberCitId = member ? member.citizenId : null;
+
+    const titleEl = document.getElementById('faction-member-modal-title');
+    if (titleEl) {
+        titleEl.innerHTML = member ? `<i class="fa-solid fa-user-gear"></i> Munkatárs Módosítása: ${member.citizenId}` : `<i class="fa-solid fa-user-plus"></i> Új Munkatárs Hozzáadása`;
+    }
+
+    const citInput = document.getElementById('faction-input-member-citid');
+    if (citInput) {
+        citInput.value = member ? member.citizenId : '';
+        citInput.disabled = !!member;
+    }
+
+    const roleInput = document.getElementById('faction-input-member-role');
+    if (roleInput) roleInput.value = member ? member.roleTitle : 'Associate';
+
+    const wageInput = document.getElementById('faction-input-member-wage');
+    if (wageInput) wageInput.value = member ? (member.wageHourly || 0) : 35.00;
+
+    const eqInput = document.getElementById('faction-input-member-equity');
+    if (eqInput) eqInput.value = member ? (member.equityShares || 0) : 0.00;
+
+    const currentNodes = member ? (member.permissionNodes || []) : ['treasury:view_ledger', 'inventory:view'];
+    document.querySelectorAll('#faction-submodal-member input[type="checkbox"]').forEach(cb => {
+        cb.checked = currentNodes.includes(cb.value);
+    });
+
+    modal.classList.remove('hidden');
+}
+
+function renderFactionMultiSig(pendingQueue, timelockedQueue, vaults, signoffRules) {
+    // 1. Pending Queue
+    const pendingList = document.getElementById('faction-multisig-pending-list');
+    if (pendingList) {
+        pendingList.innerHTML = '';
+        if (!pendingQueue || pendingQueue.length === 0) {
+            pendingList.innerHTML = '<div class="empty-state" style="padding: 20px; text-align: center; color: var(--text-dim); grid-column: 1 / -1;">Jelenleg nincs jóváhagyásra váró multi-sig kifizetési kérelem.</div>';
+        } else {
+            pendingQueue.forEach(req => {
+                const reqId = req.request_id || req.requestId;
+                const amt = Number(req.amount || 0);
+                const currentSigs = Number(req.current_signatures || req.currentSignatures || 0);
+                const reqSigs = Number(req.required_signatures || req.requiredSignatures || 2);
+                const card = document.createElement('div');
+                card.className = 'multisig-card';
+                card.innerHTML = `
+                    <div class="multisig-card-header">
+                        <span class="badge warning">PENDING ESCROW</span>
+                        <span class="multisig-amount">$${amt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div>
+                        <div style="font-size: 13px; font-weight: 600; color: var(--text-main);">${req.reason || 'Kifizetési kérelem'}</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Cél: <code>${req.target_account || req.targetAccount}</code> | Széf: <code>${req.vault_id || req.vaultId || 'Master'}</code></div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.3); border-radius: 6px; padding: 8px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                            <span>Aláírások: <strong>${currentSigs} / ${reqSigs}</strong></span>
+                            <span style="color: var(--accent-amber);">${Math.round((currentSigs / reqSigs) * 100)}%</span>
+                        </div>
+                        <div class="progress-bar"><div class="fill" style="width: ${(currentSigs / reqSigs) * 100}%;"></div></div>
+                    </div>
+                    <div style="display: flex; gap: 8px; margin-top: 6px;">
+                        <button class="btn btn-success btn-sm msig-sign-btn" style="flex: 1;"><i class="fa-solid fa-signature"></i> Aláírás</button>
+                        <button class="btn btn-danger btn-sm msig-reject-btn"><i class="fa-solid fa-ban"></i></button>
+                        <button class="btn btn-secondary btn-sm msig-cancel-btn"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                `;
+
+                const signBtn = card.querySelector('.msig-sign-btn');
+                signBtn?.addEventListener('click', () => {
+                    lockButtonAction(signBtn, async () => {
+                        const res = await postNui('faction:signMultiSig', { requestId: reqId });
+                        if (res && res.success) {
+                            showNotification({ type: 'success', title: 'ALÁÍRVA', message: `Kérelem #${reqId} sikeresen hitelesítve!` });
+                            refreshFactionOverview();
+                        } else {
+                            showNotification({ type: 'error', title: 'ALÁÍRÁS MEGTAGADVA', message: res?.error || 'Jogosultság hiányzik.' });
+                        }
+                    });
+                });
+
+                const rejectBtn = card.querySelector('.msig-reject-btn');
+                rejectBtn?.addEventListener('click', () => {
+                    lockButtonAction(rejectBtn, async () => {
+                        const res = await postNui('faction:rejectMultiSig', { requestId: reqId, reason: 'Elutasítva az elnökség által.' });
+                        if (res && res.success) {
+                            showNotification({ type: 'warning', title: 'ELUTASÍTVA', message: `Kérelem #${reqId} elutasításra került.` });
+                            refreshFactionOverview();
+                        }
+                    });
+                });
+
+                const cancelBtn = card.querySelector('.msig-cancel-btn');
+                cancelBtn?.addEventListener('click', () => {
+                    lockButtonAction(cancelBtn, async () => {
+                        const res = await postNui('faction:cancelMultiSig', { requestId: reqId, reason: 'Visszavonva.' });
+                        if (res && res.success) {
+                            showNotification({ type: 'info', title: 'TÖRÖLVE', message: `Kérelem #${reqId} visszavonva.` });
+                            refreshFactionOverview();
+                        }
+                    });
+                });
+
+                pendingList.appendChild(card);
+            });
+        }
+    }
+
+    // 2. Timelocked Queue
+    const timelockedList = document.getElementById('faction-multisig-timelocked-list');
+    if (timelockedList) {
+        timelockedList.innerHTML = '';
+        if (!timelockedQueue || timelockedQueue.length === 0) {
+            timelockedList.innerHTML = '<div class="empty-state" style="padding: 20px; text-align: center; color: var(--text-dim); grid-column: 1 / -1;">Nincs időzár alatt álló letét.</div>';
+        } else {
+            timelockedQueue.forEach(item => {
+                const reqId = item.request_id || item.requestId;
+                const amt = Number(item.amount || 0);
+                const card = document.createElement('div');
+                card.className = 'multisig-card timelocked';
+                card.innerHTML = `
+                    <div class="multisig-card-header">
+                        <span class="badge warning"><i class="fa-solid fa-lock"></i> TIMELOCKED</span>
+                        <span class="multisig-amount" style="color: var(--accent-cyan);">$${amt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div>
+                        <div style="font-size: 13px; font-weight: 600; color: var(--text-main);">${item.reason || 'Zárolt tranzakció'}</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Cél: <code>${item.target_account || item.targetAccount}</code></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); border-radius: 6px; padding: 8px 12px;">
+                        <span style="font-size: 11px; color: var(--text-secondary);"><i class="fa-solid fa-hourglass-start"></i> Időzár lejárta:</span>
+                        <strong style="font-family: var(--font-mono); font-size: 12px; color: var(--accent-amber);">${item.timelock_until || 'READY'}</strong>
+                    </div>
+                    <button class="btn btn-primary btn-sm msig-exec-btn" style="margin-top: 4px;"><i class="fa-solid fa-play"></i> Tranzakció Végrehajtása (Execute)</button>
+                `;
+
+                const execBtn = card.querySelector('.msig-exec-btn');
+                execBtn?.addEventListener('click', () => {
+                    lockButtonAction(execBtn, async () => {
+                        const res = await postNui('faction:executeTimelocked', { requestId: reqId });
+                        if (res && res.success) {
+                            showNotification({ type: 'success', title: 'LETÉT TELJESÍTVE', message: `Átutalás #${reqId} elszámolva a kincstári főkönyvben!` });
+                            refreshFactionOverview();
+                        } else {
+                            showNotification({ type: 'error', title: 'VÉGREHAJTÁS SIKERTELEN', message: res?.error || 'Időzár még nem járt le.' });
+                        }
+                    });
+                });
+
+                timelockedList.appendChild(card);
+            });
+        }
+    }
+
+    // 3. Vaults & Signoff Rules
+    const vaultsList = document.getElementById('faction-vaults-list');
+    if (vaultsList) {
+        vaultsList.innerHTML = '';
+        (vaults || []).forEach(v => {
+            const card = document.createElement('div');
+            card.className = 'mini-card';
+            card.innerHTML = `
+                <div>
+                    <div style="font-weight: 600; font-size: 12px; color: var(--text-main);">${v.vault_label || v.vaultLabel}</div>
+                    <div style="font-size: 10px; color: var(--text-muted);">Számla: <code>${v.account_id || v.accountId}</code></div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-family: var(--font-mono); font-size: 12px; color: var(--accent-emerald);">Limit: $${Number(v.daily_limit || v.dailyLimit || 0).toLocaleString()}</div>
+                    <span class="badge ${v.is_frozen || v.isFrozen ? 'danger' : 'online'}">${v.is_frozen || v.isFrozen ? 'BEFAGYASZTVA' : 'AKTÍV'}</span>
+                </div>
+            `;
+            vaultsList.appendChild(card);
+        });
+    }
+
+    const rulesList = document.getElementById('faction-signoff-rules-list');
+    if (rulesList) {
+        rulesList.innerHTML = '';
+        (signoffRules || []).forEach(r => {
+            const card = document.createElement('div');
+            card.className = 'mini-card';
+            const maxLabel = r.maxAmount ? `$${Number(r.maxAmount).toLocaleString()}` : 'Korlátlan';
+            card.innerHTML = `
+                <div>
+                    <div style="font-weight: 600; font-size: 12px; color: var(--text-main);">${r.ruleName || r.rule_name}</div>
+                    <div style="font-size: 10px; color: var(--text-muted);">$${Number(r.minAmount || r.min_amount || 0).toLocaleString()} - ${maxLabel}</div>
+                </div>
+                <div style="text-align: right;">
+                    <strong style="color: var(--accent-amber); font-size: 12px;">${r.requiredSignatures || r.required_signatures} Aláíró</strong>
+                    <div style="font-size: 10px; color: var(--text-muted);">${r.timelockSeconds || r.timelock_seconds || 0}s Időzár</div>
+                </div>
+            `;
+            rulesList.appendChild(card);
+        });
+    }
+
+    // Populate Vault select in withdrawal modal
+    const vaultSelect = document.getElementById('faction-withdraw-vault');
+    if (vaultSelect && vaults) {
+        vaultSelect.innerHTML = '';
+        vaults.forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v.vault_id || v.vaultId;
+            opt.textContent = `${v.vault_label || v.vaultLabel} (${v.account_id || v.accountId})`;
+            vaultSelect.appendChild(opt);
+        });
+    }
+}
+
+function renderFactionUnions(unions, activeCBA) {
+    // 1. Active CBA Card
+    const cbaCard = document.getElementById('faction-active-cba-card');
+    if (cbaCard) {
+        if (!activeCBA || (!activeCBA.cba_id && !activeCBA.cbaId)) {
+            cbaCard.innerHTML = `
+                <div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 16px;">
+                    <i class="fa-solid fa-circle-info" style="font-size: 20px; color: var(--accent-cyan); display: block; margin-bottom: 8px;"></i>
+                    Jelenleg nincs érvényben lévő Kollektív Szerződés (CBA).<br>
+                    Használd a jobb oldali szerződéstervezőt új megállapodás benyújtásához.
+                </div>
+            `;
+        } else {
+            const cbaId = activeCBA.cba_id || activeCBA.cbaId;
+            const status = activeCBA.status || 'proposed';
+            const wage = Number(activeCBA.wage_floor || activeCBA.wageFloor || 0).toFixed(2);
+            const ot = Number(activeCBA.overtime_multiplier || activeCBA.overtimeMultiplier || 1.5).toFixed(2);
+            const hazard = Number(activeCBA.hazard_pay_bonus || activeCBA.hazardBonus || 0).toFixed(2);
+
+            let statusBadge = '<span class="badge online">RATIFIKÁLT CBA</span>';
+            if (status === 'proposed') statusBadge = '<span class="badge warning">JAVASLAT ALATT</span>';
+            else if (status === 'breached') statusBadge = '<span class="badge danger">MEGSZEGVE</span>';
+
+            cbaCard.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h5 style="font-family: var(--font-display); font-size: 15px; color: var(--text-main); margin: 0;">${activeCBA.cba_title || activeCBA.title || 'Kollektív Szerződés'}</h5>
+                    ${statusBadge}
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; background: rgba(0,0,0,0.25); border-radius: 8px; padding: 10px;">
+                    <div>
+                        <span style="font-size: 10px; color: var(--text-muted); display: block;">GARANTÁLT BÉRALAP</span>
+                        <strong style="color: var(--accent-emerald); font-family: var(--font-mono); font-size: 14px;">$${wage}/h</strong>
+                    </div>
+                    <div>
+                        <span style="font-size: 10px; color: var(--text-muted); display: block;">TÚLÓRA SZORZÓ</span>
+                        <strong style="color: var(--accent-cyan); font-family: var(--font-mono); font-size: 14px;">${ot}x</strong>
+                    </div>
+                    <div>
+                        <span style="font-size: 10px; color: var(--text-muted); display: block;">VESZÉLYESSÉGI PÓTLÉK</span>
+                        <strong style="color: var(--accent-amber); font-family: var(--font-mono); font-size: 14px;">+$${hazard}/h</strong>
+                    </div>
+                </div>
+                ${status === 'proposed' ? `
+                    <button class="btn btn-success btn-block cba-ratify-btn" style="margin-top: 10px;"><i class="fa-solid fa-check-double"></i> Kollektív Szerződés Ratifizálása (Vállalati Jóváhagyás)</button>
+                ` : ''}
+            `;
+
+            cbaCard.querySelector('.cba-ratify-btn')?.addEventListener('click', (e) => {
+                const btn = e.currentTarget;
+                lockButtonAction(btn, async () => {
+                    const res = await postNui('faction:ratifyCBA', { cbaId: cbaId });
+                    if (res && res.success) {
+                        showNotification({ type: 'success', title: 'CBA RATIFIKÁLVA', message: 'A kollektív szerződés jogerőre emelkedett!' });
+                        refreshFactionOverview();
+                    } else {
+                        showNotification({ type: 'error', title: 'SIKERTELEN RATIFIKÁCIÓ', message: res?.error || 'Csak cégvezető ratifikálhat.' });
+                    }
+                });
+            });
+        }
+    }
+
+    // 2. Unions Grid
+    const unionsList = document.getElementById('faction-unions-list');
+    const unionSelect = document.getElementById('cba-builder-union');
+    if (unionSelect) unionSelect.innerHTML = '';
+
+    if (unionsList) {
+        unionsList.innerHTML = '';
+        (unions || []).forEach(u => {
+            const uid = u.union_id || u.unionId;
+            const bal = Number(u.strike_fund_balance || u.strikeFundBalance || 0);
+            const runway = u.runwayDays || 999;
+            const card = document.createElement('div');
+            card.className = 'union-card';
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: var(--text-main); font-size: 13px;">${u.union_name || u.legal_name || uid}</strong>
+                    <span class="badge info">${(u.sector || 'general').toUpperCase()}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px; background: rgba(0,0,0,0.2); padding: 6px 10px; border-radius: 6px;">
+                    <span style="color: var(--text-muted);">Sztrájkalap:</span>
+                    <strong style="color: var(--accent-emerald); font-family: var(--font-mono);">$${bal.toLocaleString()}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                    <span style="color: var(--text-muted);">Tartalék Időtartam:</span>
+                    <strong style="color: ${runway <= 5 ? 'var(--accent-red)' : 'var(--accent-cyan)'};">${runway} nap</strong>
+                </div>
+                <button class="btn btn-secondary btn-sm union-claim-btn" style="margin-top: 4px;"><i class="fa-solid fa-hand-holding-dollar"></i> Napi Sztrájksegély</button>
+            `;
+
+            const claimBtn = card.querySelector('.union-claim-btn');
+            claimBtn?.addEventListener('click', () => {
+                lockButtonAction(claimBtn, async () => {
+                    const res = await postNui('faction:claimStrikeRelief', { unionId: uid });
+                    if (res && res.success) {
+                        showNotification({ type: 'success', title: 'SZTRÁJKSEGÉLY SIKERES', message: 'Napi segélyed jóváírásra került a bankszámládon!' });
+                    } else {
+                        showNotification({ type: 'error', title: 'KÖVETELÉS MEGTAGADVA', message: res?.error || 'Nem vagy jogosult vagy aktív a 24h cooldown.' });
+                    }
+                });
+            });
+
+            unionsList.appendChild(card);
+
+            if (unionSelect) {
+                const opt = document.createElement('option');
+                opt.value = uid;
+                opt.textContent = `${u.union_name || u.legal_name || uid} (${(u.sector || 'general').toUpperCase()})`;
+                unionSelect.appendChild(opt);
+            }
+        });
+    }
+}
+
+function renderFactionAudit(auditLogs) {
+    const tbody = document.getElementById('faction-audit-rows');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!auditLogs || auditLogs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">Nincs rögzített audit bejegyzés.</td></tr>';
+        return;
+    }
+
+    auditLogs.forEach(entry => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="font-family: var(--font-mono); font-size: 11px;">${entry.createdAt || 'RECENT'}</td>
+            <td><span class="badge info">${entry.actionType || 'UPDATE'}</span></td>
+            <td><code>${entry.actorCitizenId || 'SYSTEM'}</code></td>
+            <td><code>${entry.targetCitizenId || '-'}</code></td>
+            <td style="font-size: 12px; color: var(--text-secondary);">${entry.notes || '-'}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
 // 13. Global NUI Envelope Dispatcher
 window.addEventListener('message', (event) => {
     const packet = event.data;
@@ -825,6 +1465,13 @@ window.addEventListener('message', (event) => {
         openMdt(packet.payload);
     } else if (action === 'MDT_CLOSE') {
         closeMdt();
+    }
+
+    // Corporate & Union Management Terminal
+    else if (action === 'FACTION_DASHBOARD_OPEN') {
+        openFactionDashboard(packet.payload);
+    } else if (action === 'FACTION_DASHBOARD_CLOSE') {
+        closeFactionDashboard();
     }
 });
 
@@ -929,6 +1576,205 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Faction / Corporate & Union Actions
+    const factionCloseBtn = document.getElementById('faction-close-btn');
+    if (factionCloseBtn) factionCloseBtn.addEventListener('click', closeFactionDashboard);
+
+    document.querySelectorAll('.faction-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            setFactionTab(tab.dataset.tab);
+        });
+    });
+
+    const factionDividendBtn = document.getElementById('faction-dividend-btn');
+    if (factionDividendBtn) {
+        factionDividendBtn.addEventListener('click', () => {
+            const amount = parseFloat(document.getElementById('faction-dividend-amount')?.value || '0');
+            const rate = parseFloat(document.getElementById('faction-dividend-rate')?.value || '0.5');
+            if (amount <= 0) {
+                showNotification({ type: 'error', title: 'ÉRVÉNYTELEN ÖSSZEG', message: 'Kérlek adj meg egy pozitív nyereség összeget!' });
+                return;
+            }
+            openDialog({
+                title: 'Osztalékkifizetés Jóváhagyása',
+                message: `Biztosan felosztasz $${amount.toLocaleString()} nyereséget a tulajdonosok között (${(rate * 100).toFixed(0)}% arányban)?`,
+                onConfirm: () => {
+                    lockButtonAction(factionDividendBtn, async () => {
+                        const res = await postNui('faction:distributeDividends', {
+                            factionId: NyxState.faction.currentFactionId,
+                            netProfit: amount,
+                            distributionRate: rate
+                        });
+                        if (res && res.success) {
+                            showNotification({ type: 'success', title: 'OSZTALÉK KIFIZETVE', message: 'Az osztalékok sikeresen jóváírva a tagok számláin!' });
+                            refreshFactionOverview();
+                        } else {
+                            showNotification({ type: 'error', title: 'SIKERTELEN KIFIZETÉS', message: res?.error || 'Nincs elegendő fedezet vagy hiányzó jogosultság.' });
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    const factionOpenAddMemberBtn = document.getElementById('faction-open-add-member-btn');
+    if (factionOpenAddMemberBtn) {
+        factionOpenAddMemberBtn.addEventListener('click', () => openMemberModal(null));
+    }
+    const factionMemberModalClose = document.getElementById('faction-member-modal-close');
+    if (factionMemberModalClose) {
+        factionMemberModalClose.addEventListener('click', () => {
+            document.getElementById('faction-submodal-member')?.classList.add('hidden');
+        });
+    }
+    const factionMemberModalCancel = document.getElementById('faction-member-modal-cancel');
+    if (factionMemberModalCancel) {
+        factionMemberModalCancel.addEventListener('click', () => {
+            document.getElementById('faction-submodal-member')?.classList.add('hidden');
+        });
+    }
+    const factionMemberModalSave = document.getElementById('faction-member-modal-save');
+    if (factionMemberModalSave) {
+        factionMemberModalSave.addEventListener('click', () => {
+            const citId = document.getElementById('faction-input-member-citid')?.value?.trim();
+            const role = document.getElementById('faction-input-member-role')?.value?.trim() || 'Employee';
+            const wage = parseFloat(document.getElementById('faction-input-member-wage')?.value || '0');
+            const equity = parseFloat(document.getElementById('faction-input-member-equity')?.value || '0');
+
+            if (!citId) {
+                showNotification({ type: 'error', title: 'HIÁNYZÓ ADAT', message: 'Kérlek add meg az állampolgár Citizen ID-jét!' });
+                return;
+            }
+
+            const nodes = [];
+            document.querySelectorAll('#faction-submodal-member input[type="checkbox"]:checked').forEach(cb => {
+                nodes.push(cb.value);
+            });
+
+            const isEdit = !!NyxState.faction.selectedMemberCitId;
+            const endpoint = isEdit ? 'faction:updateMember' : 'faction:addMember';
+
+            lockButtonAction(factionMemberModalSave, async () => {
+                const res = await postNui(endpoint, {
+                    factionId: NyxState.faction.currentFactionId,
+                    citizenId: citId,
+                    roleTitle: role,
+                    wageHourly: wage,
+                    equityShares: equity,
+                    permissionNodes: nodes
+                });
+
+                if (res && res.success) {
+                    showNotification({ type: 'success', title: 'TAG SIKERESEN FRISSÍTVE', message: `${citId} adatai elmentve!` });
+                    document.getElementById('faction-submodal-member')?.classList.add('hidden');
+                    refreshFactionOverview();
+                } else {
+                    showNotification({ type: 'error', title: 'SIKERTELEN MŰVELET', message: res?.error || 'Nem sikerült menteni.' });
+                }
+            });
+        });
+    }
+
+    const factionOpenWithdrawBtn = document.getElementById('faction-open-withdraw-btn');
+    if (factionOpenWithdrawBtn) {
+        factionOpenWithdrawBtn.addEventListener('click', () => {
+            const modal = document.getElementById('faction-submodal-withdraw');
+            if (!modal) return;
+            const vaultSelect = document.getElementById('faction-withdraw-vault');
+            if (vaultSelect) {
+                vaultSelect.innerHTML = '';
+                const vaults = NyxState.faction.data?.vaults || [{ vault_id: 'master_vault', vault_label: 'Fő Széf (Treasury Master)' }];
+                vaults.forEach(v => {
+                    const opt = document.createElement('option');
+                    opt.value = v.vault_id || v.vaultId;
+                    opt.textContent = `${v.vault_label || v.vaultLabel} (${v.vault_id || v.vaultId})`;
+                    vaultSelect.appendChild(opt);
+                });
+            }
+            modal.classList.remove('hidden');
+        });
+    }
+    const factionWithdrawModalClose = document.getElementById('faction-withdraw-modal-close');
+    if (factionWithdrawModalClose) {
+        factionWithdrawModalClose.addEventListener('click', () => {
+            document.getElementById('faction-submodal-withdraw')?.classList.add('hidden');
+        });
+    }
+    const factionWithdrawModalCancel = document.getElementById('faction-withdraw-modal-cancel');
+    if (factionWithdrawModalCancel) {
+        factionWithdrawModalCancel.addEventListener('click', () => {
+            document.getElementById('faction-submodal-withdraw')?.classList.add('hidden');
+        });
+    }
+    const factionWithdrawModalSubmit = document.getElementById('faction-withdraw-modal-submit');
+    if (factionWithdrawModalSubmit) {
+        factionWithdrawModalSubmit.addEventListener('click', () => {
+            const vaultId = document.getElementById('faction-withdraw-vault')?.value;
+            const target = document.getElementById('faction-withdraw-target')?.value?.trim();
+            const amount = parseFloat(document.getElementById('faction-withdraw-amount')?.value || '0');
+            const reason = document.getElementById('faction-withdraw-reason')?.value?.trim() || 'Multi-sig withdrawal';
+
+            if (!target || amount <= 0) {
+                showNotification({ type: 'error', title: 'HIÁNYOS KÉRELEM', message: 'Kérlek adj meg érvényes célszámlát és összeget!' });
+                return;
+            }
+
+            lockButtonAction(factionWithdrawModalSubmit, async () => {
+                const res = await postNui('faction:initiateWithdrawal', {
+                    factionId: NyxState.faction.currentFactionId,
+                    vaultId: vaultId,
+                    targetAccount: target,
+                    amount: amount,
+                    reason: reason
+                });
+
+                if (res && res.success) {
+                    showNotification({ type: 'success', title: 'LETÉT KEZDEMÉNYEZVE', message: `Kérelem #${res.requestId || ''} benyújtva!` });
+                    document.getElementById('faction-submodal-withdraw')?.classList.add('hidden');
+                    refreshFactionOverview();
+                } else {
+                    showNotification({ type: 'error', title: 'KEZDEMÉNYEZÉS SIKERTELEN', message: res?.error || 'Nincs jogosultságod vagy túllépted a limitet.' });
+                }
+            });
+        });
+    }
+
+    const cbaBuilderSubmitBtn = document.getElementById('cba-builder-submit-btn');
+    if (cbaBuilderSubmitBtn) {
+        cbaBuilderSubmitBtn.addEventListener('click', () => {
+            const title = document.getElementById('cba-builder-title')?.value?.trim();
+            const unionId = document.getElementById('cba-builder-union')?.value;
+            const wage = parseFloat(document.getElementById('cba-builder-wage')?.value || '0');
+            const overtime = parseFloat(document.getElementById('cba-builder-overtime')?.value || '1.5');
+            const hazard = parseFloat(document.getElementById('cba-builder-hazard')?.value || '0');
+            const notes = document.getElementById('cba-builder-notes')?.value?.trim() || '';
+
+            if (!title || !unionId) {
+                showNotification({ type: 'error', title: 'HIÁNYOS CBA ADATOK', message: 'Kérlek add meg a szerződés nevét és a kijelölt szakszervezetet!' });
+                return;
+            }
+
+            lockButtonAction(cbaBuilderSubmitBtn, async () => {
+                const res = await postNui('faction:proposeCBA', {
+                    factionId: NyxState.faction.currentFactionId,
+                    unionId: unionId,
+                    cbaTitle: title,
+                    guaranteedMinWage: wage,
+                    overtimeMultiplier: overtime,
+                    hazardPayBonus: hazard,
+                    notes: notes
+                });
+
+                if (res && res.success) {
+                    showNotification({ type: 'success', title: 'CBA JAVASLAT BEKÜLDVE', message: 'A kollektív szerződés tervezet beküldve!' });
+                    refreshFactionOverview();
+                } else {
+                    showNotification({ type: 'error', title: 'JAVASLAT SIKERTELEN', message: res?.error || 'Hiba a CBA benyújtásakor.' });
+                }
+            });
+        });
+    }
+
     // Dialog Confirm & Cancel
     document.getElementById('dialog-confirm-btn')?.addEventListener('click', () => closeDialog(true));
     document.getElementById('dialog-cancel-btn')?.addEventListener('click', () => closeDialog(false));
@@ -960,6 +1806,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const factionSubMember = document.getElementById('faction-submodal-member');
+            if (factionSubMember && !factionSubMember.classList.contains('hidden')) {
+                factionSubMember.classList.add('hidden');
+                return;
+            }
+
+            const factionSubWithdraw = document.getElementById('faction-submodal-withdraw');
+            if (factionSubWithdraw && !factionSubWithdraw.classList.contains('hidden')) {
+                factionSubWithdraw.classList.add('hidden');
+                return;
+            }
+
             const dialogOverlay = document.getElementById('dialog-overlay');
             if (dialogOverlay && !dialogOverlay.classList.contains('hidden')) {
                 closeDialog(false);
@@ -973,6 +1831,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (NyxState.treasury.isOpen) {
                 closeTreasuryDashboard();
+                return;
+            }
+            if (NyxState.faction.isOpen) {
+                closeFactionDashboard();
                 return;
             }
             if (NyxState.mdt.isOpen) {
@@ -1116,6 +1978,14 @@ function initBrowserDevMode() {
                     { timestamp: '14:21:12', category: 'PAYROLL', debitAccount: 'ACCT_PUBLIC_WORKS', creditAccount: 'ACCT_CITIZEN_402', amount: 850.00, memo: 'Public sector wage disbursement' }
                 ]
             });
+        }
+    });
+
+    document.getElementById('dev-btn-faction')?.addEventListener('click', () => {
+        if (NyxState.faction.isOpen) {
+            closeFactionDashboard();
+        } else {
+            openFactionDashboard();
         }
     });
 

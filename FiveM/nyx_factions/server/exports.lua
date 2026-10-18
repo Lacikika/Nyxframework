@@ -234,3 +234,12 @@ exports("GetFactionInactivityStatus", function(factionId)
         WHERE `faction_id` = ?
     ]], { factionId })
 end)
+
+-- Corporate RBAC & Citizen Organizations
+exports("GetCitizenFactions", function(citizenId)
+    return Nyx.Factions.GetCitizenFactions(citizenId)
+end)
+
+exports("GetRBACAuditLog", function(factionId, limit)
+    return Nyx.Factions.GetRBACAuditLog(factionId, limit)
+end)

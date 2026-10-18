@@ -34,6 +34,9 @@ Nyx.RPC = Nyx.RPC or {
 
 -- 1. Evaluate whether a set of member permission nodes satisfies a required node
 local function evaluateNodeMatch(nodesList, requiredNode)
+    if Nyx.CorporateRBAC and Nyx.CorporateRBAC.EvaluatePermission then
+        return Nyx.CorporateRBAC.EvaluatePermission(nodesList, requiredNode)
+    end
     if not nodesList or type(nodesList) ~= "table" then return false end
 
     for _, node in ipairs(nodesList) do
@@ -52,6 +55,26 @@ local function evaluateNodeMatch(nodesList, requiredNode)
     end
 
     return false
+end
+
+-- 1b. Immutable RBAC Audit Logger
+function Nyx.Factions.LogRBACAction(factionId, actorCitizenId, targetCitizenId, actionType, oldValues, newValues, notes)
+    if not factionId or not actorCitizenId or not targetCitizenId or not actionType then return end
+    pcall(function()
+        MySQL.prepare.await([[
+            INSERT INTO `nyx_factions_rbac_audit`
+                (`faction_id`, `actor_citizen_id`, `target_citizen_id`, `action_type`, `old_values`, `new_values`, `notes`)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ]], {
+            factionId,
+            actorCitizenId,
+            targetCitizenId,
+            actionType,
+            oldValues and json.encode(oldValues) or nil,
+            newValues and json.encode(newValues) or nil,
+            notes or ""
+        })
+    end)
 end
 
 -- 2. Query member record (in-memory cache with prepared DB query fallback)
@@ -161,6 +184,14 @@ function Nyx.Factions.AddMember(actorCitizenId, factionId, targetCitizenId, role
     -- Invalidate cache
     Nyx.Factions.MembersCache[factionId .. ":" .. targetCitizenId] = nil
 
+    -- Immutable audit log
+    Nyx.Factions.LogRBACAction(factionId, actorCitizenId, targetCitizenId, "INVITE", nil, {
+        roleTitle = roleTitle,
+        nodes = nodes,
+        equityShares = equity,
+        wageHourly = tonumber(wageHourly) or 0.00
+    }, "New member added to corporate roster")
+
     return true, {
         factionId = factionId,
         citizenId = targetCitizenId,
@@ -223,6 +254,19 @@ function Nyx.Factions.UpdateMember(actorCitizenId, factionId, targetCitizenId, r
         hiredAt = member.hiredAt
     }
 
+    -- Immutable audit log
+    Nyx.Factions.LogRBACAction(factionId, actorCitizenId, targetCitizenId, "UPDATE_PERMISSIONS", {
+        roleTitle = member.roleTitle,
+        nodes = member.permissionNodes,
+        equityShares = member.equityShares,
+        wageHourly = member.wageHourly
+    }, {
+        roleTitle = newRole,
+        nodes = newNodes,
+        equityShares = newEquity,
+        wageHourly = newWage
+    }, "Member role, wage, or permission nodes modified")
+
     return true, Nyx.Factions.MembersCache[cacheKey]
 end
 
@@ -246,6 +290,12 @@ function Nyx.Factions.RemoveMember(actorCitizenId, factionId, targetCitizenId)
     ]], { factionId, targetCitizenId })
 
     Nyx.Factions.MembersCache[factionId .. ":" .. targetCitizenId] = nil
+
+    -- Immutable audit log
+    Nyx.Factions.LogRBACAction(factionId, actorCitizenId, targetCitizenId, "TERMINATE", {
+        roleTitle = member.roleTitle,
+        equityShares = member.equityShares
+    }, nil, "Member employment terminated")
 
     return true
 end
@@ -283,4 +333,82 @@ function Nyx.Factions.GetFactionMembers(factionId)
     end
 
     return roster
+end
+
+-- 9. Query RBAC audit logs for a faction
+function Nyx.Factions.GetRBACAuditLog(factionId, limit)
+    if not factionId then return {} end
+    local maxLimit = math.max(1, math.min(100, tonumber(limit) or 25))
+    local rows = MySQL.query.await([[
+        SELECT `audit_id`, `faction_id`, `actor_citizen_id`, `target_citizen_id`,
+               `action_type`, `old_values`, `new_values`, `notes`, `created_at`
+        FROM `nyx_factions_rbac_audit`
+        WHERE `faction_id` = ?
+        ORDER BY `created_at` DESC
+        LIMIT ?
+    ]], { factionId, maxLimit })
+
+    local auditLogs = {}
+    for _, row in ipairs(rows or {}) do
+        local oldVals, newVals = nil, nil
+        if row.old_values and type(row.old_values) == "string" then
+            local ok, parsed = pcall(json.decode, row.old_values)
+            if ok then oldVals = parsed end
+        end
+        if row.new_values and type(row.new_values) == "string" then
+            local ok, parsed = pcall(json.decode, row.new_values)
+            if ok then newVals = parsed end
+        end
+        table.insert(auditLogs, {
+            auditId = row.audit_id,
+            factionId = row.faction_id,
+            actorCitizenId = row.actor_citizen_id,
+            targetCitizenId = row.target_citizen_id,
+            actionType = row.action_type,
+            oldValues = oldVals,
+            newValues = newVals,
+            notes = row.notes,
+            createdAt = row.created_at
+        })
+    end
+    return auditLogs
+end
+
+-- 10. Query all organization memberships for a citizen
+function Nyx.Factions.GetCitizenFactions(citizenId)
+    if not citizenId then return {} end
+    local rows = MySQL.query.await([[
+        SELECT m.`faction_id`, m.`role_title`, m.`permission_nodes`, m.`equity_shares`, m.`wage_hourly`, m.`hired_at`,
+               r.`legal_name`, r.`charter_type`, r.`treasury_account_id`, r.`founder_citizen_id`, r.`inactivity_status`
+        FROM `nyx_factions_members` m
+        JOIN `nyx_factions_registry` r ON m.`faction_id` = r.`faction_id`
+        WHERE m.`citizen_id` = ?
+        ORDER BY m.`equity_shares` DESC, m.`hired_at` ASC
+    ]], { citizenId })
+
+    local factions = {}
+    for _, row in ipairs(rows or {}) do
+        local nodes = {}
+        if type(row.permission_nodes) == "string" then
+            local ok, parsed = pcall(json.decode, row.permission_nodes)
+            if ok and type(parsed) == "table" then nodes = parsed end
+        elseif type(row.permission_nodes) == "table" then
+            nodes = row.permission_nodes
+        end
+
+        table.insert(factions, {
+            factionId = row.faction_id,
+            legalName = row.legal_name,
+            charterType = row.charter_type,
+            treasuryAccountId = row.treasury_account_id,
+            founderCitizenId = row.founder_citizen_id,
+            inactivityStatus = row.inactivity_status,
+            roleTitle = row.role_title,
+            permissionNodes = nodes,
+            equityShares = tonumber(row.equity_shares) or 0.00,
+            wageHourly = tonumber(row.wage_hourly) or 0.00,
+            hiredAt = row.hired_at
+        })
+    end
+    return factions
 end

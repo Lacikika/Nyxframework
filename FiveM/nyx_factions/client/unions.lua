@@ -49,22 +49,7 @@ end)
 
 -- Open Union Registry & Active CBAs
 RegisterNetEvent("nyx:factions:client:openUnionRegistry", function()
-    local ok, res = exports['nyx_core']:TriggerRPC("factions:getAllUnions")
-    if not ok or not res or not res.success then
-        TriggerEvent("nyx:ui:notify", {
-            type = "error",
-            title = "TRADE UNION REGISTRY",
-            message = "Unable to fetch union registry."
-        })
-        return
-    end
-
-    local unions = res.unions or {}
-    TriggerEvent("nyx:ui:notify", {
-        type = "info",
-        title = "ACCREDITED TRADE UNIONS",
-        message = string.format("Found %d recognized labor organizations in Los Santos.", #unions)
-    })
+    TriggerEvent("nyx:factions:client:openTerminal", { activeTab = "unions" })
 end)
 
 -- Claim Daily Strike Relief

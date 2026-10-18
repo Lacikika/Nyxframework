@@ -20,6 +20,7 @@
             <button id="dev-btn-inv"><i class="fa-solid fa-box-archive"></i> Inv</button>
             <button id="dev-btn-mdt"><i class="fa-solid fa-shield-halved"></i> MDT</button>
             <button id="dev-btn-treasury"><i class="fa-solid fa-scale-balanced"></i> Treasury</button>
+            <button id="dev-btn-faction"><i class="fa-solid fa-building-user"></i> Corp/Union</button>
             <button id="dev-btn-freight"><i class="fa-solid fa-truck"></i> Freight</button>
             <button id="dev-btn-interact"><i class="fa-solid fa-crosshairs"></i> Target</button>
             <button id="dev-btn-place"><i class="fa-solid fa-arrows-up-down-left-right"></i> Place</button>
@@ -460,6 +461,316 @@
                                 <!-- Populated from nyx_judiciary -->
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================
+             8B. CORPORATE MULTI-SIG, RBAC & UNION MANAGEMENT DASHBOARD (`nyx_factions`)
+             ================================================================ -->
+        <div id="faction-overlay" class="modal-backdrop hidden">
+            <div class="modal-dialog faction-dialog">
+                <div class="modal-header faction-header">
+                    <div class="header-left">
+                        <i class="fa-solid fa-building-user icon-accent purple"></i>
+                        <div>
+                            <div class="header-title-row">
+                                <h3 id="faction-legal-name">Vállalati Vezérlőpult</h3>
+                                <span id="faction-charter-badge" class="badge">CORPORATION</span>
+                                <select id="faction-select" class="faction-dropdown hidden"></select>
+                            </div>
+                            <span class="sub-heading">Autonomous Corporate Multi-Sig, Granular RBAC & Trade Union CBA Center</span>
+                        </div>
+                    </div>
+                    <div class="faction-header-kpi">
+                        <span class="kpi-micro-label">KINCSTÁRI EGYENLEG</span>
+                        <span id="faction-header-treasury" class="kpi-micro-val">$0.00</span>
+                    </div>
+                    <button id="faction-close-btn" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                
+                <!-- Navigation Tabs -->
+                <div class="faction-nav-tabs">
+                    <button class="faction-tab active" data-tab="overview"><i class="fa-solid fa-chart-pie"></i> Áttekintés & Tőke</button>
+                    <button class="faction-tab" data-tab="rbac"><i class="fa-solid fa-users-gear"></i> RBAC Mátrix & Tagság</button>
+                    <button class="faction-tab" data-tab="multisig"><i class="fa-solid fa-vault"></i> Multi-Sig Letét & Széfek</button>
+                    <button class="faction-tab" data-tab="unions"><i class="fa-solid fa-handshake"></i> Szakszervezetek & CBA</button>
+                    <button class="faction-tab" data-tab="audit"><i class="fa-solid fa-clock-rotate-left"></i> Vállalati Audit Napló</button>
+                </div>
+
+                <div class="modal-body faction-body">
+                    <!-- Tab 1: Overview & Equity -->
+                    <div id="faction-tab-overview" class="faction-tab-pane">
+                        <div class="faction-kpi-grid">
+                            <div class="kpi-card">
+                                <span class="kpi-label">VÁLLALATI SZÁMLA</span>
+                                <span id="faction-kpi-balance" class="kpi-val">$0.00</span>
+                                <span id="faction-kpi-account" class="kpi-sub">Számlaszám: -</span>
+                            </div>
+                            <div class="kpi-card">
+                                <span class="kpi-label">KIBOCSÁTOTT TULAJDONRÉSZ</span>
+                                <span id="faction-kpi-equity" class="kpi-val">0.00%</span>
+                                <div class="progress-bar"><div id="faction-equity-fill" class="fill" style="width: 0%;"></div></div>
+                            </div>
+                            <div class="kpi-card">
+                                <span class="kpi-label">ROSTER LÉTSZÁM</span>
+                                <span id="faction-kpi-members" class="kpi-val">0 fő</span>
+                                <span id="faction-kpi-inactivity" class="kpi-sub">Státusz: AKTÍV</span>
+                            </div>
+                            <div class="kpi-card">
+                                <span class="kpi-label">FLOTTA JÁRMŰVEK</span>
+                                <span id="faction-kpi-fleet" class="kpi-val">0 db</span>
+                                <span class="kpi-sub">Kereskedelmi Járműpark</span>
+                            </div>
+                        </div>
+
+                        <!-- Dividends Distribution Card -->
+                        <div class="card-surface faction-card">
+                            <div class="card-header-row">
+                                <div>
+                                    <h4 class="card-title"><i class="fa-solid fa-coins"></i> Tulajdonosi Osztalék Fizetés (Double-Entry Dividends)</h4>
+                                    <span class="card-subtitle">Automatikus szétosztás a tagok között tulajdoni hányaduk (Equity %) arányában.</span>
+                                </div>
+                            </div>
+                            <div class="dividend-form-row">
+                                <div class="form-group">
+                                    <label>Szétosztandó Tiszta Nyereség ($)</label>
+                                    <input type="number" id="faction-dividend-amount" min="100" max="10000000" step="100" value="10000" class="modal-input">
+                                </div>
+                                <div class="form-group">
+                                    <label>Kifizetési Arány (0.05 - 0.90)</label>
+                                    <input type="number" id="faction-dividend-rate" min="0.05" max="0.90" step="0.05" value="0.50" class="modal-input">
+                                </div>
+                                <div class="form-group action-group">
+                                    <button id="faction-dividend-btn" class="btn btn-primary"><i class="fa-solid fa-money-bill-transfer"></i> Osztalékkifizetés Végrehajtása</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: RBAC Matrix & Membership Roster -->
+                    <div id="faction-tab-rbac" class="faction-tab-pane hidden">
+                        <div class="tab-action-bar">
+                            <div class="action-bar-info">
+                                <h4 class="section-title">Vállalati Munkavállalók & Jogosultsági Csomópontok</h4>
+                                <span class="sub-text">Hierarchikus RBAC mátrix node-alapú hozzáférésekkel (*, treasury:*, roster:*, fleet:*, cba:*).</span>
+                            </div>
+                            <button id="faction-open-add-member-btn" class="btn btn-primary"><i class="fa-solid fa-user-plus"></i> Új Tag Felvétele</button>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="nyx-table rbac-table">
+                                <thead>
+                                    <tr>
+                                        <th>Citizen ID</th>
+                                        <th>Pozíció / Titulus</th>
+                                        <th>Órabér ($)</th>
+                                        <th>Tulajdonrész (%)</th>
+                                        <th>Jogosultsági Csomópontok (Nodes)</th>
+                                        <th>Műveletek</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="faction-roster-rows">
+                                    <!-- Dynamic member rows with badge pills -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Multi-Sig Escrow & Vaults -->
+                    <div id="faction-tab-multisig" class="faction-tab-pane hidden">
+                        <div class="tab-action-bar">
+                            <div class="action-bar-info">
+                                <h4 class="section-title">Többszörös Aláírású Kifizetési Letétek & Időzárak</h4>
+                                <span class="sub-text">Kritikus pénzügyi tranzakciók több aláíró jóváhagyásához és timelock escrow-hoz kötve.</span>
+                            </div>
+                            <button id="faction-open-withdraw-btn" class="btn btn-warning"><i class="fa-solid fa-file-invoice-dollar"></i> Új Kifizetés Kezdeményezése</button>
+                        </div>
+
+                        <!-- Pending Signatures Queue -->
+                        <h5 class="sub-section-title"><i class="fa-solid fa-signature"></i> Aláírásra Váró Letétek (Pending Escrow)</h5>
+                        <div id="faction-multisig-pending-list" class="multisig-cards-grid">
+                            <!-- Dynamic pending withdrawal cards -->
+                        </div>
+
+                        <!-- Timelocked Escrow Executions -->
+                        <h5 class="sub-section-title"><i class="fa-solid fa-hourglass-half"></i> Időzár Alatti Tranzakciók (Timelock Escrow)</h5>
+                        <div id="faction-multisig-timelocked-list" class="multisig-cards-grid">
+                            <!-- Dynamic timelocked execution cards -->
+                        </div>
+
+                        <!-- Vaults & Signoff Rules Overview -->
+                        <div class="multisig-meta-split">
+                            <div class="meta-col">
+                                <h5 class="sub-section-title"><i class="fa-solid fa-shield-halved"></i> Vállalati Széfek & Napi Limitek</h5>
+                                <div id="faction-vaults-list" class="mini-card-list"></div>
+                            </div>
+                            <div class="meta-col">
+                                <h5 class="sub-section-title"><i class="fa-solid fa-scale-balanced"></i> Aktív Aláírási Szabályzatok (Sign-off Rules)</h5>
+                                <div id="faction-signoff-rules-list" class="mini-card-list"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 4: Trade Unions & CBA Contract Builder -->
+                    <div id="faction-tab-unions" class="faction-tab-pane hidden">
+                        <div class="unions-dashboard-layout">
+                            <!-- Left: Active CBAs & Trade Union Standing -->
+                            <div class="unions-main-col">
+                                <h4 class="section-title"><i class="fa-solid fa-file-contract"></i> Hatályos Kollektív Szerződés (CBA)</h4>
+                                <div id="faction-active-cba-card" class="cba-status-card">
+                                    <!-- Dynamic CBA overview with status badge & ratify button -->
+                                </div>
+
+                                <h4 class="section-title"><i class="fa-solid fa-users-line"></i> Akkreditált Szakszervezetek & Sztrájkalapok</h4>
+                                <div id="faction-unions-list" class="unions-grid">
+                                    <!-- Dynamic union cards with strike fund runway & relief claim button -->
+                                </div>
+                            </div>
+
+                            <!-- Right: CBA Contract Builder Form -->
+                            <div class="cba-builder-col">
+                                <div class="card-surface builder-card">
+                                    <h4 class="card-title"><i class="fa-solid fa-pen-ruler"></i> CBA Szerződéstervező (Contract Builder)</h4>
+                                    <span class="card-subtitle">Kollektív munkaügyi megállapodás kidolgozása és benyújtása a vállalatnak.</span>
+                                    
+                                    <div class="cba-form">
+                                        <div class="form-group">
+                                            <label>Szerződés Megnevezése</label>
+                                            <input type="text" id="cba-builder-title" placeholder="Pl. 2026. Évi Logisztikai Bérmegállapodás" class="modal-input" maxlength="64">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Kijelölt Szakszervezet</label>
+                                            <select id="cba-builder-union" class="modal-select"></select>
+                                        </div>
+                                        <div class="form-row-2">
+                                            <div class="form-group">
+                                                <label>Garantált Bérplafon / Óra ($)</label>
+                                                <input type="number" id="cba-builder-wage" min="15" max="500" value="38.00" step="0.50" class="modal-input">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Túlóra Szorzó (1.0x - 3.0x)</label>
+                                                <input type="number" id="cba-builder-overtime" min="1.0" max="3.0" value="1.50" step="0.10" class="modal-input">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Veszélyességi Pótlék ($ / óra)</label>
+                                            <input type="number" id="cba-builder-hazard" min="0" max="200" value="15.00" step="1.00" class="modal-input">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Záradékok & Megjegyzések</label>
+                                            <textarea id="cba-builder-notes" rows="3" placeholder="Feltételek, kötelezettségek és garanciák..." class="modal-input"></textarea>
+                                        </div>
+                                        <button id="cba-builder-submit-btn" class="btn btn-primary btn-block"><i class="fa-solid fa-paper-plane"></i> CBA Megállapodás Javaslása (Propose)</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 5: Immutable Audit Log -->
+                    <div id="faction-tab-audit" class="faction-tab-pane hidden">
+                        <h4 class="section-title"><i class="fa-solid fa-list-check"></i> Vállalati Döntéshozatali & Mátrix Audit Napló</h4>
+                        <div class="table-container">
+                            <table class="nyx-table audit-table">
+                                <thead>
+                                    <tr>
+                                        <th>Időpont</th>
+                                        <th>Típus</th>
+                                        <th>Végrehajtó (Actor)</th>
+                                        <th>Érintett Tag (Target)</th>
+                                        <th>Részletek & Változások</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="faction-audit-rows">
+                                    <!-- Dynamic audit logs -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submodal: Add / Edit Member Dialog -->
+            <div id="faction-submodal-member" class="submodal-overlay hidden">
+                <div class="submodal-card">
+                    <div class="submodal-header">
+                        <h4 id="faction-member-modal-title"><i class="fa-solid fa-user-plus"></i> Új Munkatárs Hozzáadása</h4>
+                        <button id="faction-member-modal-close" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div class="submodal-body">
+                        <div class="form-group">
+                            <label>Citizen ID (Állampolgári Azonosító)</label>
+                            <input type="text" id="faction-input-member-citid" placeholder="Pl. NYX4092" class="modal-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Beosztás / Szerepkör Megnevezése</label>
+                            <input type="text" id="faction-input-member-role" placeholder="Pl. Logisztikai Koordinátor" class="modal-input">
+                        </div>
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label>Órabér ($ / óra)</label>
+                                <input type="number" id="faction-input-member-wage" min="0" max="10000" value="45.00" step="1.00" class="modal-input">
+                            </div>
+                            <div class="form-group">
+                                <label>Tulajdonrész (%)</label>
+                                <input type="number" id="faction-input-member-equity" min="0" max="100" value="0.00" step="0.50" class="modal-input">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Jogosultsági Csomópontok (Permission Nodes)</label>
+                            <div class="node-matrix-grid">
+                                <label class="node-checkbox"><input type="checkbox" value="*"> <span>* (Mindenhatóság / Root)</span></label>
+                                <label class="node-checkbox"><input type="checkbox" value="treasury:*"> <span>treasury:* (Teljes Pénztár)</span></label>
+                                <label class="node-checkbox"><input type="checkbox" value="treasury:view_ledger"> <span>treasury:view_ledger</span></label>
+                                <label class="node-checkbox"><input type="checkbox" value="treasury:sign_tx"> <span>treasury:sign_tx</span></label>
+                                <label class="node-checkbox"><input type="checkbox" value="roster:*"> <span>roster:* (Teljes Személyzet)</span></label>
+                                <label class="node-checkbox"><input type="checkbox" value="roster:invite"> <span>roster:invite</span></label>
+                                <label class="node-checkbox"><input type="checkbox" value="roster:promote"> <span>roster:promote</span></label>
+                                <label class="node-checkbox"><input type="checkbox" value="roster:terminate"> <span>roster:terminate</span></label>
+                                <label class="node-checkbox"><input type="checkbox" value="fleet:*"> <span>fleet:* (Teljes Flotta)</span></label>
+                                <label class="node-checkbox"><input type="checkbox" value="fleet:spawn"> <span>fleet:spawn</span></label>
+                                <label class="node-checkbox"><input type="checkbox" value="cba:*"> <span>cba:* (CBA & Szakszervezet)</span></label>
+                                <label class="node-checkbox"><input type="checkbox" value="cba:ratify"> <span>cba:ratify</span></label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="submodal-footer">
+                        <button id="faction-member-modal-cancel" class="btn btn-secondary">Mégse</button>
+                        <button id="faction-member-modal-save" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Mentés & Frissítés</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submodal: Initiate Multi-Sig Withdrawal Dialog -->
+            <div id="faction-submodal-withdraw" class="submodal-overlay hidden">
+                <div class="submodal-card">
+                    <div class="submodal-header">
+                        <h4><i class="fa-solid fa-file-invoice-dollar"></i> Új Kifizetés Kezdeményezése</h4>
+                        <button id="faction-withdraw-modal-close" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div class="submodal-body">
+                        <div class="form-group">
+                            <label>Forrás Széf / Számla</label>
+                            <select id="faction-withdraw-vault" class="modal-select"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Cél Számlaszám (Target Account / Citizen ID)</label>
+                            <input type="text" id="faction-withdraw-target" placeholder="Pl. cit:NYX1024 vagy corp:vault_02" class="modal-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Kifizetés Összege ($)</label>
+                            <input type="number" id="faction-withdraw-amount" min="10" max="5000000" value="5000" step="10" class="modal-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Kifizetés Indoklása (Reason)</label>
+                            <textarea id="faction-withdraw-reason" rows="2" placeholder="Beszerzés, bónusz vagy szerződéses teljesítés..." class="modal-input"></textarea>
+                        </div>
+                    </div>
+                    <div class="submodal-footer">
+                        <button id="faction-withdraw-modal-cancel" class="btn btn-secondary">Mégse</button>
+                        <button id="faction-withdraw-modal-submit" class="btn btn-warning"><i class="fa-solid fa-signature"></i> Letét Nyújtása (Initiate)</button>
                     </div>
                 </div>
             </div>

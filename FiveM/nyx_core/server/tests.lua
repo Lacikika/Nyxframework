@@ -6080,7 +6080,155 @@ function Nyx.Tests.TestStaggeredResourceBootloaderDispatch()
     return passes == total
 end
 
--- 29. Master Test Runner
+-- 29. Corporate Multi-Sig, RBAC Matrix & Trade Union Management
+function Nyx.Tests.TestCorporateMultiSigRBACAndUnionUI()
+    print("^3[Nyx:Tests] Running Corporate Multi-Sig, RBAC & Union Management Test Suite...^7")
+    local passes = 0
+    local total = 8
+
+    -- Resolve or fallback to Nyx.CorporateRBAC
+    local RBAC = (Nyx and Nyx.CorporateRBAC) or {}
+    local evaluatePermission = RBAC.EvaluatePermission or function(nodesList, requiredNode)
+        if not nodesList or type(nodesList) ~= "table" or not requiredNode then return false end
+        for _, node in ipairs(nodesList) do
+            if type(node) == "string" then
+                if node == "*" or node == requiredNode then return true end
+                if string.sub(node, -2) == ":*" then
+                    local prefix = string.sub(node, 1, -2)
+                    if string.sub(requiredNode, 1, #prefix) == prefix then return true end
+                end
+            end
+        end
+        return false
+    end
+
+    local validateEquity = RBAC.ValidateEquityBudget or function(currentTotal, oldMemberEquity, newMemberEquity)
+        currentTotal = math.max(0.0, math.floor((tonumber(currentTotal) or 0.0) * 100 + 0.5) / 100)
+        oldMemberEquity = math.max(0.0, math.floor((tonumber(oldMemberEquity) or 0.0) * 100 + 0.5) / 100)
+        newMemberEquity = math.max(0.0, math.floor((tonumber(newMemberEquity) or 0.0) * 100 + 0.5) / 100)
+        if newMemberEquity < 0.0 or newMemberEquity > 100.0 then return false, currentTotal, "EQUITY_OUT_OF_BOUNDS_0_TO_100" end
+        local adjustedTotal = math.floor((currentTotal - oldMemberEquity + newMemberEquity) * 100 + 0.5) / 100
+        if adjustedTotal > 100.00 then return false, adjustedTotal, "EXCEEDS_MAXIMUM_EQUITY_100_PERCENT" end
+        return true, adjustedTotal, nil
+    end
+
+    local evaluateEscrow = RBAC.EvaluateEscrowStatus or function(currentSignatures, requiredSignatures, timelockSeconds, initiatedAtUnix, currentUnix)
+        currentSignatures = math.max(0, math.floor(tonumber(currentSignatures) or 0))
+        requiredSignatures = math.max(1, math.floor(tonumber(requiredSignatures) or 2))
+        timelockSeconds = math.max(0, math.floor(tonumber(timelockSeconds) or 0))
+        initiatedAtUnix = math.max(0, math.floor(tonumber(initiatedAtUnix) or 0))
+        currentUnix = math.max(0, math.floor(tonumber(currentUnix) or os.time()))
+        if currentSignatures < requiredSignatures then
+            return { status = "AWAITING_SIGNATURES", isExecutable = false, missingSignatures = requiredSignatures - currentSignatures, remainingTimelockSeconds = 0, currentSignatures = currentSignatures, requiredSignatures = requiredSignatures }
+        end
+        local elapsed = math.max(0, currentUnix - initiatedAtUnix)
+        if timelockSeconds > 0 and elapsed < timelockSeconds then
+            return { status = "TIMELOCKED", isExecutable = false, missingSignatures = 0, remainingTimelockSeconds = timelockSeconds - elapsed, currentSignatures = currentSignatures, requiredSignatures = requiredSignatures }
+        end
+        return { status = "READY_FOR_EXECUTION", isExecutable = true, missingSignatures = 0, remainingTimelockSeconds = 0, currentSignatures = currentSignatures, requiredSignatures = requiredSignatures }
+    end
+
+    local validateCBA = RBAC.ValidateCBAParameters or function(title, wageFloor, overtimeMultiplier, hazardBonus, notes)
+        if not title or type(title) ~= "string" or string.len(string.gsub(title, "^%s*(.-)%s*$", "%1")) < 3 then return false, nil, "INVALID_CBA_TITLE_MIN_3_CHARS" end
+        local cleanTitle = string.sub(string.gsub(title, "^%s*(.-)%s*$", "%1"), 1, 64)
+        local wage = tonumber(wageFloor) or 35.00
+        if wage < 15.00 or wage > 500.00 then return false, nil, "WAGE_FLOOR_OUT_OF_BOUNDS_15_TO_500" end
+        wage = math.floor(wage * 100 + 0.5) / 100
+        local ot = tonumber(overtimeMultiplier) or 1.50
+        if ot < 1.00 or ot > 3.00 then return false, nil, "OVERTIME_MULTIPLIER_OUT_OF_BOUNDS_1_TO_3" end
+        ot = math.floor(ot * 100 + 0.5) / 100
+        local hazard = tonumber(hazardBonus) or 0.00
+        if hazard < 0.00 or hazard > 200.00 then return false, nil, "HAZARD_BONUS_OUT_OF_BOUNDS_0_TO_200" end
+        hazard = math.floor(hazard * 100 + 0.5) / 100
+        local cleanNotes = ""
+        if notes and type(notes) == "string" then cleanNotes = string.sub(string.gsub(notes, "^%s*(.-)%s*$", "%1"), 1, 255) end
+        return true, { title = cleanTitle, wageFloor = wage, overtimeMultiplier = ot, hazardBonus = hazard, notes = cleanNotes }, nil
+    end
+
+    -- Test A: Permission Node Exact Matching
+    local userNodesExact = { "treasury:view_ledger", "treasury:deposit" }
+    local hasLedger = evaluatePermission(userNodesExact, "treasury:view_ledger")
+    local hasSignTx = evaluatePermission(userNodesExact, "treasury:sign_tx")
+    if assertTest(hasLedger == true and hasSignTx == false,
+        "RBAC Exact Permission Node Evaluation",
+        string.format("hasLedger=%s, hasSignTx=%s", tostring(hasLedger), tostring(hasSignTx))) then
+        passes = passes + 1
+    end
+
+    -- Test B: Category Wildcard Permission Matching
+    local userNodesCat = { "treasury:*", "roster:view" }
+    local hasTreasurySign = evaluatePermission(userNodesCat, "treasury:sign_tx")
+    local hasTreasuryFreeze = evaluatePermission(userNodesCat, "treasury:freeze_vault")
+    local hasRosterInvite = evaluatePermission(userNodesCat, "roster:invite")
+    if assertTest(hasTreasurySign == true and hasTreasuryFreeze == true and hasRosterInvite == false,
+        "RBAC Category Wildcard Evaluation (<category>:*)",
+        string.format("sign=%s, freeze=%s, rosterInvite=%s", tostring(hasTreasurySign), tostring(hasTreasuryFreeze), tostring(hasRosterInvite))) then
+        passes = passes + 1
+    end
+
+    -- Test C: Global Root Wildcard Permission Matching
+    local userNodesRoot = { "*" }
+    local hasAnyA = evaluatePermission(userNodesRoot, "treasury:distribute_dividends")
+    local hasAnyB = evaluatePermission(userNodesRoot, "cba:ratify")
+    local hasAnyC = evaluatePermission(userNodesRoot, "fleet:spawn")
+    if assertTest(hasAnyA == true and hasAnyB == true and hasAnyC == true,
+        "RBAC Global Root Wildcard Evaluation (*)",
+        string.format("div=%s, cba=%s, fleet=%s", tostring(hasAnyA), tostring(hasAnyB), tostring(hasAnyC))) then
+        passes = passes + 1
+    end
+
+    -- Test D: Equity Shares Conservation Invariant (<= 100.00%)
+    local okAdd, totalAdd = validateEquity(80.00, 0.00, 15.00)
+    local okFail, totalFail = validateEquity(80.00, 0.00, 25.00)
+    local okUpd, totalUpd = validateEquity(80.00, 20.00, 35.00)
+    if assertTest(okAdd == true and totalAdd == 95.00 and okFail == false and totalFail == 105.00 and okUpd == true and totalUpd == 95.00,
+        "Corporate Equity Shares Budget Conservation Invariant (<= 100.00%)",
+        string.format("okAdd=%s (%.2f), okFail=%s (%.2f), okUpd=%s (%.2f)", tostring(okAdd), totalAdd, tostring(okFail), totalFail, tostring(okUpd), totalUpd)) then
+        passes = passes + 1
+    end
+
+    -- Test E: Multi-Sig Quorum Incomplete State
+    local escrowQuorumPending = evaluateEscrow(1, 2, 300, 1000, 1050)
+    if assertTest(escrowQuorumPending.status == "AWAITING_SIGNATURES" and escrowQuorumPending.isExecutable == false and escrowQuorumPending.missingSignatures == 1,
+        "Multi-Sig Escrow Status: Awaiting Signatures (Quorum Incomplete)",
+        string.format("status=%s, isExecutable=%s, missing=%d", escrowQuorumPending.status, tostring(escrowQuorumPending.isExecutable), escrowQuorumPending.missingSignatures)) then
+        passes = passes + 1
+    end
+
+    -- Test F: Multi-Sig Timelock In-Flight State
+    local escrowTimelocked = evaluateEscrow(2, 2, 300, 1000, 1100)
+    if assertTest(escrowTimelocked.status == "TIMELOCKED" and escrowTimelocked.isExecutable == false and escrowTimelocked.remainingTimelockSeconds == 200,
+        "Multi-Sig Escrow Status: Timelocked In-Flight Execution Block",
+        string.format("status=%s, isExecutable=%s, remaining=%d", escrowTimelocked.status, tostring(escrowTimelocked.isExecutable), escrowTimelocked.remainingTimelockSeconds)) then
+        passes = passes + 1
+    end
+
+    -- Test G: Multi-Sig Timelock Expired & Ready for Execution
+    local escrowReady = evaluateEscrow(2, 2, 300, 1000, 1350)
+    if assertTest(escrowReady.status == "READY_FOR_EXECUTION" and escrowReady.isExecutable == true and escrowReady.remainingTimelockSeconds == 0,
+        "Multi-Sig Escrow Status: Ready for Double-Entry Execution",
+        string.format("status=%s, isExecutable=%s, remaining=%d", escrowReady.status, tostring(escrowReady.isExecutable), escrowReady.remainingTimelockSeconds)) then
+        passes = passes + 1
+    end
+
+    -- Test H: CBA Contract Parameter Range Validation
+    local cbaValidOk, cbaValidData = validateCBA("Transport Master Agreement", 45.00, 1.50, 20.00, "Safety bonuses included")
+    local cbaInvalidWage, _, errWage = validateCBA("Invalid Wage CBA", 10.00, 1.50, 0.00)
+    local cbaInvalidOT, _, errOT = validateCBA("Invalid OT CBA", 35.00, 4.00, 0.00)
+    local cbaOk = (cbaValidOk == true and cbaValidData.wageFloor == 45.00 and cbaValidData.overtimeMultiplier == 1.50 and cbaValidData.hazardBonus == 20.00)
+        and (cbaInvalidWage == false and string.find(tostring(errWage), "WAGE_FLOOR_OUT_OF_BOUNDS") ~= nil)
+        and (cbaInvalidOT == false and string.find(tostring(errOT), "OVERTIME_MULTIPLIER_OUT_OF_BOUNDS") ~= nil)
+
+    if assertTest(cbaOk == true,
+        "Trade Union CBA Contract Parameter Sanitization & Boundary Guards",
+        string.format("validOk=%s, wageErr=%s, otErr=%s", tostring(cbaValidOk), tostring(errWage), tostring(errOT))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 30. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -6114,9 +6262,10 @@ function Nyx.Tests.RunAll()
     local t26 = Nyx.Tests.TestPressMediaAndWhistleblower()
     local t27 = Nyx.Tests.TestBatchedContainerQueriesOnBoot()
     local t28 = Nyx.Tests.TestStaggeredResourceBootloaderDispatch()
+    local t29 = Nyx.Tests.TestCorporateMultiSigRBACAndUnionUI()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

@@ -21,10 +21,49 @@ CreateThread(function()
             return { success = ok, data = res, error = (not ok and res or nil) }
         end)
 
-        -- 2. Query organizational overview
+        -- 2. Query organizational overview (auto-detects primary faction if omitted)
         exports['nyx_core']:RegisterRPC("factions:getOverview", function(src, factionId)
-            local overview = Nyx.Factions.GetFactionOverview(factionId)
+            local targetFactionId = factionId
+            if not targetFactionId or targetFactionId == "" then
+                local player = Nyx.GetPlayer(src)
+                if player and player.citizenId then
+                    local userFactions = Nyx.Factions.GetCitizenFactions(player.citizenId)
+                    if userFactions and #userFactions > 0 then
+                        targetFactionId = userFactions[1].factionId
+                    end
+                end
+            end
+            if not targetFactionId then
+                return { success = false, error = "NO_FACTION_SPECIFIED" }
+            end
+
+            local overview = Nyx.Factions.GetFactionOverview(targetFactionId)
+            if overview then
+                overview.cba = Nyx.Factions.GetEnterpriseCBA(targetFactionId)
+                overview.rbacAudit = Nyx.Factions.GetRBACAuditLog(targetFactionId, 25)
+                if Nyx.Factions.GetAllUnions then
+                    overview.unions = Nyx.Factions.GetAllUnions()
+                end
+            end
             return { success = (overview ~= nil), overview = overview }
+        end)
+
+        -- 2b. Query all citizen organizational memberships
+        exports['nyx_core']:RegisterRPC("factions:getCitizenFactions", function(src, citizenId)
+            local targetCitId = citizenId
+            if not targetCitId or targetCitId == "" then
+                local player = Nyx.GetPlayer(src)
+                targetCitId = player and player.citizenId
+            end
+            if not targetCitId then return { success = false, error = "UNAUTHENTICATED" } end
+            local factions = Nyx.Factions.GetCitizenFactions(targetCitId)
+            return { success = true, factions = factions or {} }
+        end)
+
+        -- 2c. Query RBAC audit logs
+        exports['nyx_core']:RegisterRPC("factions:getRBACAuditLog", function(src, factionId, limit)
+            local logs = Nyx.Factions.GetRBACAuditLog(factionId, limit)
+            return { success = true, audit = logs or {} }
         end)
 
         -- 3. Add new member

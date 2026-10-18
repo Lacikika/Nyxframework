@@ -42,7 +42,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
   - **Issue:** 14 modular resources querying the MariaDB pool simultaneously causes connection contention on fresh server startup.
   - **Fix:** Introduce a 50ms staggered initialization bus following `nyx:core:dbReady` so heavy resources initialize sequentially without thread hitches.
 
-- [ ] **Feature: Corporate Multi-Sig, RBAC & Union Management UI (`nyx_ui` & `nyx_factions`)**
+- [x] **Feature: Corporate Multi-Sig, RBAC & Union Management UI (`nyx_ui` & `nyx_factions`)**
   - **Implementation:** Single-frame React/Svelte dashboard for player corporations and trade unions: visual RBAC permission matrix, multi-sig escrow approvals, and CBA contract builder.
 
 - [ ] **Feature: Judicial Chain-of-Custody, Warrants & Jury UI (`nyx_ui` & `nyx_judiciary`)**
@@ -107,6 +107,34 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Corporate Multi-Sig, RBAC & Union Management UI (`nyx_ui` & `nyx_factions`)**
+  - **Database Schema Migration (`034_factions_corporate_ui_and_rbac_audit.sql`, `index.json`)**:
+    - Created `nyx_factions_rbac_audit` table persisting immutable corporate governance and permission mutation logs (`audit_id`, `faction_id`, `actor_citizen_id`, `target_citizen_id`, `action_type`, `old_values`, `new_values`, `notes`, `created_at`).
+    - Extended `nyx_factions_cba` table with `cba_notes` column for contract builder annotations.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 34) and mirrored to `FiveM/nyx_factions/sql/migrations/`.
+  - **Shared Lua 5.4 Deterministic RBAC Engine (`nyx_factions/shared/corporate_rbac.lua`, `fxmanifest.lua`)**:
+    - Defined standard corporate permission taxonomy covering `treasury`, `roster`, `fleet`, `inventory`, and `cba`.
+    - Implemented `Nyx.CorporateRBAC.EvaluatePermission` supporting global root wildcard (`*`), category prefix wildcards (`<category>:*`), and exact node matching.
+    - Implemented `Nyx.CorporateRBAC.ValidateEquityBudget` enforcing total corporate equity conservation $\le 100.00\%$ with 2-decimal cent precision.
+    - Implemented `Nyx.CorporateRBAC.EvaluateEscrowStatus` evaluating quorum status, missing signatures, timelock in-flight seconds, and execution readiness.
+    - Implemented `Nyx.CorporateRBAC.ValidateCBAParameters` sanitizing and validating wage floors ($15-$500/h), overtime multipliers (1.0x-3.0x), and hazard pay bonuses ($0-$200/h).
+    - Registered `shared/corporate_rbac.lua` in `FiveM/nyx_factions/fxmanifest.lua`.
+  - **Server-Side Governance & Audit Instrumentation (`nyx_factions/server/`)**:
+    - *Permissions & Audit (`permissions.lua`)*: Added `LogRBACAction`, `GetRBACAuditLog`, and `GetCitizenFactions`. Hooked `evaluateNodeMatch` to `CorporateRBAC.EvaluatePermission`. Instrumented `AddMember`, `UpdateMember`, and `RemoveMember` with immutable audit logging.
+    - *Main Controller & RPCs (`main.lua`)*: Registered `factions:getCitizenFactions` and `factions:getRBACAuditLog` RPCs. Enhanced `factions:getOverview` to auto-resolve citizen primary faction and enrich payload with active CBA, audit log, and accredited unions.
+    - *Server Exports (`exports.lua`)*: Exported `GetCitizenFactions` and `GetRBACAuditLog`.
+  - **Client-Side Terminal Dispatch & UI Bridge (`nyx_factions/client/`, `nyx_ui/client/`)**:
+    - *Factions Client (`terminals.lua`, `unions.lua`)*: Added `/corporate`, `/faction`, and `/org` commands. Updated `openTerminal` to query overview/factions and dispatch `OpenFactionDashboard`. Wired `openUnionRegistry` to open terminal with `{ activeTab = "unions" }`.
+    - *UI Bridge (`bridge.lua`, `exports.lua`)*: Added corporate/union parameter whitelisting in `SanitizePayload`. Registered safe NUI callbacks for `closeFactionDashboard`, `faction:getOverview`, `faction:getCitizenFactions`, `faction:addMember`, `faction:updateMember`, `faction:removeMember`, `faction:initiateWithdrawal`, `faction:signMultiSig`, `faction:rejectMultiSig`, `faction:cancelMultiSig`, `faction:executeTimelocked`, `faction:proposeCBA`, `faction:ratifyCBA`, `faction:claimStrikeRelief`, `faction:castStrikeVote`, and `faction:distributeDividends`. Exported `OpenFactionDashboard` and `CloseFactionDashboard`.
+  - **Web Single-Frame CEF SPA (`nyx_ui/web/`)**:
+    - *HTML (`index.html`)*: Added `#faction-overlay` with 5-tab responsive layout (Overview & Equity, RBAC Matrix & Membership Roster, Multi-Sig Escrow & Vaults, Trade Unions & CBA Builder, Immutable Audit Log) plus `#faction-submodal-member` and `#faction-submodal-withdraw` dialogs. Added `#dev-btn-faction` to `#dev-mode-bar`.
+    - *CSS (`css/app.css`)*: Section 16 styling strictly adhering to CEF render budget (high-opacity dark surfaces `rgba(12, 15, 22, 0.94)`, subtle borders, zero `backdrop-filter`, zero `blur()`, WCAG AA+ text tokens `#F8FAFC`/`#94A3B8`/`#475569`, interactive target min-height $\ge 40$px, max-height 85vh).
+    - *JavaScript (`js/app.js`)*: Added `NyxState.faction` reactive state, message listeners (`FACTION_DASHBOARD_OPEN`/`CLOSE`), tab switching, dividend distribution with `openDialog` confirmation, add/edit member form with permission node checkboxes, multi-sig withdrawal initiation, timelock execution, CBA proposal and ratification, strike fund relief claiming, double-submit exploit locking (`lockButtonAction`), hierarchical submodal escape handling, and browser dev mode mock telemetry.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestCorporateMultiSigRBACAndUnionUI()` (Test 29) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_corporate_multisig_rbac_union_ui.py` covering migration 034 schema, manifest declarations, server RPCs, client bridge, CEF render budget, HTML IDs, and algorithmic parity (6/6 passing).
+    - Full pytest suite: 246/246 tests passing (100% pass rate).
+    - Verified clean passes across all 14 resources, 208 Lua files, and all 34 SQL migrations via `scripts/validator.py` and `scripts/verify.ps1`.
 - **[2026-10-18] Architecture: Staggered Resource Bootloader Dispatch (`nyx_core`)**
   - **Pure Lua 5.4 Shared Engine (`nyx_core/shared/bootloader.lua`, `fxmanifest.lua`)**:
     - Created pure shared bootloader engine `Nyx.Bootloader` providing canonical 6-stage architecture mapping all 14 modular resources (`kernel`, `inventory`, `civil`, `governance`, `justice`, `interface`).
