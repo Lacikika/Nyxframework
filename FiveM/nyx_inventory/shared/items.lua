@@ -316,6 +316,24 @@ Nyx.Items.Registry = {
         type = 'tool',
         description = 'Comprehensive forensic field toolkit with UV luminol, swabs, and tweezers.'
     },
+    ['forensic_swab'] = {
+        name = 'forensic_swab',
+        label = 'Sterile Forensic Swab',
+        weight = 20,
+        stackable = true,
+        maxStack = 20,
+        type = 'tool',
+        description = 'Sterile cotton applicator for biological DNA, gunshot residue, and chemical sampling.'
+    },
+    ['camera_forensic'] = {
+        name = 'camera_forensic',
+        label = 'High-Resolution Forensic Camera',
+        weight = 850,
+        stackable = false,
+        maxSlots = 1,
+        type = 'tool',
+        description = 'Calibrated digital camera embedding cryptographic timestamp & EXIF sensor telemetry.'
+    },
     ['car_keys'] = {
         name = 'car_keys',
         label = 'Vehicle Key Fob',

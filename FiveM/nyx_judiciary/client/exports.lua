@@ -11,3 +11,15 @@ end)
 exports("GetCourtroomCenter", function()
     return Config.Courtroom and Config.Courtroom.InteriorCenter or vector3(-545.2, -203.8, 38.2)
 end)
+
+exports("PerformForensicSwab", function(targetServerId, swabType)
+    return PerformForensicSwab and PerformForensicSwab(targetServerId, swabType) or false
+end)
+
+exports("CapturePhotoEvidence", function(cameraName, notes)
+    return CapturePhotoEvidence and CapturePhotoEvidence(cameraName, notes) or false
+end)
+
+exports("VerifyChainOfCustody", function(evidenceId)
+    return ClientVerifyChainOfCustody and ClientVerifyChainOfCustody(evidenceId) or false
+end)

@@ -115,3 +115,119 @@ end)
 function IsForensicActive()
     return isForensicActive
 end
+
+-- 3. Forensic Swab Collection (GSR, DNA, Chemical)
+function PerformForensicSwab(targetServerId, swabType)
+    swabType = swabType or "gsr"
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+
+    -- Play swab animation
+    local dict = "mp_arresting"
+    RequestAnimDict(dict)
+    local timeout = 0
+    while not HasAnimDictLoaded(dict) and timeout < 20 do
+        Wait(50)
+        timeout = timeout + 1
+    end
+
+    TaskPlayAnim(ped, dict, "a_uncuff", 8.0, -8.0, 2500, 49, 0, false, false, false)
+    Wait(2500)
+    ClearPedTasks(ped)
+
+    if exports['nyx_core'] and exports['nyx_core'].TriggerServerRPC then
+        local res = exports['nyx_core']:TriggerServerRPC("judiciary:createSwabEvidence", {
+            targetCitizenId = targetServerId and tostring(targetServerId) or "UNKNOWN",
+            swabType = swabType,
+            coords = { x = coords.x, y = coords.y, z = coords.z },
+            isGSRPositive = true
+        })
+        return res
+    end
+    return false
+end
+
+-- 4. Digital Photographic / CCTV Surveillance Evidence
+function CapturePhotoEvidence(cameraName, notes)
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+
+    -- Camera flash effect
+    PlaySoundFrontend(-1, "Camera_Shoot", "Phone_Soundset_Franklin", true)
+
+    local snapshotHash = string.format("EXIF-%d-%04d", GetGameTimer(), math.random(1000, 9999))
+    if exports['nyx_core'] and exports['nyx_core'].TriggerServerRPC then
+        local res = exports['nyx_core']:TriggerServerRPC("judiciary:createPhotoEvidence", {
+            cameraLocation = cameraName or "PATROL_DASHCAM_01",
+            snapshotHash = snapshotHash,
+            coords = { x = coords.x, y = coords.y, z = coords.z },
+            notes = notes or "Patrol photographic evidence"
+        })
+        return res
+    end
+    return false
+end
+
+-- 5. Chain of Custody Verification Query
+function ClientVerifyChainOfCustody(evidenceId)
+    if not evidenceId then return false end
+
+    if exports['nyx_core'] and exports['nyx_core'].TriggerServerRPC then
+        local res = exports['nyx_core']:TriggerServerRPC("judiciary:verifyChainOfCustody", evidenceId)
+        return res
+    end
+    return false
+end
+
+-- Commands for Law Enforcement & Forensic Personnel
+RegisterCommand("swab", function(source, args)
+    local targetId = args[1] or "0"
+    local swabType = args[2] or "gsr"
+    TriggerEvent("chat:addMessage", {
+        color = { 0, 180, 255 },
+        multiline = true,
+        args = { "Forensics", string.format("Collecting %s swab from subject %s...", swabType:upper(), targetId) }
+    })
+    PerformForensicSwab(targetId, swabType)
+end, false)
+
+RegisterCommand("photocctv", function(source, args)
+    local cam = args[1] or "FIELD_CAMERA"
+    local notes = table.concat(args, " ", 2)
+    CapturePhotoEvidence(cam, notes)
+    TriggerEvent("chat:addMessage", {
+        color = { 0, 220, 100 },
+        multiline = true,
+        args = { "Forensics", string.format("Photographic snapshot captured and cryptographically sealed: %s", cam) }
+    })
+end, false)
+
+RegisterCommand("verifychain", function(source, args)
+    local evId = args[1]
+    if not evId then
+        TriggerEvent("chat:addMessage", {
+            color = { 255, 100, 100 },
+            multiline = true,
+            args = { "Forensics", "Usage: /verifychain <evidenceId>" }
+        })
+        return
+    end
+
+    CreateThread(function()
+        local res = ClientVerifyChainOfCustody(evId)
+        if res and res.success then
+            TriggerEvent("chat:addMessage", {
+                color = { 50, 230, 50 },
+                multiline = true,
+                args = { "Forensics", string.format("Chain Integrity: [VALID] | Blocks: %d | Head: %s",
+                    res.data.chainLength or 0, (res.data.currentChainHash or ""):sub(1, 12)) }
+            })
+        else
+            TriggerEvent("chat:addMessage", {
+                color = { 255, 50, 50 },
+                multiline = true,
+                args = { "Forensics", string.format("Chain Integrity: [COMPROMISED/FAILED] Status: %s", tostring(res and res.status or "ERROR")) }
+            })
+        end
+    end)
+end, false)

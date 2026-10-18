@@ -75,3 +75,49 @@ end)
 exports("ExecuteVerdict", function(docketId, verdictPayload, presidingJudgeCitId)
     return Nyx.Judiciary.ExecuteVerdict(docketId, verdictPayload, presidingJudgeCitId)
 end)
+
+-- Cryptographic Chain-of-Custody & Forensic Ledger Exports
+exports("GetEvidenceChainOfCustody", function(evidenceId)
+    return Nyx.Judiciary.GetEvidenceChainOfCustody(evidenceId)
+end)
+
+exports("VerifyChainOfCustody", function(evidenceId)
+    return Nyx.Judiciary.VerifyChainOfCustody(evidenceId)
+end)
+
+exports("TransferCustody", function(src, evidenceId, targetCitId, notes)
+    return Nyx.Judiciary.TransferCustody(src, evidenceId, targetCitId, notes)
+end)
+
+exports("StoreInLocker", function(src, evidenceId, lockerId, notes)
+    return Nyx.Judiciary.StoreInLocker(src, evidenceId, lockerId, notes)
+end)
+
+exports("CheckoutFromLocker", function(src, evidenceId, lockerId, reason)
+    return Nyx.Judiciary.CheckoutFromLocker(src, evidenceId, lockerId, reason)
+end)
+
+exports("SubmitLabAnalysis", function(src, evidenceId, analysisType, findings)
+    return Nyx.Judiciary.SubmitLabAnalysis(src, evidenceId, analysisType, findings)
+end)
+
+exports("SubmitExhibitToCourt", function(src, evidenceId, docketId, exhibitLabel, notes)
+    return Nyx.Judiciary.SubmitExhibitToCourt(src, evidenceId, docketId, exhibitLabel, notes)
+end)
+
+exports("RegisterSwabEvent", function(src, targetCitId, swabType, coords, isGSRPositive)
+    return Nyx.Judiciary.RegisterSwabEvent(src, targetCitId, swabType, coords, isGSRPositive)
+end)
+
+exports("RegisterPhotoEvidence", function(src, cameraLocation, snapshotHashOrData, coords, notes)
+    return Nyx.Judiciary.RegisterPhotoEvidence(src, cameraLocation, snapshotHashOrData, coords, notes)
+end)
+
+exports("AppendCustodyBlock", function(evidenceId, action, custodianCitId, recipientCitId, facilityId, notes, blockMetadata)
+    return Nyx.Judiciary.AppendCustodyBlock(evidenceId, action, custodianCitId, recipientCitId, facilityId, notes, blockMetadata)
+end)
+
+exports("ComputeChainHash", function(prevHash, evidenceId, sequenceId, action, custodianCitId, recipientCitId, facilityId, timestamp, salt)
+    return Nyx.Judiciary.ComputeChainHash(prevHash, evidenceId, sequenceId, action, custodianCitId, recipientCitId, facilityId, timestamp, salt)
+end)
+

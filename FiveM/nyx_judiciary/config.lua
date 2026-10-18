@@ -53,7 +53,87 @@ Config.Forensics = {
     },
     EvidenceBagItem = 'evidence_bag',
     ForensicKitItem = 'forensic_kit',
-    AutoSweepInterval = 60          -- Sweep expired crime scene evidence every 60 seconds
+    ForensicSwabItem = 'forensic_swab',
+    CameraItem = 'camera_forensic',
+    AutoSweepInterval = 60,         -- Sweep expired crime scene evidence every 60 seconds
+
+    -- Authorized law enforcement & judiciary roles
+    AuthorizedJobs = {
+        ['police'] = true,
+        ['sheriff'] = true,
+        ['state_police'] = true,
+        ['doj'] = true,
+        ['judge'] = true,
+        ['forensics'] = true,
+        ['admin'] = true
+    },
+
+    -- Valid chain-of-custody lifecycle state transitions
+    AllowedActions = {
+        ['COLLECTED'] = true,
+        ['TRANSFERRED'] = true,
+        ['SECURED_IN_LOCKER'] = true,
+        ['CHECKED_OUT_LAB'] = true,
+        ['LAB_ANALYZED'] = true,
+        ['SUBMITTED_EXHIBIT'] = true,
+        ['RELEASED_TO_OWNER'] = true,
+        ['DESTROYED'] = true
+    },
+
+    -- Swab categories and parameters
+    SwabTypes = {
+        ['gsr'] = { label = 'Gunshot Residue (GSR) Swab', windowSeconds = 1800 },
+        ['dna'] = { label = 'Epithelial DNA Surface Swab', windowSeconds = 7200 },
+        ['narcotic'] = { label = 'Narcotic & Chemical Surface Swab', windowSeconds = 3600 }
+    },
+
+    -- Certified Laboratory Analytical Tests
+    LabAnalysisTypes = {
+        ['ballistics_match'] = { label = 'Ballistics Striation & Rifling Comparison', fee = 250.00 },
+        ['dna_profile'] = { label = 'Short Tandem Repeat (STR) DNA Profile', fee = 400.00 },
+        ['gsr_spectrometry'] = { label = 'Scanning Electron Microscopy (GSR-SEM)', fee = 150.00 },
+        ['fingerprint_afis'] = { label = 'Automated Fingerprint Identification (AFIS)', fee = 200.00 },
+        ['digital_forensics'] = { label = 'Cryptographic CCTV / Digital Forensics', fee = 100.00 }
+    },
+
+    -- Certified Physical Evidence Lockers & Depository Vaults
+    Lockers = {
+        ['locker_mrpd_01'] = {
+            id = 'locker_mrpd_01',
+            name = 'Mission Row Police Dept Evidence Locker #1',
+            facilityType = 'police_locker',
+            dept = 'police',
+            coords = vector3(475.2, -998.4, 26.2)
+        },
+        ['locker_sandy_01'] = {
+            id = 'locker_sandy_01',
+            name = 'Sandy Shores Sheriff Substation Locker #1',
+            facilityType = 'police_locker',
+            dept = 'sheriff',
+            coords = vector3(1853.1, 3683.4, 34.2)
+        },
+        ['locker_paleto_01'] = {
+            id = 'locker_paleto_01',
+            name = 'Paleto Bay Constable Depository #1',
+            facilityType = 'police_locker',
+            dept = 'sheriff',
+            coords = vector3(-448.2, 6012.3, 31.7)
+        },
+        ['lab_davis_forensics'] = {
+            id = 'lab_davis_forensics',
+            name = 'Davis Regional Forensic Crime Laboratory',
+            facilityType = 'forensics_lab',
+            dept = 'forensics',
+            coords = vector3(362.4, -1585.1, 29.2)
+        },
+        ['vault_court_district'] = {
+            id = 'vault_court_district',
+            name = 'San Andreas Superior Court Evidence Vault',
+            facilityType = 'court_vault',
+            dept = 'doj',
+            coords = vector3(-540.8, -198.2, 38.2)
+        }
+    }
 }
 
 -- Courtroom Spatial Anchors (San Andreas Superior District Court)

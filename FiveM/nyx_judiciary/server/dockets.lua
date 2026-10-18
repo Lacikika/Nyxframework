@@ -84,6 +84,19 @@ function Nyx.Judiciary.LinkEvidence(docketId, evidenceId, authorizedCitId)
         WHERE `evidence_id` = ?
     ]], { docketId, evidenceId })
 
+    -- Record cryptographic custody transition block
+    if Nyx.Judiciary.AppendCustodyBlock then
+        Nyx.Judiciary.AppendCustodyBlock(
+            evidenceId,
+            "SUBMITTED_EXHIBIT",
+            authorizedCitId or "COURT_CLERK",
+            nil,
+            "vault_court_district",
+            string.format("Submitted as evidence to docket %s", docketId),
+            { docketId = docketId, authorizedBy = authorizedCitId }
+        )
+    end
+
     return true, {
         docketId = docketId,
         evidenceId = evidenceId,
@@ -153,8 +166,10 @@ function Nyx.Judiciary.GetDocket(docketId)
     if not docket then return nil end
 
     local evidence = MySQL.query.await([[
-        SELECT `evidence_id`, `type`, `evidence_hash`, `collector_citizen_id`,
-               `is_contaminated`, `contamination_source`, `metadata`, `created_at`
+        SELECT `evidence_id`, `type`, `evidence_hash`, `current_chain_hash`, `chain_length`,
+               `collector_citizen_id`, `current_custodian_id`, `current_facility`,
+               `is_contaminated`, `contamination_source`, `is_sealed`, `exhibit_label`,
+               `metadata`, `lab_analysis`, `created_at`
         FROM `nyx_judiciary_evidence`
         WHERE `docket_id` = ?
     ]], { docketId })

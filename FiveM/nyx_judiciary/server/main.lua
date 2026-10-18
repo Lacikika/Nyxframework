@@ -104,6 +104,86 @@ CreateThread(function()
             local dockets = Nyx.Judiciary.GetActiveDockets()
             return { success = true, dockets = dockets }
         end)
+
+        -- Query full chronological chain-of-custody ledger
+        exports['nyx_core']:RegisterRPC("judiciary:getChainOfCustody", function(src, evidenceId)
+            local chain = Nyx.Judiciary.GetEvidenceChainOfCustody(evidenceId)
+            return { success = true, chain = chain }
+        end)
+
+        -- Full cryptographic merkle / hash chain integrity verification
+        exports['nyx_core']:RegisterRPC("judiciary:verifyChainOfCustody", function(src, evidenceId)
+            local ok, status, data = Nyx.Judiciary.VerifyChainOfCustody(evidenceId)
+            return { success = ok, status = status, data = data }
+        end)
+
+        -- Physical custody handoff (Officer to Officer)
+        exports['nyx_core']:RegisterRPC("judiciary:transferCustody", function(src, payload)
+            if not payload or not payload.evidenceId or not payload.targetCitizenId then
+                return { success = false, error = "INVALID_PAYLOAD" }
+            end
+            local ok, res = Nyx.Judiciary.TransferCustody(src, payload.evidenceId, payload.targetCitizenId, payload.notes)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- Deposit evidence into secure police locker or court vault
+        exports['nyx_core']:RegisterRPC("judiciary:storeInLocker", function(src, payload)
+            if not payload or not payload.evidenceId or not payload.lockerId then
+                return { success = false, error = "INVALID_PAYLOAD" }
+            end
+            local ok, res = Nyx.Judiciary.StoreInLocker(src, payload.evidenceId, payload.lockerId, payload.notes)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- Check out evidence from locker for active investigation / lab
+        exports['nyx_core']:RegisterRPC("judiciary:checkoutFromLocker", function(src, payload)
+            if not payload or not payload.evidenceId or not payload.lockerId then
+                return { success = false, error = "INVALID_PAYLOAD" }
+            end
+            local ok, res = Nyx.Judiciary.CheckoutFromLocker(src, payload.evidenceId, payload.lockerId, payload.reason)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- Certified Forensic Crime Lab analysis submission
+        exports['nyx_core']:RegisterRPC("judiciary:submitLabAnalysis", function(src, payload)
+            if not payload or not payload.evidenceId or not payload.analysisType then
+                return { success = false, error = "INVALID_PAYLOAD" }
+            end
+            local ok, res = Nyx.Judiciary.SubmitLabAnalysis(src, payload.evidenceId, payload.analysisType, payload.findings)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- Submit evidence as court exhibit linked to active docket
+        exports['nyx_core']:RegisterRPC("judiciary:submitExhibitToCourt", function(src, payload)
+            if not payload or not payload.evidenceId or not payload.docketId then
+                return { success = false, error = "INVALID_PAYLOAD" }
+            end
+            local ok, res = Nyx.Judiciary.SubmitExhibitToCourt(src, payload.evidenceId, payload.docketId, payload.exhibitLabel, payload.notes)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- Create photographic / CCTV digital evidence
+        exports['nyx_core']:RegisterRPC("judiciary:createPhotoEvidence", function(src, payload)
+            if not payload or not payload.coords then
+                return { success = false, error = "INVALID_PAYLOAD" }
+            end
+            local ok, res = Nyx.Judiciary.RegisterPhotoEvidence(src, payload.cameraLocation, payload.snapshotHash, payload.coords, payload.notes)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- Create forensic swab evidence (GSR or DNA)
+        exports['nyx_core']:RegisterRPC("judiciary:createSwabEvidence", function(src, payload)
+            if not payload or not payload.coords then
+                return { success = false, error = "INVALID_PAYLOAD" }
+            end
+            local dropId, hash = Nyx.Judiciary.RegisterSwabEvent(src, payload.targetCitizenId, payload.swabType, payload.coords, payload.isGSRPositive)
+            return { success = (dropId ~= false), dropId = dropId, evidenceHash = hash }
+        end)
+
+        -- Query registered evidence lockers and forensic facilities
+        exports['nyx_core']:RegisterRPC("judiciary:getLockers", function(src)
+            return { success = true, lockers = Config.Forensics and Config.Forensics.Lockers or {} }
+        end)
     end
 
     -- 2. Evidence Sweeper Background Task (every 60s)
@@ -142,4 +222,16 @@ RegisterNetEvent("nyx:judiciary:server:surfaceTouched", function(surfaceDesc, co
     local src = source
     if not coords then return end
     Nyx.Judiciary.RegisterFingerprintEvent(src, surfaceDesc, coords)
+end)
+
+RegisterNetEvent("nyx:judiciary:server:swabTaken", function(targetCitId, swabType, coords, isGSRPositive)
+    local src = source
+    if not coords then return end
+    Nyx.Judiciary.RegisterSwabEvent(src, targetCitId, swabType, coords, isGSRPositive)
+end)
+
+RegisterNetEvent("nyx:judiciary:server:photoCaptured", function(cameraLocation, snapshotHash, coords, notes)
+    local src = source
+    if not coords then return end
+    Nyx.Judiciary.RegisterPhotoEvidence(src, cameraLocation, snapshotHash, coords, notes)
 end)

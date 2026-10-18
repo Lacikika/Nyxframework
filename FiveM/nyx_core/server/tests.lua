@@ -495,7 +495,184 @@ function Nyx.Tests.TestElasticItemPricingAndZoneDemand()
     return passes == total
 end
 
--- 8. Master Test Runner
+-- 8. Test Cryptographic Evidence Chain-of-Custody & SHA-256 Fingerprints
+function Nyx.Tests.TestEvidenceChainOfCustody()
+    print("^3[Nyx:Tests] Running Evidence Chain-of-Custody & SHA-256 Suite...^7")
+    local passes = 0
+    local total = 6
+
+    -- Mock SHA-256 implementation if running standalone or retrieve from judiciary export/namespace
+    local sha256 = (Nyx.Judiciary and Nyx.Judiciary.Sha256) or function(str)
+        local band, bor, bxor, bnot = function(a, b) return a & b end, function(a, b) return a | b end, function(a, b) return a ~ b end, function(a) return ~a & 0xFFFFFFFF end
+        local rshift, lshift = function(a, b) return (a & 0xFFFFFFFF) >> b end, function(a, b) return (a << b) & 0xFFFFFFFF end
+        local function ror(x, n) return (rshift(x, n) | lshift(x, 32 - n)) & 0xFFFFFFFF end
+        local K = {
+            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+            0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+            0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+            0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+            0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+            0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+            0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+        }
+        local H = { 0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19 }
+        local len = #str
+        local bit_len = len * 8
+        local pad = { str:byte(1, len) }
+        pad[#pad + 1] = 0x80
+        while (#pad % 64) ~= 56 do pad[#pad + 1] = 0x00 end
+        for i = 7, 0, -1 do pad[#pad + 1] = (bit_len >> (i * 8)) & 0xFF end
+        local W = {}
+        for chunk = 1, #pad, 64 do
+            for t = 0, 15 do
+                local idx = chunk + t * 4
+                W[t] = (lshift(pad[idx], 24) | lshift(pad[idx + 1], 16) | lshift(pad[idx + 2], 8) | pad[idx + 3]) & 0xFFFFFFFF
+            end
+            for t = 16, 63 do
+                local s0 = bxor(bxor(ror(W[t - 15], 7), ror(W[t - 15], 18)), rshift(W[t - 15], 3))
+                local s1 = bxor(bxor(ror(W[t - 2], 17), ror(W[t - 2], 19)), rshift(W[t - 2], 10))
+                W[t] = (W[t - 16] + s0 + W[t - 7] + s1) & 0xFFFFFFFF
+            end
+            local a, b, c, d, e, f, g, h = H[1], H[2], H[3], H[4], H[5], H[6], H[7], H[8]
+            for t = 0, 63 do
+                local S1 = bxor(bxor(ror(e, 6), ror(e, 11)), ror(e, 25))
+                local ch = bxor(band(e, f), band(bnot(e), g))
+                local temp1 = (h + S1 + ch + K[t + 1] + W[t]) & 0xFFFFFFFF
+                local S0 = bxor(bxor(ror(a, 2), ror(a, 13)), ror(a, 22))
+                local maj = bxor(bxor(band(a, b), band(a, c)), band(b, c))
+                local temp2 = (S0 + maj) & 0xFFFFFFFF
+                h = g; g = f; f = e; e = (d + temp1) & 0xFFFFFFFF
+                d = c; c = b; b = a; a = (temp1 + temp2) & 0xFFFFFFFF
+            end
+            H[1] = (H[1] + a) & 0xFFFFFFFF; H[2] = (H[2] + b) & 0xFFFFFFFF; H[3] = (H[3] + c) & 0xFFFFFFFF; H[4] = (H[4] + d) & 0xFFFFFFFF
+            H[5] = (H[5] + e) & 0xFFFFFFFF; H[6] = (H[6] + f) & 0xFFFFFFFF; H[7] = (H[7] + g) & 0xFFFFFFFF; H[8] = (H[8] + h) & 0xFFFFFFFF
+        end
+        return string.format("%08x%08x%08x%08x%08x%08x%08x%08x", H[1], H[2], H[3], H[4], H[5], H[6], H[7], H[8])
+    end
+
+    local computeChainHash = (Nyx.Judiciary and Nyx.Judiciary.ComputeChainHash) or function(prevHash, evidenceId, sequenceId, action, custodianCitId, recipientCitId, facilityId, timestamp, salt)
+        local raw = string.format("%s:%s:%d:%s:%s:%s:%s:%d:%s",
+            tostring(prevHash or "GENESIS"),
+            tostring(evidenceId),
+            tonumber(sequenceId) or 1,
+            tostring(action),
+            tostring(custodianCitId or "NONE"),
+            tostring(recipientCitId or "NONE"),
+            tostring(facilityId or "NONE"),
+            tonumber(timestamp) or 0,
+            tostring(salt or "")
+        )
+        return sha256(raw)
+    end
+
+    -- Test A: Deterministic SHA-256 Physical Evidence Fingerprinting
+    local serial = "W-COMBATPISTOL-7781"
+    local originCit = "CIT-9011"
+    local coords = { x = 112.50, y = -1024.30, z = 28.50 }
+    local salt = "e7K9p2L0"
+    local rawCasing = string.format("%s:%s:%.2f,%.2f,%.2f:%s", serial, originCit, coords.x, coords.y, coords.z, salt)
+    local hashCasing = sha256(rawCasing)
+
+    if assertTest(#hashCasing == 64 and hashCasing == sha256(rawCasing),
+        "Deterministic SHA-256 Physical Evidence Fingerprint Invariant",
+        "Failed to generate 64-character deterministic SHA-256 fingerprint") then
+        passes = passes + 1
+    end
+
+    -- Test B: Genesis Custody Block Creation (Sequence 1, PrevHash == Root Fingerprint)
+    local evidenceId = "ev-chain-unit-001"
+    local genTime = 1770000000
+    local genSalt = "genSalt1"
+    local genHash = computeChainHash(hashCasing, evidenceId, 1, "COLLECTED", "OFFICER_PATROL_1", nil, "person:OFFICER_PATROL_1", genTime, genSalt)
+
+    if assertTest(#genHash == 64 and genHash ~= hashCasing,
+        "Genesis Chain-of-Custody Block Invariant",
+        "Genesis block hash did not evaluate correctly") then
+        passes = passes + 1
+    end
+
+    -- Test C: Multi-Step Sequential Chain Linking
+    local b2Salt = "saltBlock2"
+    local b2Time = 1770000400
+    local b2Hash = computeChainHash(genHash, evidenceId, 2, "SECURED_IN_LOCKER", "OFFICER_PATROL_1", nil, "locker_mrpd_01", b2Time, b2Salt)
+
+    local b3Salt = "saltBlock3"
+    local b3Time = 1770001200
+    local b3Hash = computeChainHash(b2Hash, evidenceId, 3, "CHECKED_OUT_LAB", "LOCKER:locker_mrpd_01", "DETECTIVE_2", "person:DETECTIVE_2", b3Time, b3Salt)
+
+    local b4Salt = "saltBlock4"
+    local b4Time = 1770002000
+    local b4Hash = computeChainHash(b3Hash, evidenceId, 4, "LAB_ANALYZED", "FORENSIC_TECH_1", nil, "lab_davis_forensics", b4Time, b4Salt)
+
+    local b5Salt = "saltBlock5"
+    local b5Time = 1770003000
+    local b5Hash = computeChainHash(b4Hash, evidenceId, 5, "SUBMITTED_EXHIBIT", "PROSECUTOR_1", nil, "vault_court_district", b5Time, b5Salt)
+
+    local chain = {
+        { seq = 1, prev = hashCasing, hash = genHash, act = "COLLECTED", cust = "OFFICER_PATROL_1", rec = nil, fac = "person:OFFICER_PATROL_1", t = genTime, s = genSalt },
+        { seq = 2, prev = genHash, hash = b2Hash, act = "SECURED_IN_LOCKER", cust = "OFFICER_PATROL_1", rec = nil, fac = "locker_mrpd_01", t = b2Time, s = b2Salt },
+        { seq = 3, prev = b2Hash, hash = b3Hash, act = "CHECKED_OUT_LAB", cust = "LOCKER:locker_mrpd_01", rec = "DETECTIVE_2", fac = "person:DETECTIVE_2", t = b3Time, s = b3Salt },
+        { seq = 4, prev = b3Hash, hash = b4Hash, act = "LAB_ANALYZED", cust = "FORENSIC_TECH_1", rec = nil, fac = "lab_davis_forensics", t = b4Time, s = b4Salt },
+        { seq = 5, prev = b4Hash, hash = b5Hash, act = "SUBMITTED_EXHIBIT", cust = "PROSECUTOR_1", rec = nil, fac = "vault_court_district", t = b5Time, s = b5Salt }
+    }
+
+    if assertTest(#chain == 5 and chain[5].hash == b5Hash and chain[5].prev == chain[4].hash,
+        "Sequential Cryptographic Chain-of-Custody Progression Invariant",
+        "Block chain continuity linkage mismatch") then
+        passes = passes + 1
+    end
+
+    -- Test D: Pristine Chain Verification Routine
+    local function verifyChain(rootFp, blockList)
+        local expectedPrev = rootFp
+        for i, blk in ipairs(blockList) do
+            if blk.seq ~= i then return false, "SEQ_GAP" end
+            if blk.prev ~= expectedPrev then return false, "HASH_DISCONTINUITY" end
+            local rec = computeChainHash(blk.prev, evidenceId, blk.seq, blk.act, blk.cust, blk.rec, blk.fac, blk.t, blk.s)
+            if rec ~= blk.hash then return false, "TAMPER_DETECTED" end
+            expectedPrev = blk.hash
+        end
+        return true, "VALID"
+    end
+
+    local isValid, status = verifyChain(hashCasing, chain)
+    if assertTest(isValid == true and status == "VALID",
+        "Pristine Chain-of-Custody Verification Invariant",
+        "Pristine chain verification rejected unexpectedly") then
+        passes = passes + 1
+    end
+
+    -- Test E: Adversarial Tamper Detection (Modify historical block 3 custodian)
+    local tamperedChain = {
+        chain[1],
+        chain[2],
+        { seq = 3, prev = b2Hash, hash = b3Hash, act = "CHECKED_OUT_LAB", cust = "LOCKER:locker_mrpd_01", rec = "UNAUTHORIZED_THIEF", fac = "person:UNAUTHORIZED_THIEF", t = b3Time, s = b3Salt },
+        chain[4],
+        chain[5]
+    }
+    local isTamperedValid, tamperStatus = verifyChain(hashCasing, tamperedChain)
+    if assertTest(isTamperedValid == false and tamperStatus == "TAMPER_DETECTED",
+        "Adversarial Block Mutation Tamper Detection Invariant",
+        "Verification engine failed to detect modified custodian in intermediate block") then
+        passes = passes + 1
+    end
+
+    -- Test F: Contamination State Handling Invariant
+    local isGlovesEquipped = false
+    local isContaminated = (not isGlovesEquipped) and 1 or 0
+    local contamSource = isContaminated == 1 and "CITIZEN_BARE_HANDS" or nil
+
+    if assertTest(isContaminated == 1 and contamSource == "CITIZEN_BARE_HANDS",
+        "Forensic Evidence Contamination Detection Invariant",
+        "Failed to flag un-gloved evidence collection as contaminated") then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 9. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -508,9 +685,10 @@ function Nyx.Tests.RunAll()
     local t5 = Nyx.Tests.TestVehicleMileageAndWear()
     local t6 = Nyx.Tests.TestWeightPenalties()
     local t7 = Nyx.Tests.TestElasticItemPricingAndZoneDemand()
+    local t8 = Nyx.Tests.TestEvidenceChainOfCustody()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

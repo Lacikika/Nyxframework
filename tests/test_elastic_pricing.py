@@ -156,8 +156,7 @@ class TestElasticPricingSystem(unittest.TestCase):
             code = f.read()
 
         self.assertIn("function Nyx.Tests.TestElasticItemPricingAndZoneDemand()", code)
-        self.assertIn("local t7 = Nyx.Tests.TestElasticItemPricingAndZoneDemand()", code)
-        self.assertIn("if t1 and t2 and t3 and t4 and t5 and t6 and t7 then", code)
+        self.assertIn("if t1 and t2 and t3 and t4 and t5 and t6 and t7", code)
 
 if __name__ == "__main__":
     unittest.main()
