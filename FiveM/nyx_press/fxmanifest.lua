@@ -16,19 +16,22 @@ version '1.0.0'
 
 shared_scripts {
     'config.lua',
-    'shared/press.lua'
+    'shared/press.lua',
+    'shared/subscriptions.lua'
 }
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/main.lua',
     'server/press.lua',
+    'server/subscriptions.lua',
     'server/exports.lua'
 }
 
 client_scripts {
     'client/main.lua',
     'client/press.lua',
+    'client/subscriptions.lua',
     'client/interact.lua',
     'client/exports.lua'
 }

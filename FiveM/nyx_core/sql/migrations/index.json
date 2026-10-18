@@ -44,5 +44,6 @@
   "043_gas_station_reservoirs_and_bulk_fuel_hauling.sql",
   "044_vehicle_keys_rfid_and_lockpicking_forensics.sql",
   "045_penal_labor_processing_and_sentence_reductions.sql",
-  "046_agricultural_extraction_milling_and_perishable_food_logistics.sql"
+  "046_agricultural_extraction_milling_and_perishable_food_logistics.sql",
+  "047_press_subscriptions_and_whistleblower_escrow.sql"
 ]

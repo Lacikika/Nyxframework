@@ -81,7 +81,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Agricultural Extraction, Milling & Perishable Food Logistics (`nyx_services` & `nyx_logistics`)**
   - **Implementation:** Natural crop harvest nodes and milling refineries producing shelf-stable bulk goods, feeding retail food containers with time-decay perishables.
 
-- [ ] **Feature: Investigative Press Leaks, Dropbox Whistleblowing & Subscriptions (`nyx_press` & `nyx_treasury`)**
+- [x] **Feature: Investigative Press Leaks, Dropbox Whistleblowing & Subscriptions (`nyx_press` & `nyx_treasury`)**
   - **Implementation:** Anonymous physical dropboxes for whistleblowers submitting evidence hashes, newspaper printing costs, and automated revenue splits from public newsstands.
 
 - [ ] **Feature: Substation Physical Sabotage, Alarm Breaches & Blackout Raids (`nyx_services` & `nyx_properties`)**
@@ -107,6 +107,52 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Investigative Press Leaks, Dropbox Whistleblowing & Subscriptions (`nyx_press` & `nyx_treasury`)**
+  - **Database Migrations (`032_press_media_whistleblower_and_print_circulation.sql`, `047_press_subscriptions_and_whistleblower_escrow.sql`, `index.json`)**:
+    - Created `nyx_press_outlets` table (`outlet_id` PK, `faction_id`, `name`, `license_status`, `accredited_union_id`, `press_coords`, `print_cost_per_copy`, `cover_price_default`, `revenue_balance`, `created_at`) managing registered publishing houses.
+    - Created `nyx_press_publications` table (`publication_id` PK, `outlet_id`, `headline`, `subheading`, `author_citizen_id`, `author_byline`, `category`, `content`, `edition_number`, `circulation_count`, `copies_sold`, `price_per_copy`, `is_retracted`, `retraction_reason`, `retracted_by_judge_id`, `created_at`) for newspaper archives.
+    - Created `nyx_press_whistleblower_dropboxes` table (`dropbox_id` PK, `label`, `coords`, `public_pgp_fingerprint`, `is_active`) and `nyx_press_leaks` table (`leak_id` PK, `dropbox_id`, `target_outlet_id`, `title`, `leak_category`, `encrypted_payload`, `source_hash`, `evidence_fingerprint`, `claimed_by_journalist_id`, `status`, `submitted_at`, `claimed_at`).
+    - Created `nyx_press_newsstands` table (`stand_id` PK, `label`, `coords`, `heading`, `current_publication_id`, `copies_inventory`, `total_sold`).
+    - Created `nyx_press_subscription_plans` table (`plan_id` PK, `outlet_id`, `name`, `plan_type`, `billing_period_sec`, `price`, `publisher_share_ratio`, `whistleblower_pool_ratio`, `municipal_tax_ratio`, `is_active`).
+    - Created `nyx_press_subscriptions` table (`subscription_id` PK, `citizen_id`, `outlet_id`, `plan_id`, `delivery_property_id`, `status`, `auto_renew`, `current_period_start`, `current_period_end`, `last_billed_at`, `consecutive_failures`).
+    - Created `nyx_press_subscription_billing_logs` table (`log_id` PK, `log_uuid` UNIQUE, `subscription_id`, `citizen_id`, `outlet_id`, `amount`, `publisher_share`, `whistleblower_escrow_share`, `municipal_tax_share`, `treasury_tx_id`, `status`).
+    - Created `nyx_press_whistleblower_bounties` table (`bounty_id` PK, `leak_id`, `outlet_id`, `awarded_by_journalist_id`, `source_hash`, `bounty_amount`, `is_claimed`, `claimed_at`, `claimed_dropbox_id`, `claim_tx_id`, `status`).
+    - Seeded initial subscription plans for Los Santos Daily Globe, Weazel News, and The Underground Post across digital and doorstep print delivery tiers.
+    - Seeded dedicated whistleblower bounty escrow reserve accounts in `nyx_treasury_accounts`: `pool:whistleblower:press:daily_globe`, `pool:whistleblower:press:weazel_news`, and `pool:whistleblower:press:underground_post`.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 47) and mirrored to `FiveM/nyx_press/sql/migrations/`.
+  - **Shared Pure Lua 5.4 Domain Engines (`nyx_press/shared/press.lua`, `nyx_press/shared/subscriptions.lua`, `fxmanifest.lua`)**:
+    - Implemented `Nyx.Press.SHA256` and constant-time string equality `Nyx.Press.ConstantTimeEquals`.
+    - Implemented `Nyx.Press.CalculatePrintingCost` modeling tiered volume printing expenses with machine overhead and page factor scaling.
+    - Implemented `Nyx.Press.CalculateSaleRevenueSplit` enforcing closed-loop retail newsstand double-entry splits (Publisher 75%, Municipal Tax 25%) with strict zero-cent leakage ($\Delta = 0.00$).
+    - Implemented `Nyx.Press.GenerateSourceHash` and `Nyx.Press.VerifySourceIdentity` generating and validating zero-knowledge SHA-256 source hashes with client/server salt and nonce.
+    - Implemented `Nyx.Press.EvaluateMediaAccreditation` checking Trade Union credentials (`union:press_guild`) and registered media corporate charter leadership (`CEO` / `Editor-in-Chief`).
+    - Implemented `Nyx.Press.ValidateArticle` and state machine transition rules for publications and whistleblower leaks.
+    - Implemented `Nyx.Press.Subscriptions.CalculateSubscriptionSplit` computing 3-way double-entry splits (Publisher 75%, Whistleblower Escrow Pool 15%, Municipal Tax 10%) with zero-cent leakage.
+    - Implemented `Nyx.Press.Subscriptions.ValidateSubscriptionPlan`, `EvaluateSubscriptionStatus` (`active`, `past_due`, `cancelled`, `expired`), `ValidateBountyAward`, and `VerifyBountyClaim`.
+    - Declared `shared/subscriptions.lua` in `FiveM/nyx_press/fxmanifest.lua`.
+  - **Authoritative Server Subsystem & RPCs (`nyx_press/server/press.lua`, `server/subscriptions.lua`, `server/exports.lua`)**:
+    - Implemented `PublishArticle` with accreditation checks, publication archiving, broadcast alerts, and automated hook calling `DeliverPublicationToSubscribers`.
+    - Implemented `PrintCirculationCopies` deducting utility supplies via double-entry treasury transfer from player/faction account to `gov:dept:works`, and routing copies to target newsstand or player inventory.
+    - Implemented `DepositWhistleblowerLeak` generating cryptographic zero-knowledge proof receipts `(sourceHash, salt, nonce)`.
+    - Implemented `PurchaseNewspaper` at newsstands with dual-leg double-entry treasury settlements to publisher and municipal tax accounts.
+    - Implemented `RetractPublication` for judges executing judicial defamation injunctions.
+    - Implemented `Subscribe` debiting citizen bank account, executing 3-way double-entry treasury splits to publisher, whistleblower escrow pool, and municipal master reserve, and generating subscription record.
+    - Implemented `CancelSubscription` and recurring 60-second billing sweeper `ProcessRecurringBillingTick` managing automatic renewals and delinquency degradation.
+    - Implemented `DeliverPublicationToSubscribers` delivering digital alerts to online subscribers and depositing physical `press_newspaper` items into home property stashes (`property:<id>:stash`).
+    - Implemented `AwardWhistleblowerBounty` allowing accredited journalists to award investigative bounties from outlet escrow pools to leak source hashes.
+    - Implemented `ClaimWhistleblowerBounty` verifying cryptographic proof-of-whistleblower identity `(sourceHash, salt, nonce)` at dropboxes and disbursing funds directly from escrow to the source.
+    - Registered RPC endpoints: `press:getOutlets`, `press:getRecentPublications`, `press:getPublication`, `press:publishArticle`, `press:printCopies`, `press:getDropboxes`, `press:depositLeak`, `press:getAvailableLeaks`, `press:claimLeak`, `press:getNewsstandInfo`, `press:purchasePaper`, `press:retractPublication`, `press:getSubscriptionPlans`, `press:getMySubscriptions`, `press:subscribe`, `press:cancelSubscription`, `press:awardBounty`, `press:claimBounty`, `press:getBountyPoolBalance`, `press:getAvailableBounties`.
+    - Exported public APIs in `FiveM/nyx_press/server/exports.lua`.
+  - **Client-Side Subsystem & Interactions (`nyx_press/client/press.lua`, `client/subscriptions.lua`, `client/interact.lua`, `client/exports.lua`)**:
+    - Implemented newsstand purchase interactions and reader view.
+    - Registered commands: `/readpaper`, `/pressoutlets`, `/whistleblow`, `/retractpaper`, `/pressplans`, `/mysubscriptions`, `/subscribepress`, `/cancelsubscription`, `/awardbounty`, `/claimbounty`, `/bounties`.
+    - Registered Third-Eye interaction points on newsstands, printing presses, and encrypted dropboxes.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestPressSubscriptionsAndWhistleblowerEscrow()` (Test 42) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_press_subscriptions_and_whistleblower_escrow.py` with 9 test cases covering migration 047 schema, 3-way revenue split conservation, plan validation, subscription state transitions, bounty escrow guards, cryptographic proof verification, next period math, and manifest declarations (9/9 passing).
+    - Full pytest suite: 377/377 tests passing (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 239 Lua files, 47 migrations, 100% clean verification.
+
 - **[2026-10-18] Feature: Agricultural Extraction, Milling & Perishable Food Logistics (`nyx_services` & `nyx_logistics`)**
   - **Database Migration (`046_agricultural_extraction_milling_and_perishable_food_logistics.sql`, `index.json`)**:
     - Created `nyx_logistics_agriculture_farms` table (`farm_id` PK, `name`, `zone_id`, `crop_type`, `soil_fertility`, `irrigation_status`, `current_reserve`, `max_reserve`, `regen_rate_per_hour`, `coords`, `last_harvested_at`, timestamps) for farmland extraction nodes and soil fertility tracking.

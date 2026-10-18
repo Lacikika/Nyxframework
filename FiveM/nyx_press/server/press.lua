@@ -108,6 +108,11 @@ function Nyx.Press.PublishArticle(src, payload)
         price = price
     })
 
+    -- Dispatch subscriber delivery (digital alerts & property stash print deposits)
+    if Nyx.Press.DeliverPublicationToSubscribers then
+        pcall(Nyx.Press.DeliverPublicationToSubscribers, pubId)
+    end
+
     return {
         success = true,
         publicationId = pubId,

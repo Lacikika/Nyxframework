@@ -51,3 +51,32 @@ end)
 exports('CalculateSaleRevenueSplit', function(coverPrice, publisherSplitRatio)
     return Nyx.Press.CalculateSaleRevenueSplit(coverPrice, publisherSplitRatio)
 end)
+
+exports('SubscribeCitizen', function(src, planId, deliveryPropertyId)
+    return Nyx.Press.Subscribe(src, planId, deliveryPropertyId)
+end)
+
+exports('CancelSubscription', function(src, subscriptionId)
+    return Nyx.Press.CancelSubscription(src, subscriptionId)
+end)
+
+exports('GetCitizenSubscriptions', function(citizenId)
+    return Nyx.Press.GetCitizenSubscriptions(citizenId)
+end)
+
+exports('AwardWhistleblowerBounty', function(src, leakId, amount)
+    return Nyx.Press.AwardWhistleblowerBounty(src, leakId, amount)
+end)
+
+exports('ClaimWhistleblowerBounty', function(src, bountyId, salt, nonce, dropboxId)
+    return Nyx.Press.ClaimWhistleblowerBounty(src, bountyId, salt, nonce, dropboxId)
+end)
+
+exports('DeliverPublicationToSubscribers', function(pubId)
+    return Nyx.Press.DeliverPublicationToSubscribers(pubId)
+end)
+
+exports('CalculateSubscriptionSplit', function(price, pubRatio, poolRatio, taxRatio)
+    return Nyx.Press.Subscriptions.CalculateSubscriptionSplit(price, pubRatio, poolRatio, taxRatio)
+end)
+
