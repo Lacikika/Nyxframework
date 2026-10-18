@@ -230,6 +230,88 @@ Nyx.Logistics.Recipes.Registry = {
                 }
             }
         }
+    },
+    ['wheat_milling'] = {
+        key = 'wheat_milling',
+        label = 'Industrial Wheat Milling (Flour)',
+        facilityType = 'refinery',
+        processingTime = 20,
+        powerRequirementKw = 10,
+        inputs = {
+            { item = 'crop_wheat', amount = 4 }
+        },
+        outputs = {
+            {
+                item = 'bulk_flour',
+                amount = 1,
+                metadata = {
+                    quality = 1.00,
+                    durability = 100.0
+                }
+            }
+        }
+    },
+    ['corn_milling'] = {
+        key = 'corn_milling',
+        label = 'Industrial Corn Milling (Cornmeal)',
+        facilityType = 'refinery',
+        processingTime = 20,
+        powerRequirementKw = 10,
+        inputs = {
+            { item = 'crop_corn', amount = 4 }
+        },
+        outputs = {
+            {
+                item = 'bulk_cornmeal',
+                amount = 1,
+                metadata = {
+                    quality = 1.00,
+                    durability = 100.0
+                }
+            }
+        }
+    },
+    ['bakery_bread'] = {
+        key = 'bakery_bread',
+        label = 'Commercial Artisan Bread Loaf Baking',
+        facilityType = 'assembly',
+        processingTime = 15,
+        powerRequirementKw = 8,
+        inputs = {
+            { item = 'bulk_flour', amount = 1 },
+            { item = 'drink_water', amount = 2 }
+        },
+        outputs = {
+            {
+                item = 'food_bread',
+                amount = 4,
+                metadata = {
+                    durability = 100.0,
+                    isSpoiled = false,
+                    nutrition = 35
+                }
+            }
+        }
+    },
+    ['produce_pallet_packaging'] = {
+        key = 'produce_pallet_packaging',
+        label = 'Agricultural Fresh Produce Palletizing',
+        facilityType = 'assembly',
+        processingTime = 25,
+        powerRequirementKw = 6,
+        inputs = {
+            { item = 'crop_produce', amount = 10 },
+            { item = 'civic_wooden_pallet', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'pallet_agricultural_produce',
+                amount = 1,
+                metadata = {
+                    durability = 100.0
+                }
+            }
+        }
     }
 }
 

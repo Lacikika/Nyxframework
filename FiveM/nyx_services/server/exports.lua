@@ -136,3 +136,44 @@ exports("SetPlayerBloodVolume", function(src, volume)
     end
     return false, "TRAUMA_STATE_NOT_FOUND"
 end)
+
+-- Agricultural Extraction & Food Pantries
+exports("GetFarm", function(farmId)
+    return Nyx.Services.Farms and Nyx.Services.Farms[farmId]
+end)
+
+exports("GetAllFarms", function()
+    return Nyx.Services.Farms or {}
+end)
+
+exports("HarvestCrop", function(src, farmId)
+    return Nyx.Services.HarvestCrop(src, farmId)
+end)
+
+exports("GetPantry", function(pantryId)
+    return Nyx.Services.Pantries and Nyx.Services.Pantries[pantryId]
+end)
+
+exports("GetAllPantries", function()
+    return Nyx.Services.Pantries or {}
+end)
+
+exports("GetPantrySupplyCounts", function(pantryId)
+    return Nyx.Services.GetPantryStockCounts(pantryId)
+end)
+
+exports("EvaluatePantryStatus", function(pantryId)
+    return Nyx.Services.EvaluatePantryStatus(pantryId)
+end)
+
+exports("RestockPantry", function(src, pantryId, itemId, amount)
+    return Nyx.Services.RestockPantry(src, pantryId, itemId, amount)
+end)
+
+exports("DisposeSpoiledFood", function(src, pantryId)
+    return Nyx.Services.DisposeSpoiledFood(src, pantryId)
+end)
+
+exports("RecordFoodAudit", function(action, sourceId, targetInvId, itemId, quantity, durability, isSpoiled, citizenId, notes)
+    return Nyx.Services.RecordFoodAudit(action, sourceId, targetInvId, itemId, quantity, durability, isSpoiled, citizenId, notes)
+end)

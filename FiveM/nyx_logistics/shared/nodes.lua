@@ -48,6 +48,45 @@ Nyx.Logistics.Nodes.Registry = {
             dict = 'anim@amb@clubhouse@tutorial@bkr_tut_ig3@',
             name = 'machinic_loop_mechandplayer'
         }
+    },
+    ['farm_grapeseed_wheat'] = {
+        id = 'farm_grapeseed_wheat',
+        label = 'Grapeseed Golden Wheat Fields',
+        resource = 'crop_wheat',
+        maxReserve = 800,
+        regenRatePerHour = 80,
+        requiredTool = nil,
+        coords = vector3(2320.5, 4890.2, 41.5),
+        anim = {
+            dict = 'amb@world_human_gardener_plant@male@base',
+            name = 'base'
+        }
+    },
+    ['farm_chaparral_corn'] = {
+        id = 'farm_chaparral_corn',
+        label = 'Great Chaparral Sun Corn Plantation',
+        resource = 'crop_corn',
+        maxReserve = 600,
+        regenRatePerHour = 60,
+        requiredTool = nil,
+        coords = vector3(1055.2, 1420.4, 98.2),
+        anim = {
+            dict = 'amb@world_human_gardener_plant@male@base',
+            name = 'base'
+        }
+    },
+    ['farm_paleto_produce'] = {
+        id = 'farm_paleto_produce',
+        label = 'Paleto Bay Coastal Organic Orchard',
+        resource = 'crop_produce',
+        maxReserve = 500,
+        regenRatePerHour = 50,
+        requiredTool = nil,
+        coords = vector3(-420.8, 6250.6, 30.5),
+        anim = {
+            dict = 'amb@world_human_gardener_plant@male@base',
+            name = 'base'
+        }
     }
 }
 

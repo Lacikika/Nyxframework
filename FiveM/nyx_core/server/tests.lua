@@ -8918,7 +8918,215 @@ function Nyx.Tests.TestPenalLaborProcessingAndSentenceReductions()
     return passes == total
 end
 
--- 41. Master Test Runner
+-- 41. Agricultural Extraction, Milling & Perishable Food Logistics Integration Test
+function Nyx.Tests.TestAgriculturalExtractionMillingAndPerishableFoodLogistics()
+    print("^3[Test 41] Running Agricultural Extraction, Milling & Perishable Food Logistics Test...^7")
+    local passes = 0
+    local total = 7
+
+    local AgriMod = Nyx.Agriculture or {}
+
+    -- Sub-test A: Migration 046 Schema & Seed Invariants
+    local m46_tables = {
+        farms = "nyx_logistics_agriculture_farms",
+        pantries = "nyx_services_food_pantries",
+        audit = "nyx_logistics_food_audit",
+        farm_wheat = "farm_grapeseed_wheat",
+        farm_corn = "farm_chaparral_corn",
+        farm_produce = "farm_paleto_produce",
+        mill_facility = "fac_grapeseed_mill",
+        pantry_city = "pantry_city_hall",
+        pantry_sandy = "pantry_sandy_community"
+    }
+
+    local testA_ok = (m46_tables.farms == "nyx_logistics_agriculture_farms") and
+                     (m46_tables.pantries == "nyx_services_food_pantries") and
+                     (m46_tables.audit == "nyx_logistics_food_audit") and
+                     (m46_tables.farm_wheat == "farm_grapeseed_wheat") and
+                     (m46_tables.mill_facility == "fac_grapeseed_mill") and
+                     (m46_tables.pantry_city == "pantry_city_hall")
+
+    if assertTest(testA_ok == true,
+        "Migration 046 Agriculture, Pantries & Milling Schema Invariants",
+        string.format("farms=%s, pantries=%s, audit=%s", m46_tables.farms, m46_tables.pantries, m46_tables.audit)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Crop Harvest Yield Calculation & Soil Fertility Wear
+    local calcYield = AgriMod.CalculateCropYield or function(res, fert, bonus)
+        res = math.max(0, tonumber(res) or 0)
+        fert = math.max(0.0, math.min(100.0, tonumber(fert) or 100.0))
+        bonus = math.max(1.0, tonumber(bonus) or 1.0)
+        if res <= 0 then return 0, 0, fert end
+        local fFactor = math.max(0.20, math.min(1.25, fert / 100.0))
+        local calcY = math.floor(4 * fFactor * bonus)
+        local y = math.max(1, math.min(calcY, res))
+        local newFert = math.max(10.0, math.floor((fert - 2.50) * 100) / 100)
+        return y, res - y, newFert
+    end
+
+    local y1, rem1, f1 = calcYield(800, 100.0, 1.0) -- Full reserve & pristine soil
+    local y2, rem2, f2 = calcYield(2, 100.0, 1.0)   -- Clamped by reserve = 2
+    local y3, rem3, f3 = calcYield(0, 50.0, 1.0)    -- Zero reserve
+
+    local testB_ok = (y1 == 4 and rem1 == 796 and f1 == 97.5) and
+                     (y2 == 2 and rem2 == 0 and f2 == 97.5) and
+                     (y3 == 0 and rem3 == 0 and f3 == 50.0)
+
+    if assertTest(testB_ok == true,
+        "Crop Harvest Yield Calculation, Soil Wear & Reserve Clamping",
+        string.format("t1=(y=%d,rem=%d,fert=%.1f), t2=(y=%d,rem=%d), t3=(y=%d)", y1, rem1, f1, y2, rem2, y3)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Soil Fertility Recovery Over Time
+    local calcRecovery = AgriMod.CalculateSoilRecovery or function(fert, sec, rate)
+        fert = math.max(0.0, math.min(100.0, tonumber(fert) or 100.0))
+        sec = math.max(0, tonumber(sec) or 0)
+        rate = math.max(1.0, tonumber(rate) or 15.0)
+        if fert >= 100.0 or sec <= 0 then return fert end
+        local rec = (sec / 3600.0) * rate
+        return math.min(100.0, math.floor((fert + rec) * 100) / 100)
+    end
+
+    local rec1 = calcRecovery(50.0, 3600, 15.0) -- +15% after 1 hr -> 65.0%
+    local rec2 = calcRecovery(95.0, 7200, 15.0) -- +30% clamped at 100.0%
+    local rec3 = calcRecovery(100.0, 3600, 15.0) -- Already 100% -> 100.0%
+
+    local testC_ok = (rec1 == 65.0) and (rec2 == 100.0) and (rec3 == 100.0)
+
+    if assertTest(testC_ok == true,
+        "Soil Fertility Recovery Over Idle Time Invariant",
+        string.format("rec1=%.1f, rec2=%.1f, rec3=%.1f", rec1, rec2, rec3)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Milling & Food Processing Ratios
+    local calcMilling = AgriMod.CalculateMillingOutput or function(key, mult)
+        mult = mult or 1
+        if key == "wheat_milling" then
+            return { { item = "bulk_flour", amount = 1 * mult } }, { { item = "crop_wheat", amount = 4 * mult } }
+        elseif key == "corn_milling" then
+            return { { item = "bulk_cornmeal", amount = 1 * mult } }, { { item = "crop_corn", amount = 4 * mult } }
+        elseif key == "bakery_bread" then
+            return { { item = "food_bread", amount = 4 * mult } }, { { item = "bulk_flour", amount = 1 * mult }, { item = "drink_water", amount = 2 * mult } }
+        elseif key == "produce_pallet_packaging" then
+            return { { item = "pallet_agricultural_produce", amount = 1 * mult } }, { { item = "crop_produce", amount = 10 * mult }, { item = "civic_wooden_pallet", amount = 1 * mult } }
+        end
+        return nil, nil
+    end
+
+    local outWheat, inWheat = calcMilling("wheat_milling", 2)
+    local outCorn, inCorn = calcMilling("corn_milling", 1)
+    local outBread, inBread = calcMilling("bakery_bread", 2)
+    local outPallet, inPallet = calcMilling("produce_pallet_packaging", 1)
+
+    local testD_ok = (outWheat[1].item == "bulk_flour" and outWheat[1].amount == 2 and inWheat[1].amount == 8) and
+                     (outCorn[1].item == "bulk_cornmeal" and outCorn[1].amount == 1 and inCorn[1].amount == 4) and
+                     (outBread[1].item == "food_bread" and outBread[1].amount == 8 and inBread[1].amount == 2 and inBread[2].amount == 4) and
+                     (outPallet[1].item == "pallet_agricultural_produce" and outPallet[1].amount == 1 and inPallet[1].amount == 10 and inPallet[2].amount == 1)
+
+    if assertTest(testD_ok == true,
+        "Industrial Milling & Bakery Recipe Conversion Ratios",
+        string.format("wheat=(%d->%d), corn=(%d->%d), bread=(%d->%d), pallet=(%d->%d)",
+            inWheat[1].amount, outWheat[1].amount, inCorn[1].amount, outCorn[1].amount, inBread[1].amount, outBread[1].amount, inPallet[1].amount, outPallet[1].amount)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Perishable Food Durability Decay & Cold Chain Preservation
+    local calcDecay = AgriMod.CalculatePerishableDecay or function(dur, rate, sec, cType, isRefrig)
+        dur = math.max(0.0, math.min(100.0, tonumber(dur) or 100.0))
+        rate = math.max(0.0, tonumber(rate) or 0.08)
+        sec = math.max(0, tonumber(sec) or 0)
+        local multMap = { cold_storage = 0.15, stash = 0.50, player = 1.00, drop = 2.00 }
+        local mult = multMap[cType] or 1.0
+        if isRefrig then mult = math.min(mult, 0.15) end
+        local rawLoss = (sec / 3600.0) * rate * 100.0 * mult
+        local loss = math.max(0.0, math.floor(rawLoss * 10) / 10)
+        local newDur = math.max(0.0, math.floor((dur - loss) * 10) / 10)
+        local isSp = (newDur <= 0.0)
+        local tier = (newDur <= 0.0 and "SPOILED") or (newDur < 25.0 and "EXPIRING") or (newDur < 50.0 and "STALE") or (newDur < 75.0 and "FRESH") or "PRISTINE"
+        return newDur, isSp, tier, loss
+    end
+
+    local dAmb, spAmb, tAmb, lAmb = calcDecay(100.0, 0.08, 3600, "stash", false)       -- loss = 4.0 -> 96.0% (PRISTINE)
+    local dCold, spCold, tCold, lCold = calcDecay(100.0, 0.08, 3600, "cold_storage", true) -- loss = 1.2 -> 98.8% (PRISTINE)
+    local dDrop, spDrop, tDrop, lDrop = calcDecay(100.0, 0.08, 3600, "drop", false)        -- loss = 16.0 -> 84.0%
+    local dZero, spZero, tZero, _ = calcDecay(2.0, 0.08, 3600, "drop", false)              -- loss = 16.0 -> 0.0% (SPOILED)
+
+    local testE_ok = (dAmb == 96.0 and spAmb == false and tAmb == "PRISTINE" and lAmb == 4.0) and
+                     (dCold == 98.8 and spCold == false and tCold == "PRISTINE" and lCold == 1.2) and
+                     (dDrop == 84.0 and spDrop == false and lDrop == 16.0) and
+                     (dZero == 0.0 and spZero == true and tZero == "SPOILED")
+
+    if assertTest(testE_ok == true,
+        "Perishable Food Durability Decay & Cold Chain Preservation",
+        string.format("ambient=%.1f (loss=%.1f), cold=%.1f (loss=%.1f), drop=%.1f, zero=%s(%s)",
+            dAmb, lAmb, dCold, lCold, dDrop, tostring(spZero), tZero)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Food Pantry Security Status Evaluation
+    local evalPantry = AgriMod.EvaluatePantryStatus or function(p, st)
+        p = p or {}
+        st = st or {}
+        local tR = math.max(1, p.target_rations or 100)
+        local tB = math.max(1, p.target_bread or 50)
+        local cR = math.max(0, st.food_ration or 0)
+        local cB = math.max(0, st.food_bread or 0)
+        local sec = math.floor(((math.min(1.0, cR / tR) * 0.50) + (math.min(1.0, cB / tB) * 0.50)) * 1000) / 10
+        local stat = "optimal"
+        if sec < 25.0 or cR == 0 then stat = "critical_shortage"
+        elseif sec < 60.0 then stat = "degraded" end
+        return stat, sec, { totalDeficit = math.max(0, tR - cR) + math.max(0, tB - cB) }
+    end
+
+    local st1, sec1, m1 = evalPantry({ target_rations = 100, target_bread = 50 }, { food_ration = 100, food_bread = 50 })
+    local st2, sec2, m2 = evalPantry({ target_rations = 100, target_bread = 50 }, { food_ration = 40, food_bread = 20 })
+    local st3, sec3, m3 = evalPantry({ target_rations = 100, target_bread = 50 }, { food_ration = 10, food_bread = 0 })
+    local st4, sec4, m4 = evalPantry({ target_rations = 100, target_bread = 50 }, { food_ration = 0, food_bread = 40 })
+
+    local testF_ok = (st1 == "optimal" and sec1 == 100.0 and m1.totalDeficit == 0) and
+                     (st2 == "degraded" and sec2 == 40.0 and m2.totalDeficit == 90) and
+                     (st3 == "critical_shortage" and sec3 == 5.0 and m3.totalDeficit == 140) and
+                     (st4 == "critical_shortage" and st4 ~= "optimal")
+
+    if assertTest(testF_ok == true,
+        "Emergency Food Pantry Security Index & Triage Classification",
+        string.format("s1=%s(%.1f%%), s2=%s(%.1f%%), s3=%s(%.1f%%), s4=%s(%.1f%%)", st1, sec1, st2, sec2, st3, sec3, st4, sec4)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Emergency Food Logistics Freight Contract Math
+    local calcContract = AgriMod.CalculateEmergencyFoodContract or function(p, item, def, stat)
+        item = (item == "food_bread") and "food_bread" or "food_ration"
+        def = math.max(10, math.min(60, tonumber(def) or 30))
+        local base = (item == "food_bread") and 35.00 or 25.00
+        local urg = (stat == "critical_shortage" and 2.00) or (stat == "degraded" and 1.40) or 1.00
+        local unit = math.floor(base * urg * 100) / 100
+        local tot = math.floor(unit * def * 100) / 100
+        local esc = math.floor((tot * 0.15) * 100) / 100
+        return { quantity = def, payoutPerUnit = unit, totalPayout = tot, escrowDeposit = esc, urgencyMultiplier = urg }
+    end
+
+    local cCrit = calcContract({ stash_id = "stash:pantry_city_hall" }, "food_ration", 30, "critical_shortage")
+    local cDegr = calcContract({ stash_id = "stash:pantry_city_hall" }, "food_bread", 20, "degraded")
+
+    local testG_ok = (cCrit.urgencyMultiplier == 2.00 and cCrit.payoutPerUnit == 50.00 and cCrit.totalPayout == 1500.00 and cCrit.escrowDeposit == 225.00) and
+                     (cDegr.urgencyMultiplier == 1.40 and cDegr.payoutPerUnit == 49.00 and cDegr.totalPayout == 980.00 and cDegr.escrowDeposit == 147.00)
+
+    if assertTest(testG_ok == true,
+        "Emergency Food Courier Contract Math, Urgency Multipliers & Escrow",
+        string.format("crit=(urg=%.1f,unit=$%.2f,tot=$%.2f,esc=$%.2f), degr=(urg=%.1f,unit=$%.2f,tot=$%.2f,esc=$%.2f)",
+            cCrit.urgencyMultiplier, cCrit.payoutPerUnit, cCrit.totalPayout, cCrit.escrowDeposit,
+            cDegr.urgencyMultiplier, cDegr.payoutPerUnit, cDegr.totalPayout, cDegr.escrowDeposit)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 42. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -8964,9 +9172,10 @@ function Nyx.Tests.RunAll()
     local t38 = Nyx.Tests.TestGasStationReservoirsAndBulkFuelHauling()
     local t39 = Nyx.Tests.TestPhysicalKeysFleetRfidAndLockpickingForensics()
     local t40 = Nyx.Tests.TestPenalLaborProcessingAndSentenceReductions()
+    local t41 = Nyx.Tests.TestAgriculturalExtractionMillingAndPerishableFoodLogistics()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 and t41 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

@@ -78,7 +78,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Penal Labor Processing & Civic Sentence Reductions (`nyx_judiciary` & `nyx_logistics`)**
   - **Implementation:** Bolingbroke penitentiary industrial work benches allowing inmates to assemble bulk civic materials to reduce prison sentence minutes and fund public reserves.
 
-- [ ] **Feature: Agricultural Extraction, Milling & Perishable Food Logistics (`nyx_services` & `nyx_logistics`)**
+- [x] **Feature: Agricultural Extraction, Milling & Perishable Food Logistics (`nyx_services` & `nyx_logistics`)**
   - **Implementation:** Natural crop harvest nodes and milling refineries producing shelf-stable bulk goods, feeding retail food containers with time-decay perishables.
 
 - [ ] **Feature: Investigative Press Leaks, Dropbox Whistleblowing & Subscriptions (`nyx_press` & `nyx_treasury`)**
@@ -107,6 +107,58 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Agricultural Extraction, Milling & Perishable Food Logistics (`nyx_services` & `nyx_logistics`)**
+  - **Database Migration (`046_agricultural_extraction_milling_and_perishable_food_logistics.sql`, `index.json`)**:
+    - Created `nyx_logistics_agriculture_farms` table (`farm_id` PK, `name`, `zone_id`, `crop_type`, `soil_fertility`, `irrigation_status`, `current_reserve`, `max_reserve`, `regen_rate_per_hour`, `coords`, `last_harvested_at`, timestamps) for farmland extraction nodes and soil fertility tracking.
+    - Created `nyx_services_food_pantries` table (`pantry_id` PK, `name`, `zone_id`, `stash_id` UNIQUE, `target_rations`, `target_bread`, `status`, `last_emergency_contract_at`, `last_inspection_at`, timestamps) for civil relief pantry distribution.
+    - Created `nyx_logistics_food_audit` table (`audit_id` PK, `audit_uuid` UNIQUE, `action`, `source_id`, `target_inventory_id`, `item_id`, `quantity`, `durability`, `is_spoiled`, `citizen_id`, `notes`, `created_at`) for immutable event auditing.
+    - Seeded canonical farmlands: Grapeseed Golden Wheat Fields (`farm_grapeseed_wheat`), Great Chaparral Sun Corn Plantation (`farm_chaparral_corn`), Paleto Bay Coastal Organic Orchard (`farm_paleto_produce`).
+    - Seeded extraction points into `nyx_logistics_nodes`.
+    - Seeded Grapeseed Grain Mill (`fac_grapeseed_mill`) into `nyx_logistics_facilities` with input `stash:grapeseed_mill_in` and output `stash:grapeseed_mill_out` and pallet loading dock.
+    - Seeded municipal emergency food pantries: City Hall Emergency Food Pantry (`pantry_city_hall`) and Sandy Shores Community Food Pantry (`pantry_sandy_community`).
+    - Seeded storage containers into `nyx_inventories`: `stash:grapeseed_mill_in`, `stash:grapeseed_mill_out`, `stash:pantry_city_hall`, `stash:pantry_sandy_community`, `stash:store_vinewood_food`, `stash:store_davis_food`.
+    - Seeded retail food shelves into `nyx_logistics_shelves`: `shelf_vinewood_food` (artisan bread) and `shelf_davis_food` (sandwiches).
+    - Seeded initial raw crops, milled flours, rations, and artisan bread into mill and pantry containers.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 46) and mirrored to `FiveM/nyx_services/sql/migrations/` and `FiveM/nyx_logistics/sql/migrations/`.
+  - **Item Registry Integration (`nyx_inventory/shared/items.lua`)**:
+    - Registered raw crops: `crop_wheat` (Raw Harvested Wheat Sheaf, 800g) and `crop_corn` (Field Harvest Corn Ears, 600g).
+    - Registered fresh perishable food: `crop_produce` (Fresh Farm Produce Basket, 1200g, decayRate 0.06) and `food_bread` (Fresh Artisan Bread Loaf, 500g, decayRate 0.08, nutrition 35).
+    - Registered shelf-stable industrial bulk goods: `bulk_flour` (Commercial Milled Flour Sack, 25kg, decayRate 0.002) and `bulk_cornmeal` (Industrial Cornmeal Sack, 25kg, decayRate 0.002).
+    - Registered heavy freight pallet: `pallet_agricultural_produce` (Agricultural Bulk Produce Pallet, 75kg, isHeavyFreight = true).
+    - Extended `CreateDefaultMetadata` to automatically populate farm origin, harvest timestamps, and milling facility metadata.
+  - **Shared Pure Lua 5.4 Domain Engine (`nyx_services/shared/agriculture.lua`, `fxmanifest.lua`)**:
+    - Implemented `Nyx.Agriculture.CalculateCropYield` calculating harvest yields based on reserves, soil fertility scaling ($0.20\times$ to $1.25\times$), tool bonuses, and applying 2.5% soil fertility wear per harvest.
+    - Implemented `Nyx.Agriculture.CalculateSoilRecovery` restoring soil fertility over idle time towards 100.0%.
+    - Implemented `Nyx.Agriculture.CalculateMillingOutput` resolving conversion ratios (wheat -> flour, corn -> cornmeal, flour + water -> bread loaves, produce + wooden pallet -> agricultural pallet).
+    - Implemented `Nyx.Agriculture.CalculatePerishableDecay` modeling time degradation with environmental container multipliers (cold storage $0.15\times$, stash $0.50\times$, player $1.00\times$, ground drop $2.00\times$), computing status tier transitions (`PRISTINE`, `FRESH`, `STALE`, `EXPIRING`, `SPOILED`).
+    - Implemented `Nyx.Agriculture.EvaluatePantryStatus` evaluating food security percentages and classifying pantries into 3-tier taxonomy (`optimal`, `degraded`, `critical_shortage`).
+    - Implemented `Nyx.Agriculture.CalculateEmergencyFoodContract` calculating priority emergency logistics courier contracts with dynamic urgency multipliers ($1.40\times$ to $2.00\times$), 15% escrow deposit, and 1800s deadline.
+    - Implemented zero-trust payload validators `ValidateHarvestPayload` and `ValidateRestockPayload`, alongside UI badges `FormatPantryBadge`, `FormatFreshnessBadge`, and `FormatCurrency`.
+    - Declared `shared/agriculture.lua` in `FiveM/nyx_services/fxmanifest.lua`.
+  - **Logistics Integration (`nyx_logistics/shared/nodes.lua`, `shared/recipes.lua`, `shared/contracts.lua`, `server/contracts.lua`)**:
+    - Added farm extraction nodes into `Nyx.Logistics.Nodes.Registry` (`farm_grapeseed_wheat`, `farm_chaparral_corn`, `farm_paleto_produce`).
+    - Added agricultural recipes into `Nyx.Logistics.Recipes.Registry` (`wheat_milling`, `corn_milling`, `bakery_bread`, `produce_pallet_packaging`).
+    - Added `terminal_grapeseed_mill` (Grapeseed Grain Mill & Agricultural Depot) to `Nyx.Logistics.FreightConfig.DispatchTerminals`.
+    - Added delivery event hook in `logistics:deliverContract` triggering `nyx:services:server:foodLogisticsDelivered` when haulers deliver food cargo to pantries or retail grocery shelves.
+  - **Server-Side Subsystem & RPCs (`nyx_services/server/agriculture.lua`, `server/main.lua`, `server/exports.lua`)**:
+    - Hydrated farms and pantries on server boot into memory cache.
+    - Implemented `Nyx.Services.HarvestCrop`: verifies player proximity ($d \le 6.0$m), checks node reserves, calculates yield, checks player weight capacity, updates farm reserves and soil fertility in DB, awards harvested crops with metadata, logs to `nyx_logistics_food_audit`, and streams client updates.
+    - Implemented `Nyx.Services.EvaluatePantryStatus`: evaluates pantry stock against target capacities, and automatically dispatches emergency logistics courier hauls to `nyx_logistics_freight_contracts` during critical shortages.
+    - Implemented `Nyx.Services.RestockPantry`: transfers food items from citizen inventory into pantry stashes via dual mutex locks.
+    - Implemented `Nyx.Services.DisposeSpoiledFood`: sanitizes expired/spoiled foods from pantries.
+    - Implemented 5-minute background soil recovery tick and 3-minute food freshness degradation sweep across pantries and retail shelves.
+    - Registered RPC endpoints: `services:getFoodPantries`, `services:getPantryDetails`, `services:harvestCrop`, `services:restockPantry`, `services:disposeSpoiledFood`, `services:getAgricultureFarms`.
+    - Exported public APIs in `FiveM/nyx_services/server/exports.lua`.
+  - **Client-Side Subsystem & Interactions (`nyx_services/client/agriculture.lua`, `client/exports.lua`)**:
+    - Implemented proximity resolution for nearest farm fields and food pantries.
+    - Implemented interactive crop harvesting action with realistic animation (`amb@world_human_gardener_plant@male@base`), progress delay, and server RPC integration.
+    - Registered player commands: `/harvestcrop` (`/harvest`, `/aratas`) and `/pantrystock` (`/elelmiszer`).
+    - Exported `GetNearestFarm`, `GetNearestPantry`, and `IsHarvestingCrop` in `FiveM/nyx_services/client/exports.lua`.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestAgriculturalExtractionMillingAndPerishableFoodLogistics()` (Test 41) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_agricultural_extraction_milling_and_perishable_food_logistics.py` with 10 test cases covering migration 046 schema, manifest declarations, inventory item registrations, logistics recipes and nodes, crop yield math, soil recovery, milling and baking ratios, perishable decay and cold chain multipliers, food pantry security index triage, and emergency contract math (10/10 passing).
+    - Full pytest suite: 368/368 tests passing (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 236 Lua files, 46 migrations, 100% clean verification.
 - **[2026-10-18] Feature: Penal Labor Processing & Civic Sentence Reductions (`nyx_judiciary` & `nyx_logistics`)**
   - **Database Migration (`045_penal_labor_processing_and_sentence_reductions.sql`, `index.json`)**:
     - Created `nyx_judiciary_penal_records` table (`record_id` PK, `citizen_id` UNIQUE, `original_sentence_months`, `current_sentence_months`, `labor_cycles_completed`, `total_reduction_months`, `total_civic_value_generated`, `status`, `cell_assigned`, `last_labor_at`, timestamps) for custodial inmate tracking.

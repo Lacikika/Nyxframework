@@ -267,7 +267,7 @@ class TestPenalLaborProcessingAndSentenceReductions(unittest.TestCase):
 
         self.assertIn("Nyx.Tests.TestPenalLaborProcessingAndSentenceReductions", content)
         self.assertIn("local t40 = Nyx.Tests.TestPenalLaborProcessingAndSentenceReductions()", content)
-        self.assertIn("and t40 then", content)
+        self.assertIn("and t40", content)
 
 
 if __name__ == "__main__":

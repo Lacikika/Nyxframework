@@ -12,9 +12,12 @@ local servicesLoaded = false
 local function loadServicesData()
     if servicesLoaded then return end
     servicesLoaded = true
-    -- 1. Load substations and hospitals from database
+    -- 1. Load substations, hospitals, and agriculture from database
     Nyx.Services.LoadSubstations()
     Nyx.Services.LoadHospitals()
+    if Nyx.Services.LoadAgriculture then
+        Nyx.Services.LoadAgriculture()
+    end
 end
 
 -- Staggered initialization listener (Stage 3: Civil Infrastructure)
@@ -176,6 +179,91 @@ CreateThread(function()
             local severity = tonumber(payload.severity) or 1.0
             local ok, res = Nyx.Services.AddLimbDamage(src, limb, woundType, severity)
             return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- Query registered emergency food pantries
+        exports['nyx_core']:RegisterRPC("services:getFoodPantries", function(src)
+            local pantries = {}
+            for id, p in pairs(Nyx.Services.Pantries or {}) do
+                local counts = Nyx.Services.GetPantryStockCounts(id)
+                local status, securityPercent, metrics = Nyx.Agriculture.EvaluatePantryStatus(p, counts)
+                pantries[#pantries + 1] = {
+                    id = id,
+                    name = p.name,
+                    zoneId = p.zone_id,
+                    stashId = p.stash_id,
+                    status = status,
+                    badge = Nyx.Agriculture.FormatPantryBadge(status),
+                    securityPercent = securityPercent,
+                    counts = counts,
+                    metrics = metrics
+                }
+            end
+            return { success = true, pantries = pantries }
+        end)
+
+        -- Query detailed pantry stock and freshness telemetry
+        exports['nyx_core']:RegisterRPC("services:getPantryDetails", function(src, pantryId)
+            local p = Nyx.Services.Pantries and Nyx.Services.Pantries[pantryId]
+            if not p then return { success = false, error = "PANTRY_NOT_FOUND" } end
+            local counts = Nyx.Services.GetPantryStockCounts(pantryId)
+            local status, securityPercent, metrics = Nyx.Agriculture.EvaluatePantryStatus(p, counts)
+            return {
+                success = true,
+                pantry = {
+                    id = p.id,
+                    name = p.name,
+                    zoneId = p.zone_id,
+                    stashId = p.stash_id,
+                    status = status,
+                    badge = Nyx.Agriculture.FormatPantryBadge(status),
+                    securityPercent = securityPercent,
+                    metrics = metrics
+                }
+            }
+        end)
+
+        -- Authoritative crop harvest at farmland node
+        exports['nyx_core']:RegisterRPC("services:harvestCrop", function(src, payload)
+            if type(payload) ~= "table" then return { success = false, error = "INVALID_PAYLOAD" } end
+            local farmId = tostring(payload.farmId or "")
+            local ok, res = Nyx.Services.HarvestCrop(src, farmId)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- Restock emergency food pantry
+        exports['nyx_core']:RegisterRPC("services:restockPantry", function(src, payload)
+            if type(payload) ~= "table" then return { success = false, error = "INVALID_PAYLOAD" } end
+            local pantryId = tostring(payload.pantryId or "")
+            local itemId = tostring(payload.itemId or "")
+            local amount = tonumber(payload.amount) or 0
+            local ok, res = Nyx.Services.RestockPantry(src, pantryId, itemId, amount)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- Dispose spoiled food in pantry
+        exports['nyx_core']:RegisterRPC("services:disposeSpoiledFood", function(src, pantryId)
+            local ok, res = Nyx.Services.DisposeSpoiledFood(src, tostring(pantryId or ""))
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- Query registered agricultural farms
+        exports['nyx_core']:RegisterRPC("services:getAgricultureFarms", function(src)
+            local farms = {}
+            for id, f in pairs(Nyx.Services.Farms or {}) do
+                farms[#farms + 1] = {
+                    id = f.id,
+                    name = f.name,
+                    zoneId = f.zone_id,
+                    cropType = f.crop_type,
+                    soilFertility = f.soil_fertility,
+                    irrigationStatus = f.irrigation_status,
+                    currentReserve = f.current_reserve,
+                    maxReserve = f.max_reserve,
+                    coords = f.coords
+                }
+            end
+            return { success = true, farms = farms }
         end)
     end
 

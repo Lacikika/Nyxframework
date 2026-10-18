@@ -17,7 +17,8 @@ shared_scripts {
     '@nyx_treasury/shared/degradation.lua',
     'config.lua',
     'shared/trauma.lua',
-    'shared/medical.lua'
+    'shared/medical.lua',
+    'shared/agriculture.lua'
 }
 
 server_scripts {
@@ -26,6 +27,7 @@ server_scripts {
     'server/billing.lua',
     'server/medical.lua',
     'server/trauma.lua',
+    'server/agriculture.lua',
     'server/repair_stations.lua',
     'server/main.lua',
     'server/exports.lua'
@@ -36,8 +38,13 @@ client_scripts {
     'client/substations.lua',
     'client/repair_stations.lua',
     'client/trauma.lua',
+    'client/agriculture.lua',
     'client/main.lua',
     'client/exports.lua'
+}
+
+files {
+    'sql/migrations/*.sql'
 }
 
 dependencies {

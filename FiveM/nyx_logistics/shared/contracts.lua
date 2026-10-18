@@ -73,6 +73,13 @@ Nyx.Logistics.FreightConfig = {
             coords = vector3(1705.0, 2577.5, 45.5),
             model = `prop_terminal_01`,
             heading = 180.0
+        },
+        {
+            id = "terminal_grapeseed_mill",
+            name = "Grapeseed Grain Mill & Agricultural Depot",
+            coords = vector3(2438.0, 4964.0, 46.0),
+            model = `prop_terminal_01`,
+            heading = 180.0
         }
     }
 }

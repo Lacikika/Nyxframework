@@ -132,6 +132,28 @@ Nyx.Items.Registry = {
         nutrition = 25,
         description = 'Handcrafted deli sandwich. Perishable.'
     },
+    ['food_bread'] = {
+        name = 'food_bread',
+        label = 'Fresh Artisan Bread Loaf',
+        weight = 500,
+        stackable = true,
+        maxStack = 10,
+        type = 'food',
+        decayRate = 0.08,
+        nutrition = 35,
+        description = 'Freshly baked crusty artisan bread loaf. Perishable staple.'
+    },
+    ['crop_produce'] = {
+        name = 'crop_produce',
+        label = 'Fresh Farm Produce Basket',
+        weight = 1200,
+        stackable = true,
+        maxStack = 20,
+        type = 'food',
+        decayRate = 0.06,
+        nutrition = 20,
+        description = 'Assorted fresh harvest fruits and garden vegetables. Highly perishable without cold storage.'
+    },
     ['drink_water'] = {
         name = 'drink_water',
         label = 'Purified Water',
@@ -374,6 +396,64 @@ Nyx.Items.Registry = {
         type = 'freight',
         description = 'Heavy industrial shipment crate containing pressed structural steel.'
     },
+    ['crop_wheat'] = {
+        name = 'crop_wheat',
+        label = 'Raw Harvested Wheat Sheaf',
+        weight = 800,
+        stackable = true,
+        maxStack = 50,
+        type = 'material',
+        decayRate = 0.015,
+        description = 'Harvested golden wheat sheaf from regional agricultural farmland, ready for industrial milling into flour.'
+    },
+    ['crop_corn'] = {
+        name = 'crop_corn',
+        label = 'Field Harvest Corn Ears',
+        weight = 600,
+        stackable = true,
+        maxStack = 50,
+        type = 'material',
+        decayRate = 0.02,
+        description = 'Freshly harvested yellow field corn ears for milling and animal feed.'
+    },
+    ['bulk_flour'] = {
+        name = 'bulk_flour',
+        label = 'Commercial Milled Flour Sack',
+        weight = 25000,
+        stackable = true,
+        maxStack = 10,
+        type = 'freight',
+        decayRate = 0.002,
+        description = 'Heavy 25kg commercial sack of fine milled wheat flour. Shelf-stable industrial bulk baking staple.'
+    },
+    ['bulk_cornmeal'] = {
+        name = 'bulk_cornmeal',
+        label = 'Industrial Cornmeal Sack',
+        weight = 25000,
+        stackable = true,
+        maxStack = 10,
+        type = 'freight',
+        decayRate = 0.002,
+        description = 'Heavy 25kg sack of milled yellow cornmeal for industrial food manufacturing and livestock feed.'
+    },
+    ['pallet_agricultural_produce'] = {
+        name = 'pallet_agricultural_produce',
+        label = 'Agricultural Bulk Produce Pallet',
+        weight = 75000,
+        stackable = false,
+        maxSlots = 1,
+        type = 'freight',
+        isHeavyFreight = true,
+        decayRate = 0.00,
+        description = 'Heavy freight wooden pallet loaded with crates of fresh regional farm harvest and milled grains.',
+        client = {
+            model = `prop_boxpile_06a`,
+            animDict = 'anim@heists@box_carry@',
+            anim = 'idle',
+            attachOffset = { x = 0.0, y = 0.48, z = -0.20 },
+            attachRot = { x = 0.0, y = 0.0, z = 0.0 }
+        }
+    },
 
     -- Tools & Valuables
     ['tool_lockpick'] = {
@@ -612,6 +692,13 @@ function Nyx.Items.CreateDefaultMetadata(name, extra)
         elseif item.name == 'civic_inmate_uniform' then
             meta.inmateNumber = (type(extra) == "table" and extra.inmateNumber) or string.format("INM-%05d", math.random(10000, 99999))
             meta.facility = "bolingbroke_penitentiary"
+        elseif item.name == 'food_bread' or item.name == 'crop_produce' then
+            meta.isSpoiled = false
+            meta.farmOrigin = (type(extra) == "table" and extra.farmOrigin) or "grapeseed"
+            meta.harvestedAt = (type(extra) == "table" and extra.harvestedAt) or os.time()
+        elseif item.name == 'bulk_flour' or item.name == 'bulk_cornmeal' then
+            meta.milledAt = os.time()
+            meta.facility = (type(extra) == "table" and extra.facility) or "fac_grapeseed_mill"
         end
     end
 

@@ -542,6 +542,11 @@ Nyx.RPC.Register("logistics:deliverContract", function(src, payload)
         TriggerEvent("nyx:judiciary:server:workshopMaterialsDelivered", destInvId, contractId, contract.item_id, contract.quantity)
     end
 
+    -- Notify food and agriculture services if destination is a food retail shelf or emergency pantry
+    if destInvId and (destInvId:find("pantry") or destInvId:find("_food") or contract.contract_type == "perishable_food" or contract.contract_type == "bulk_agricultural") then
+        TriggerEvent("nyx:services:server:foodLogisticsDelivered", destInvId, contractId, contract.item_id, contract.quantity)
+    end
+
     return {
         success = true,
         payout = payout,
