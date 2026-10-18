@@ -19,7 +19,8 @@ shared_scripts {
     'shared/spatial_grid.lua',
     'shared/decay.lua',
     'shared/items.lua',
-    'shared/drops.lua'
+    'shared/drops.lua',
+    'shared/batch.lua'
 }
 
 server_scripts {

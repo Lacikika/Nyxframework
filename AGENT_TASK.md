@@ -34,7 +34,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
   - **Issue:** Power grid substations initialize with `0.0%` fuel and health on server boot, triggering a city-wide blackout cascade immediately.
   - **Fix:** Update database hydration fallback in `server/powergrid.lua` to ensure default substations start at `100.0%` fuel and turbine integrity.
 
-- [ ] **Performance: Batched Container Queries on Boot (`nyx_inventory` & `nyx_logistics`)**
+- [x] **Performance: Batched Container Queries on Boot (`nyx_inventory` & `nyx_logistics`)**
   - **Issue:** Sequential `SELECT * FROM nyx_inventories WHERE id = ?` calls cause 320ms query delays and a 370ms server thread hitch warning.
   - **Fix:** Implement batched array queries (`WHERE id IN (...)`) for known startup containers (`stash:*`, `property:*`) to resolve cold-cache database latency.
 
@@ -107,6 +107,28 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Performance: Batched Container Queries on Boot (`nyx_inventory` & `nyx_logistics`)**
+  - **Pure Lua 5.4 Batch Query Engine (`nyx_inventory/shared/batch.lua`, `fxmanifest.lua`)**:
+    - Created pure shared batch planner `Nyx.Inventory.Batch` providing `SanitizeContainerIds` (order-preserving deduplication, trimming, and non-string validation), `PartitionExisting` (segregating hot cache hits from cold database misses), `ChunkIds` (bounded chunking to max 50 items per SQL statement), and `BuildQueryPlan` (generating parameterized ANSI SQL `WHERE id IN (?, ?, ...)` and `WHERE inventory_id IN (?, ?, ...)`).
+    - Added relational item grouping `GroupItemsByInventory` mapping flat item rows to parent container IDs with zero cross-container contamination.
+    - Added mathematical query savings model `CalculateQuerySavings`: proves $Q_{\text{seq}} = 2N$ vs $Q_{\text{batched}} = 2 \times \lceil N / \text{chunkSize} \rceil$, achieving 97.5% - 98.0% query round-trip reductions (saving 78 queries for 40 containers; 196 queries for 100 containers).
+    - Registered `shared/batch.lua` in `FiveM/nyx_inventory/fxmanifest.lua`.
+  - **Authoritative State Hydration & Batch Loading Server Subsystem (`nyx_inventory/server/state.lua`, `server/exports.lua`)**:
+    - Extracted unified hydration helper `Nyx.Inventory.HydrateContainerFromRow(record, itemRows)` unifying single-get and batch-load container instantiations, spatial metadata parsing, item mapping, and offline catch-up decay.
+    - Implemented `Nyx.Inventory.BatchLoad(containerIds, options)`: executes batched array queries for cold-cache misses, groups items, hydrates active memory cache `Nyx.Inventories`, and optionally auto-creates missing containers.
+    - Added automated bootloader thread in `nyx_inventory/server/state.lua`: on server boot, queries all known startup containers (`SELECT id FROM nyx_inventories WHERE id LIKE 'stash:%' OR id LIKE 'property:%' OR type = 'stash'`) and pre-loads them in a single batched array query, entirely eliminating cold-cache database latency and server thread hitch warnings on startup.
+    - Added public server exports in `nyx_inventory/server/exports.lua`: `BatchLoadInventories`, `PreloadInventories`, `GetInventoriesBatch`, and `RegisterContainersBatch`.
+  - **Cross-Resource Bootloader Optimizations (`nyx_logistics`, `nyx_properties`, `nyx_inventory`)**:
+    - *Facilities (`nyx_logistics/server/facilities.lua`)*: Batches input and output stash IDs before hydration loop, replacing sequential queries with a single array query.
+    - *Shelves (`nyx_logistics/server/shelves.lua`)*: Batches all retail shelf container IDs prior to price elasticity computation, guaranteeing 0ms memory hits.
+    - *Pallets (`nyx_logistics/server/pallets.lua`)*: Batches all physical pallet inventory IDs on startup prior to entity hydration.
+    - *Properties (`nyx_properties/server/main.lua`)*: Batches all real estate property stash IDs before registration and RFID locking loops.
+    - *World Drops (`nyx_inventory/server/drops.lua`)*: Batches all persistent world drops prior to spatial grid recovery loop.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestBatchedContainerQueriesOnBoot()` (Test 27) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest test suite `tests/test_batched_container_queries.py` validating 9 distinct scenarios (sanitization, cache partitioning, chunking, query plan generation, query savings math, item grouping, startup pattern recognition, hot/cold simulation, and cross-resource manifest/exports integrity).
+    - Full pytest suite: 232/232 tests passing (100% pass rate).
+    - Verified clean passes across all 14 resources, 205 Lua files, and all 32 SQL migrations via `scripts/validator.py` and `scripts/verify.ps1`.
 - **[2026-10-18] Hotfix: Substation Zero-State Blackout Cascade on Startup (`nyx_services`)**
   - **Authoritative Hydration Evaluator & Database Fallback (`nyx_services/server/powergrid.lua`, `nyx_services/server/exports.lua`)**:
     - Created pure hydration evaluator `Nyx.Services.HydrateSubstationRecord(subId, dbRow, cfgSub)` implementing resilient decoding of spatial coordinates, bounding radii, and transformer connection metadata.

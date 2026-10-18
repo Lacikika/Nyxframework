@@ -50,6 +50,18 @@ CreateThread(function()
 
     local rows = MySQL.query.await("SELECT * FROM `nyx_logistics_shelves`")
     if rows then
+        -- Performance: Batch pre-load all retail shelf inventories in one array query
+        local shelfInvIds = {}
+        for _, row in ipairs(rows) do
+            if row.inventory_id and row.inventory_id ~= "" then
+                shelfInvIds[#shelfInvIds + 1] = row.inventory_id
+            end
+        end
+
+        if #shelfInvIds > 0 and exports['nyx_inventory'] and exports['nyx_inventory'].BatchLoadInventories then
+            exports['nyx_inventory']:BatchLoadInventories(shelfInvIds, 'stash')
+        end
+
         for _, row in ipairs(rows) do
             local lastPurchasedUnix = nil
             if row.last_purchased_at then

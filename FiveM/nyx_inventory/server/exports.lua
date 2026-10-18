@@ -227,6 +227,64 @@ exports("RegisterContainer", function(invId, label, maxWeight, maxSlots, coords)
     return container
 end)
 
+-- Batch load multiple containers in array queries (WHERE id IN (...)) to eliminate sequential database latency
+exports("BatchLoadInventories", function(containerIds, autoCreateType)
+    if type(containerIds) ~= "table" then return {}, 0, 0, 0 end
+    return Nyx.Inventory.BatchLoad(containerIds, { autoCreateType = autoCreateType })
+end)
+
+-- Preload containers into memory cache (alias for BatchLoadInventories)
+exports("PreloadInventories", function(containerIds)
+    if type(containerIds) ~= "table" then return {}, 0, 0, 0 end
+    return Nyx.Inventory.BatchLoad(containerIds)
+end)
+
+-- Get batch of containers as a key-value dictionary [id] = container
+exports("GetInventoriesBatch", function(containerIds)
+    if type(containerIds) ~= "table" then return {}, 0, 0, 0 end
+    local results = Nyx.Inventory.BatchLoad(containerIds)
+    return results
+end)
+
+-- Batch register or ensure multiple custom containers exist without sequential queries
+exports("RegisterContainersBatch", function(containerDefs)
+    if type(containerDefs) ~= "table" then return {} end
+
+    local ids = {}
+    for _, def in ipairs(containerDefs) do
+        if def.id then
+            ids[#ids + 1] = def.id
+        end
+    end
+
+    local loaded = Nyx.Inventory.BatchLoad(ids, { autoCreateType = "stash" })
+
+    for _, def in ipairs(containerDefs) do
+        local container = loaded[def.id]
+        if container then
+            local modified = false
+            if def.maxWeight and container.maxWeight ~= tonumber(def.maxWeight) then
+                container.maxWeight = tonumber(def.maxWeight)
+                modified = true
+            end
+            if def.maxSlots and container.maxSlots ~= tonumber(def.maxSlots) then
+                container.maxSlots = tonumber(def.maxSlots)
+                modified = true
+            end
+            if def.coords and not container.coords then
+                container.coords = def.coords
+                modified = true
+            end
+            if modified then
+                container:save()
+            end
+        end
+    end
+
+    return loaded
+end)
+
+
 -- Query player inventory weight and capacity
 exports("GetPlayerWeight", function(src)
     local player = exports['nyx_core']:GetPlayer(src)

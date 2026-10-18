@@ -27,6 +27,18 @@ CreateThread(function()
 
     local rows = MySQL.query.await("SELECT * FROM `nyx_logistics_pallets`")
     if rows then
+        -- Performance: Batch pre-load all physical pallet inventories in one array query
+        local palletInvIds = {}
+        for _, r in ipairs(rows) do
+            if r.inventory_id and r.inventory_id ~= "" then
+                palletInvIds[#palletInvIds + 1] = r.inventory_id
+            end
+        end
+
+        if #palletInvIds > 0 and exports['nyx_inventory'] and exports['nyx_inventory'].BatchLoadInventories then
+            exports['nyx_inventory']:BatchLoadInventories(palletInvIds, 'pallet')
+        end
+
         for _, r in ipairs(rows) do
             local coords = nil
             if r.coords and type(r.coords) == "string" then

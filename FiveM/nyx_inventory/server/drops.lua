@@ -572,6 +572,17 @@ CreateThread(function()
 
     local rows = MySQL.query.await("SELECT `id`, `coords`, `rotation`, `model`, `routing_bucket`, `shelf_node_id`, `grid_cell`, `last_decay_at` FROM `nyx_inventories` WHERE `type` = 'drop'")
     if rows then
+        -- Performance: Batch pre-load all world drop containers in array queries (WHERE id IN (...))
+        local dropIds = {}
+        for _, row in ipairs(rows) do
+            if row.id and not Nyx.Inventories[row.id] then
+                dropIds[#dropIds + 1] = row.id
+            end
+        end
+        if #dropIds > 0 and Nyx.Inventory.BatchLoad then
+            Nyx.Inventory.BatchLoad(dropIds)
+        end
+
         for _, row in ipairs(rows) do
             if row.coords then
                 local okCoords, parsedCoords = pcall(json.decode, row.coords)

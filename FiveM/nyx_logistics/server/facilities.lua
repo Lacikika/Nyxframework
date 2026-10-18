@@ -28,6 +28,21 @@ CreateThread(function()
 
     local rows = MySQL.query.await("SELECT * FROM `nyx_logistics_facilities`")
     if rows then
+        -- Performance: Batch pre-load all facility input & output stashes in one array query
+        local stashIds = {}
+        for _, row in ipairs(rows) do
+            if row.input_inventory_id and row.input_inventory_id ~= "" then
+                stashIds[#stashIds + 1] = row.input_inventory_id
+            end
+            if row.output_inventory_id and row.output_inventory_id ~= "" then
+                stashIds[#stashIds + 1] = row.output_inventory_id
+            end
+        end
+
+        if #stashIds > 0 and exports['nyx_inventory'] and exports['nyx_inventory'].BatchLoadInventories then
+            exports['nyx_inventory']:BatchLoadInventories(stashIds, 'stash')
+        end
+
         for _, row in ipairs(rows) do
             local coords = parseCoordsJson(row.coords)
             local dockCoords = parseCoordsJson(row.pallet_dock_coords)

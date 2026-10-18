@@ -75,6 +75,19 @@ MySQL.ready(function()
     -- Load all properties into memory
     local rows = MySQL.query.await("SELECT * FROM `nyx_properties`")
     if rows then
+        -- Performance: Batch pre-load all real estate property stashes in one array query
+        local stashIds = {}
+        for _, r in ipairs(rows) do
+            local stashId = r.stash_inventory_id or string.format("property:%s:main", r.property_code)
+            if stashId and stashId ~= "" then
+                stashIds[#stashIds + 1] = stashId
+            end
+        end
+
+        if #stashIds > 0 and exports['nyx_inventory'] and exports['nyx_inventory'].BatchLoadInventories then
+            exports['nyx_inventory']:BatchLoadInventories(stashIds, 'stash')
+        end
+
         for _, r in ipairs(rows) do
             local propData = {
                 id = r.property_id,

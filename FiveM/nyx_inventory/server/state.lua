@@ -277,41 +277,26 @@ function Container:save()
     return p
 end
 
--- Helper: Load or Get Container from Memory / DB
-function Nyx.Inventory.Get(invId, autoCreateType, defaultCoords)
-    if not invId then return nil end
+-- Helper: Hydrate a Container from a database row and associated item records
+function Nyx.Inventory.HydrateContainerFromRow(record, itemRows)
+    if not record or not record.id then return nil end
 
-    if Nyx.Inventories[invId] then
-        return Nyx.Inventories[invId]
-    end
-
-    -- Query Database
-    local record = MySQL.single.await("SELECT * FROM `nyx_inventories` WHERE `id` = ?", { invId })
-
-    if not record then
-        if not autoCreateType then
-            return nil
-        end
-
-        local def = Config.Containers[autoCreateType] or Config.Containers['player']
-        local newContainer = Nyx.Inventory.NewContainer(invId, autoCreateType, def.maxWeight, def.maxSlots, defaultCoords)
-        newContainer:save()
-        return newContainer
-    end
-
-    -- Parse DB Record
     local coords = nil
     if record.coords and #record.coords > 0 then
         local ok, parsed = pcall(json.decode, record.coords)
-        if ok then coords = parsed end
+        if ok and type(parsed) == "table" then coords = parsed end
     end
 
-    local container = Nyx.Inventory.NewContainer(record.id, record.type, record.max_weight, record.max_slots, coords)
+    local container = Nyx.Inventory.NewContainer(
+        record.id,
+        record.type,
+        record.max_weight,
+        record.max_slots,
+        coords
+    )
     container.gridCell = record.grid_cell
     container.lastDecayAt = tonumber(record.last_decay_at) or 0
 
-    -- Load Items
-    local itemRows = MySQL.query.await("SELECT * FROM `nyx_inventory_items` WHERE `inventory_id` = ? ORDER BY `slot` ASC", { invId })
     if itemRows then
         for _, row in ipairs(itemRows) do
             local meta = {}
@@ -322,7 +307,7 @@ function Nyx.Inventory.Get(invId, autoCreateType, defaultCoords)
 
             container.items[tonumber(row.slot)] = {
                 item_uuid = row.item_uuid,
-                inventory_id = invId,
+                inventory_id = record.id,
                 item_id = row.item_id,
                 slot = tonumber(row.slot),
                 amount = tonumber(row.amount) or 1,
@@ -346,6 +331,144 @@ function Nyx.Inventory.Get(invId, autoCreateType, defaultCoords)
 
     return container
 end
+
+-- Helper: Load or Get Container from Memory / DB
+function Nyx.Inventory.Get(invId, autoCreateType, defaultCoords)
+    if not invId then return nil end
+
+    if Nyx.Inventories[invId] then
+        return Nyx.Inventories[invId]
+    end
+
+    -- Query Database
+    local record = MySQL.single.await("SELECT * FROM `nyx_inventories` WHERE `id` = ?", { invId })
+
+    if not record then
+        if not autoCreateType then
+            return nil
+        end
+
+        local def = Config.Containers[autoCreateType] or Config.Containers['player']
+        local newContainer = Nyx.Inventory.NewContainer(invId, autoCreateType, def.maxWeight, def.maxSlots, defaultCoords)
+        newContainer:save()
+        return newContainer
+    end
+
+    -- Load Items
+    local itemRows = MySQL.query.await("SELECT * FROM `nyx_inventory_items` WHERE `inventory_id` = ? ORDER BY `slot` ASC", { invId })
+
+    return Nyx.Inventory.HydrateContainerFromRow(record, itemRows)
+end
+
+-- Batch Load multiple containers in array queries (WHERE id IN (...)) to eliminate cold-cache round trips
+function Nyx.Inventory.BatchLoad(containerIds, options)
+    if type(containerIds) ~= "table" then
+        return {}, 0, 0, 0
+    end
+
+    options = options or {}
+    local chunkSize = tonumber(options.chunkSize) or 50
+    local autoCreateType = options.autoCreateType
+    local defaultCoords = options.defaultCoords
+
+    -- 1. Sanitize and partition into hot cache hits and cold cache misses
+    local cleanList, _ = Nyx.Inventory.Batch.SanitizeContainerIds(containerIds)
+    local hits, misses = Nyx.Inventory.Batch.PartitionExisting(cleanList, Nyx.Inventories)
+
+    local results = {}
+    for _, hitId in ipairs(hits) do
+        results[hitId] = Nyx.Inventories[hitId]
+    end
+
+    if #misses == 0 then
+        return results, #hits, 0, 0
+    end
+
+    -- 2. Build parameterized query plan for missing containers
+    local plan = Nyx.Inventory.Batch.BuildQueryPlan(misses, chunkSize)
+
+    for _, queryChunk in ipairs(plan.chunks) do
+        local invRows = MySQL.query.await(queryChunk.headerQuery, queryChunk.headerParams)
+        local foundIds = {}
+        local foundSet = {}
+
+        if invRows and #invRows > 0 then
+            for _, r in ipairs(invRows) do
+                foundIds[#foundIds + 1] = r.id
+                foundSet[r.id] = true
+            end
+
+            -- Query items for returned containers in batched IN (...) clause
+            local itemPlaceholders = {}
+            for p = 1, #foundIds do
+                itemPlaceholders[p] = "?"
+            end
+            local itemQuery = string.format(
+                "SELECT * FROM `nyx_inventory_items` WHERE `inventory_id` IN (%s) ORDER BY `slot` ASC",
+                table.concat(itemPlaceholders, ",")
+            )
+            local itemRows = MySQL.query.await(itemQuery, foundIds)
+            local itemsByInv = Nyx.Inventory.Batch.GroupItemsByInventory(itemRows)
+
+            -- Hydrate into active cache
+            for _, record in ipairs(invRows) do
+                local container = Nyx.Inventory.HydrateContainerFromRow(record, itemsByInv[record.id])
+                results[record.id] = container
+            end
+        end
+
+        -- Handle optional auto-creation for unpersisted containers
+        if autoCreateType then
+            local def = Config.Containers[autoCreateType] or Config.Containers['stash']
+            for _, id in ipairs(queryChunk.ids) do
+                if not foundSet[id] and not results[id] then
+                    local newContainer = Nyx.Inventory.NewContainer(
+                        id,
+                        autoCreateType,
+                        def.maxWeight,
+                        def.maxSlots,
+                        defaultCoords
+                    )
+                    newContainer:save()
+                    results[id] = newContainer
+                end
+            end
+        end
+    end
+
+    return results, #hits, #misses, plan.queriesSaved
+end
+
+-- Batch Preload Known Startup Containers on Boot ('stash:*', 'property:*')
+CreateThread(function()
+    while GetResourceState("oxmysql") ~= "started" do
+        Wait(50)
+    end
+
+    local startTimer = GetGameTimer()
+
+    -- Query known startup containers matching stash:* or property:* or type = 'stash'
+    local rows = MySQL.query.await([[
+        SELECT `id` FROM `nyx_inventories`
+        WHERE `id` LIKE 'stash:%' OR `id` LIKE 'property:%' OR `type` = 'stash'
+    ]])
+
+    local startupIds = {}
+    if rows then
+        for _, r in ipairs(rows) do
+            if r.id and not Nyx.Inventories[r.id] then
+                startupIds[#startupIds + 1] = r.id
+            end
+        end
+    end
+
+    if #startupIds > 0 then
+        local loaded, hits, misses, queriesSaved = Nyx.Inventory.BatchLoad(startupIds)
+        local elapsedMs = GetGameTimer() - startTimer
+        print(string.format("^2[Nyx:Inventory] Batched startup preloaded %d container(s) ('stash:*', 'property:*') in %dms (Saved %d queries, Cold-Cache Latency Resolved).^7", #startupIds, elapsedMs, queriesSaved or 0))
+    end
+end)
+
 
 -- Debounced Batch Flush Thread
 CreateThread(function()
