@@ -29,25 +29,41 @@ function Nyx.RPC.GenerateNonce()
     end))
 end
 
--- Validate route naming conventions: alphanumeric with ':', '.', '_', '-'
+-- Validate nonce: non-empty string with maximum length of 64 chars
+function Nyx.RPC.IsValidNonce(nonce)
+    if type(nonce) ~= "string" then return false end
+    if #nonce == 0 or #nonce > 64 then return false end
+    return true
+end
+
+-- Validate route naming conventions: alphanumeric with ':', '.', '_', '-' up to 128 chars
 function Nyx.RPC.IsValidRoute(route)
     if type(route) ~= "string" then return false end
     if #route == 0 or #route > 128 then return false end
     return (string.match(route, "^[%w%.:_%-]+$") ~= nil)
 end
 
--- Check payload size constraints (capped at Config.MaxPayloadSize)
-function Nyx.RPC.IsPayloadWithinBounds(payload)
+-- Check payload size constraints (capped at Config.MaxPayloadSize or 65536 bytes)
+function Nyx.RPC.IsPayloadWithinBounds(payload, customCap)
     if payload == nil then return true end
+    local maxSize = customCap or (Config and Config.MaxPayloadSize) or 65536
     local rawSize = 0
-    if type(payload) == "string" then
+
+    local valType = type(payload)
+    if valType == "string" then
         rawSize = #payload
-    else
+    elseif valType == "number" or valType == "boolean" then
+        rawSize = #tostring(payload)
+    elseif valType == "table" then
         local ok, encoded = pcall(json.encode, payload)
         if not ok or not encoded then
             return false
         end
         rawSize = #encoded
+    else
+        -- Disallow raw userdata, functions, threads
+        return false
     end
-    return rawSize <= (Config.MaxPayloadSize or 65536)
+
+    return rawSize <= maxSize
 end

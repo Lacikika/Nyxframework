@@ -1,7 +1,7 @@
 --[[
     Nyxframework: nyx_core
     File: client/rpc.lua
-    Description: Client-side RPC bus supporting promises, execution timeouts, and bidirectional calls.
+    Description: Client-side RPC bus supporting promises, execution timeouts, 64KB payload caps, and bidirectional calls.
 ]]
 
 Nyx = Nyx or {}
@@ -17,7 +17,7 @@ function Nyx.RPC.Register(route, handler)
     end
 
     registeredHandlers[route] = handler
-    if Config.Debug then
+    if Config and Config.Debug then
         print(string.format("^4[Nyx:RPC:Client]^7 Registered client route: ^3%s^7", route))
     end
 end
@@ -31,9 +31,17 @@ function Nyx.RPC.Trigger(route, ...)
         return p
     end
 
+    local args = { ... }
+
+    -- Enforce 64KB payload limit client-side before sending across network
+    if not Nyx.RPC.IsPayloadWithinBounds(args) then
+        local p = promise.new()
+        p:reject(Nyx.RPC.Errors.PAYLOAD_TOO_LARGE)
+        return p
+    end
+
     local p = promise.new()
     local nonce = Nyx.RPC.GenerateNonce()
-    local args = { ... }
 
     pendingRequests[nonce] = {
         promise = p,
@@ -44,7 +52,7 @@ function Nyx.RPC.Trigger(route, ...)
     TriggerServerEvent("nyx:core:rpc:request", nonce, route, args)
 
     -- Enforce Client Timeout
-    SetTimeout(Config.RPCTimeout or 5000, function()
+    SetTimeout((Config and Config.RPCTimeout) or 5000, function()
         if pendingRequests[nonce] then
             pendingRequests[nonce] = nil
             p:reject(Nyx.RPC.Errors.TIMEOUT)
@@ -62,7 +70,7 @@ end
 
 -- Incoming Response from Server
 RegisterNetEvent("nyx:core:rpc:response", function(nonce, success, payload, err)
-    if type(nonce) ~= "string" then return end
+    if not Nyx.RPC.IsValidNonce(nonce) then return end
 
     local pending = pendingRequests[nonce]
     if not pending then
@@ -80,7 +88,13 @@ end)
 
 -- Incoming Client Request from Server (Bidirectional)
 RegisterNetEvent("nyx:core:rpc:clientRequest", function(nonce, route, args)
-    if type(nonce) ~= "string" or not Nyx.RPC.IsValidRoute(route) then
+    if not Nyx.RPC.IsValidNonce(nonce) or not Nyx.RPC.IsValidRoute(route) then
+        return
+    end
+
+    -- Enforce 64KB payload check on server request payload
+    if not Nyx.RPC.IsPayloadWithinBounds(args) then
+        TriggerServerEvent("nyx:core:rpc:clientResponse", nonce, false, nil, Nyx.RPC.Errors.PAYLOAD_TOO_LARGE)
         return
     end
 
@@ -104,7 +118,12 @@ RegisterNetEvent("nyx:core:rpc:clientRequest", function(nonce, route, args)
         end)
 
         if ok then
-            TriggerServerEvent("nyx:core:rpc:clientResponse", nonce, true, result, nil)
+            -- Enforce 64KB payload check on client response payload
+            if not Nyx.RPC.IsPayloadWithinBounds(result) then
+                TriggerServerEvent("nyx:core:rpc:clientResponse", nonce, false, nil, Nyx.RPC.Errors.PAYLOAD_TOO_LARGE)
+            else
+                TriggerServerEvent("nyx:core:rpc:clientResponse", nonce, true, result, nil)
+            end
         else
             TriggerServerEvent("nyx:core:rpc:clientResponse", nonce, false, nil, customErr or Nyx.RPC.Errors.INTERNAL_ERROR)
         end

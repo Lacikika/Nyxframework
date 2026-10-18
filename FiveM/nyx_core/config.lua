@@ -20,15 +20,22 @@ Config.BanCard = {
     appealMessage = "If you believe this ban is in error, submit an appeal via our civil registry.",
 }
 
--- High-Performance RPC Engine
+-- High-Performance RPC Engine & Zero-Trust Security
 Config.RPCTimeout = 5000       -- 5000 ms client/server promise timeout
 Config.MaxPayloadSize = 65536  -- 64 KB maximum packet size
 
 Config.RateLimit = {
-    capacity = 50,    -- Max burst capacity of tokens
-    refillRate = 50,  -- Tokens refilled per second
-    actionOnExceed = "kick", -- Action: "kick" or "drop"
-    kickReason = "[Nyx-Security] Socket exhaustion detected: RPC rate limit exceeded."
+    enabled = true,
+    capacity = 50,           -- Max burst capacity of tokens
+    refillRate = 50,         -- Tokens refilled per second (50 req/s)
+    defaultCost = 1.0,       -- Default tokens consumed per RPC call
+    actionOnExceed = "throttle", -- "throttle" (reject with RATE_LIMITED) or "kick"
+    kickOnSustainedFlooding = true, -- Auto-kick if player continues flooding when rate-limited
+    maxViolations = 10,      -- Sustained violations required to trigger automatic kick
+    violationWindowMs = 5000, -- 5000 ms rolling window for violation decay
+    kickReason = "[Nyx-Security] Socket exhaustion detected: RPC rate limit exceeded.",
+    routeCosts = {},
+    exemptRoutes = {}
 }
 
 -- Player State & Persistence

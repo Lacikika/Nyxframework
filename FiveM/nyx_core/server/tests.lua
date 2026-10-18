@@ -18,11 +18,11 @@ local function assertTest(condition, testName, errMsg)
     end
 end
 
--- 1. Test RPC Round-Trip Promise & Timeout Resolution
+-- 1. Test RPC Round-Trip Promise, Rate Limiting & 64KB Payload Enforcement
 function Nyx.Tests.TestRPC()
-    print("^3[Nyx:Tests] Running RPC Suite...^7")
+    print("^3[Nyx:Tests] Running RPC Security Suite (Rate Limiting & Payload Cap)...^7")
     local passes = 0
-    local total = 2
+    local total = 12
 
     -- Test A: Registration and in-memory execution
     local testRoute = "__test:echo"
@@ -51,8 +51,153 @@ function Nyx.Tests.TestRPC()
         passes = passes + 1
     end
 
+    -- Test C: Token Bucket Rate Limiting (50 burst capacity, 51st request rejected)
+    local testSrc = 991
+    Nyx.RPC.ResetRateLimit(testSrc)
+    local testTime = 100000.0
+    local burstOk = true
+
+    for i = 1, 50 do
+        local allowed, rem, status = Nyx.RPC.CheckRateLimit(testSrc, "test:ping", 1.0, testTime)
+        if not allowed or status ~= "OK" then
+            burstOk = false
+            break
+        end
+    end
+
+    local allowed51, rem51, status51 = Nyx.RPC.CheckRateLimit(testSrc, "test:ping", 1.0, testTime)
+    if assertTest(burstOk and not allowed51 and status51 == "RATE_LIMITED", "RPC Token Bucket 50 Burst & Depletion", string.format("51st call status=%s, allowed=%s", tostring(status51), tostring(allowed51))) then
+        passes = passes + 1
+    end
+
+    -- Test D: Token Bucket Refill Math (50 tokens/sec = 10 tokens per 200ms)
+    local testTimeRefill = testTime + 200.0 -- 200ms later -> +10 tokens
+    local refillCount = 0
+    for i = 1, 10 do
+        local allowed = Nyx.RPC.CheckRateLimit(testSrc, "test:ping", 1.0, testTimeRefill)
+        if allowed then
+            refillCount = refillCount + 1
+        end
+    end
+    local postRefillAllowed = Nyx.RPC.CheckRateLimit(testSrc, "test:ping", 1.0, testTimeRefill)
+
+    if assertTest(refillCount == 10 and not postRefillAllowed, "RPC Token Bucket Refill Math (50 req/s)", string.format("Refill count=%d, post-refill allowed=%s", refillCount, tostring(postRefillAllowed))) then
+        passes = passes + 1
+    end
+
+    -- Test E: Multi-Source Isolation (Player A exhaustion does not affect Player B)
+    local srcA = 992
+    local srcB = 993
+    Nyx.RPC.ResetRateLimit(srcA)
+    Nyx.RPC.ResetRateLimit(srcB)
+
+    for i = 1, 50 do
+        Nyx.RPC.CheckRateLimit(srcA, "test:action", 1.0, testTime)
+    end
+    local srcAExhausted = not Nyx.RPC.CheckRateLimit(srcA, "test:action", 1.0, testTime)
+    local srcBAllowed, srcBTokens = Nyx.RPC.CheckRateLimit(srcB, "test:action", 1.0, testTime)
+
+    if assertTest(srcAExhausted and srcBAllowed and srcBTokens == 49.0, "RPC Multi-Source Bucket Isolation", "Exhausting srcA interfered with srcB tokens") then
+        passes = passes + 1
+    end
+
+    -- Test F: Custom Route Token Cost (e.g. 25 tokens cost)
+    local srcCost = 994
+    Nyx.RPC.ResetRateLimit(srcCost)
+    local costOk1, remCost1 = Nyx.RPC.CheckRateLimit(srcCost, "test:heavy", 25.0, testTime)
+    local costOk2, remCost2 = Nyx.RPC.CheckRateLimit(srcCost, "test:heavy", 25.0, testTime)
+    local costOk3, _ = Nyx.RPC.CheckRateLimit(srcCost, "test:heavy", 1.0, testTime)
+
+    if assertTest(costOk1 and remCost1 == 25.0 and costOk2 and remCost2 == 0.0 and not costOk3, "RPC Custom Route Token Cost", "Failed custom token cost deduction") then
+        passes = passes + 1
+    end
+
+    -- Test G: Sustained Flooding & Automatic Kick Escalation
+    local srcFlood = 995
+    Nyx.RPC.ResetRateLimit(srcFlood)
+    for i = 1, 50 do Nyx.RPC.CheckRateLimit(srcFlood, "test:flood", 1.0, testTime) end -- exhaust
+
+    local kickedStatus = false
+    -- Config has maxViolations = 10
+    for v = 1, 10 do
+        local allowed, _, status = Nyx.RPC.CheckRateLimit(srcFlood, "test:flood", 1.0, testTime)
+        if status == "KICKED" then
+            kickedStatus = true
+            break
+        end
+    end
+
+    if assertTest(kickedStatus == true, "RPC Sustained Flooding Kick Escalation", "Sustained rate limit flooding did not escalate to KICKED") then
+        passes = passes + 1
+    end
+
+    -- Test H: 64KB Payload Size Boundary (65535, 65536, 65537 bytes)
+    local p65535 = string.rep("x", 65535)
+    local p65536 = string.rep("x", 65536)
+    local p65537 = string.rep("x", 65537)
+
+    local ok65535 = Nyx.RPC.IsPayloadWithinBounds(p65535)
+    local ok65536 = Nyx.RPC.IsPayloadWithinBounds(p65536)
+    local ok65537 = Nyx.RPC.IsPayloadWithinBounds(p65537)
+
+    if assertTest(ok65535 == true and ok65536 == true and ok65537 == false, "RPC 64KB Payload Cap Boundary Enforcer", string.format("65535=%s, 65536=%s, 65537=%s", tostring(ok65535), tostring(ok65536), tostring(ok65537))) then
+        passes = passes + 1
+    end
+
+    -- Test I: Complex Nested Table Payload Serialization Check
+    local smallTable = { key = "val", items = { 1, 2, 3, 4, 5 } }
+    local largeTable = {}
+    for i = 1, 1200 do
+        largeTable[i] = { id = i, name = "heavy_inventory_item_identifier_payload_padding_" .. i }
+    end
+
+    local okSmall = Nyx.RPC.IsPayloadWithinBounds(smallTable)
+    local okLarge = Nyx.RPC.IsPayloadWithinBounds(largeTable) -- JSON is well over 64KB
+
+    if assertTest(okSmall == true and okLarge == false, "RPC Complex Table JSON Payload Bound Guard", string.format("small=%s, large=%s", tostring(okSmall), tostring(okLarge))) then
+        passes = passes + 1
+    end
+
+    -- Test J: Nonce Security Validation
+    local validNonce = "550e8400-e29b-41d4-a716-446655440000"
+    local emptyNonce = ""
+    local longNonce = string.rep("a", 65)
+
+    local okVNonce = Nyx.RPC.IsValidNonce(validNonce)
+    local okENonce = Nyx.RPC.IsValidNonce(emptyNonce)
+    local okLNonce = Nyx.RPC.IsValidNonce(longNonce)
+
+    if assertTest(okVNonce == true and okENonce == false and okLNonce == false, "RPC Nonce Security Validation", "Nonce length security validation failed") then
+        passes = passes + 1
+    end
+
+    -- Test K: Route Security Validation
+    local validRoute = "parliament:submitBill"
+    local invalidRouteChar = "parliament:submit Bill; DROP TABLE"
+    local invalidRouteLen = string.rep("r", 129)
+
+    local okVRoute = Nyx.RPC.IsValidRoute(validRoute)
+    local okIRoute = Nyx.RPC.IsValidRoute(invalidRouteChar)
+    local okLRoute = Nyx.RPC.IsValidRoute(invalidRouteLen)
+
+    if assertTest(okVRoute == true and okIRoute == false and okLRoute == false, "RPC Route Security Validation", "Route format/length security validation failed") then
+        passes = passes + 1
+    end
+
+    -- Test L: Source Disconnect Cleanup
+    local srcClean = 998
+    Nyx.RPC.CheckRateLimit(srcClean, "test:route", 1.0, testTime)
+    local stateBefore = Nyx.RPC.GetRateLimitState(srcClean)
+    Nyx.RPC.CleanupSource(srcClean)
+    local stateAfter = Nyx.RPC.GetRateLimitState(srcClean)
+
+    if assertTest(stateBefore ~= nil and stateAfter == nil, "RPC Source Disconnect Cleanup", "Rate limit state was not cleared on disconnect cleanup") then
+        passes = passes + 1
+    end
+
     return passes == total
 end
+
 
 -- 2. Test Inventory Mutex Concurrency & Duplication Prevention
 function Nyx.Tests.TestInventoryConcurrency()

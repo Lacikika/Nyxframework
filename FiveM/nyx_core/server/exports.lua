@@ -28,6 +28,27 @@ exports("TriggerClientRPC", function(src, route, ...)
     return Nyx.RPC.TriggerClient(src, route, ...)
 end)
 
+-- RPC Security, Rate Limiting & Payload Bounds
+exports("CheckRPCRateLimit", function(src, route, customCost)
+    return Nyx.RPC.CheckRateLimit(src, route, customCost)
+end)
+
+exports("GetRPCRateLimitState", function(src)
+    return Nyx.RPC.GetRateLimitState(src)
+end)
+
+exports("ResetRPCRateLimit", function(src)
+    Nyx.RPC.ResetRateLimit(src)
+end)
+
+exports("IsRPCPayloadValid", function(payload, customCap)
+    return Nyx.RPC.IsPayloadWithinBounds(payload, customCap)
+end)
+
+exports("GetRPCRateLimitMetrics", function()
+    return Nyx.RPC.GetRateLimitMetrics()
+end)
+
 -- Virtual Routing Bucket Controls
 exports("SetLimbo", function(src)
     Nyx.Buckets.SetLimbo(src)
