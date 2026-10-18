@@ -344,6 +344,136 @@ Nyx.RPC.Register("inventory:dropItem", function(src, payload)
     return { success = true, dropId = res }
 end)
 
+-- Single Authoritative RPC for Client-Side Hologram Placement (Zero-Packet Placement Release)
+Nyx.RPC.Register("inventory:commitWorldPlacement", function(src, payload)
+    if type(payload) ~= "table" then return { success = false, error = "INVALID_PAYLOAD" } end
+
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return { success = false, error = "UNAUTHORIZED" } end
+
+    local ped = GetPlayerPed(tostring(src))
+    local playerCoords = GetEntityCoords(ped)
+
+    local targetCoords = payload.coords
+    if type(targetCoords) ~= "table" or not targetCoords.x or not targetCoords.y or not targetCoords.z then
+        return { success = false, error = "INVALID_COORDINATES" }
+    end
+
+    local placementVec = vector3(tonumber(targetCoords.x) or 0.0, tonumber(targetCoords.y) or 0.0, tonumber(targetCoords.z) or 0.0)
+    local maxDist = (Config.Placement and Config.Placement.MaxDistance or 6.0) + 2.5 -- Tolerance margin for latency
+    local dist = #(playerCoords - placementVec)
+
+    -- Security: Anti-teleport / proximity validation
+    if dist > maxDist then
+        return { success = false, error = "PLACEMENT_OUT_OF_RANGE" }
+    end
+
+    local safeCoords = {
+        x = math.floor(placementVec.x * 100) / 100,
+        y = math.floor(placementVec.y * 100) / 100,
+        z = math.floor(placementVec.z * 100) / 100
+    }
+
+    local heading = 0.0
+    if type(payload.rotation) == "table" then
+        heading = tonumber(payload.rotation.heading) or tonumber(payload.rotation.z) or 0.0
+    elseif type(payload.rotation) == "number" then
+        heading = payload.rotation
+    end
+    heading = (heading % 360.0 + 360.0) % 360.0
+    local safeRotation = {
+        x = 0.0,
+        y = 0.0,
+        z = math.floor(heading * 100) / 100,
+        heading = math.floor(heading * 100) / 100
+    }
+
+    -- CASE 1: Reposition existing world drop container
+    if payload.dropId then
+        local dropId = tostring(payload.dropId)
+        local existingDrop = Nyx.Drops[dropId]
+        if not existingDrop then
+            return { success = false, error = "DROP_NOT_FOUND" }
+        end
+
+        local originalVec = vector3(existingDrop.coords.x, existingDrop.coords.y, existingDrop.coords.z)
+        if #(playerCoords - originalVec) > maxDist then
+            return { success = false, error = "DROP_OUT_OF_RANGE" }
+        end
+
+        if not Nyx.Inventory.AcquireLock(dropId) then
+            return { success = false, error = "CONTAINER_BUSY" }
+        end
+
+        local ok, updateErr = Nyx.Drops.Update(dropId, safeCoords, safeRotation)
+        Nyx.Inventory.ReleaseLock(dropId)
+
+        if not ok then
+            return { success = false, error = updateErr or "UPDATE_FAILED" }
+        end
+
+        return { success = true, dropId = dropId, coords = safeCoords, rotation = safeRotation }
+    end
+
+    -- CASE 2: New placement from player's inventory
+    local fromInv = payload.fromInv
+    local slot = tonumber(payload.slot)
+    local amount = math.floor(tonumber(payload.amount) or 1)
+    local itemId = payload.itemId
+
+    if not fromInv or not slot or amount <= 0 then
+        return { success = false, error = "INVALID_PARAMETERS" }
+    end
+
+    if not Nyx.Inventory.ValidateAccess(src, fromInv) then
+        return { success = false, error = "ACCESS_DENIED" }
+    end
+
+    if not Nyx.Inventory.AcquireLock(fromInv) then
+        return { success = false, error = "CONTAINER_BUSY" }
+    end
+
+    local outcome, res = Nyx.Inventory.WithLock(fromInv, function()
+        local container = Nyx.Inventory.Get(fromInv)
+        if not container then return false, "CONTAINER_NOT_FOUND" end
+
+        local item = container:getItem(slot)
+        if not item or (tonumber(item.amount) or 0) < amount then
+            return false, "ITEM_NOT_FOUND"
+        end
+
+        if itemId and item.item_id ~= itemId then
+            return false, "ITEM_MISMATCH"
+        end
+
+        local droppedItemData = {
+            item_uuid = Nyx.RPC.GenerateNonce(),
+            item_id = item.item_id,
+            slot = 1,
+            amount = amount,
+            metadata = deepCopy(item.metadata or {})
+        }
+
+        if amount == item.amount then
+            container:removeItem(slot)
+        else
+            item.amount = item.amount - amount
+            container:setItem(slot, item)
+        end
+
+        local newDropId = Nyx.Drops.Create(safeCoords, droppedItemData, safeRotation)
+        return true, newDropId
+    end)
+
+    Nyx.Inventory.ReleaseLock(fromInv)
+
+    if not outcome then
+        return { success = false, error = res or "PLACEMENT_FAILED" }
+    end
+
+    return { success = true, dropId = res, coords = safeCoords, rotation = safeRotation }
+end)
+
 -- Authoritative Item Consumption & Activation RPC
 Nyx.RPC.Register("inventory:useItem", function(src, payload)
     if type(payload) ~= "table" then return { success = false, error = "INVALID_PAYLOAD" } end

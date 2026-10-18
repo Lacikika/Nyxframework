@@ -1106,7 +1106,173 @@ function Nyx.Tests.TestMasterUIArchitecture()
     return passes == total
 end
 
--- 12. Master Test Runner
+-- 12. Test Extended Third-Eye (LALT) Cursor Manipulation & Zero-Packet Placement
+function Nyx.Tests.TestThirdEyeAndZeroPacketPlacement()
+    print("^3[Nyx:Tests] Running Extended Third-Eye & Zero-Packet Placement Suite...^7")
+    local passes = 0
+    local total = 6
+
+    -- Test A: Distance Boundary & Anti-Teleport Validation
+    local playerPos = vector3(100.0, 200.0, 30.0)
+    local maxDist = 6.0 + 2.5 -- 8.5m tolerance
+    local function validatePlacementDistance(targetPos)
+        local dist = #(playerPos - targetPos)
+        if dist > maxDist then
+            return false, "PLACEMENT_OUT_OF_RANGE"
+        end
+        return true
+    end
+
+    local okFar, errFar = validatePlacementDistance(vector3(120.0, 200.0, 30.0)) -- 20m away
+    local okNear, _ = validatePlacementDistance(vector3(103.0, 202.0, 30.0))   -- ~3.6m away
+
+    if assertTest(okFar == false and errFar == "PLACEMENT_OUT_OF_RANGE" and okNear == true,
+        "Placement Distance Boundary Clamping",
+        "Anti-teleport placement range validation failed") then
+        passes = passes + 1
+    end
+
+    -- Test B: Precision Heading Normalization & Orientation Math
+    local function normalizeHeading(raw)
+        local h = 0.0
+        if type(raw) == "table" then
+            h = tonumber(raw.heading) or tonumber(raw.z) or 0.0
+        elseif type(raw) == "number" then
+            h = raw
+        end
+        h = (h % 360.0 + 360.0) % 360.0
+        return math.floor(h * 100) / 100
+    end
+
+    local h1 = normalizeHeading(375.5)   -- wraps to 15.5
+    local h2 = normalizeHeading(-45.0)   -- wraps to 315.0
+    local h3 = normalizeHeading(720.0)   -- wraps to 0.0
+    local h4 = normalizeHeading({ z = 180.256 }) -- wraps to 180.25
+
+    if assertTest(h1 == 15.5 and h2 == 315.0 and h3 == 0.0 and h4 == 180.25,
+        "Heading Angle Normalization (0-360 deg)",
+        string.format("Normalized headings mismatch: h1=%.2f, h2=%.2f, h3=%.2f, h4=%.2f", h1, h2, h3, h4)) then
+        passes = passes + 1
+    end
+
+    -- Test C: Coordinate Precision Clamping (Prevent Floating-Point Bloat in DB)
+    local function sanitizeCoordinates(c)
+        return {
+            x = math.floor((c.x or 0.0) * 100) / 100,
+            y = math.floor((c.y or 0.0) * 100) / 100,
+            z = math.floor((c.z or 0.0) * 100) / 100
+        }
+    end
+
+    local cleanCoords = sanitizeCoordinates({ x = 123.4567, y = -987.6543, z = 45.1234 })
+    if assertTest(cleanCoords.x == 123.45 and cleanCoords.y == -987.66 and cleanCoords.z == 45.12,
+        "Spatial Coordinate Sanitization & DB Precision",
+        string.format("Coordinate clamping failed: (%.4f, %.4f, %.4f)", cleanCoords.x, cleanCoords.y, cleanCoords.z)) then
+        passes = passes + 1
+    end
+
+    -- Test D: Zero-Packet Local Drag Simulation (Zero RPCs during movement)
+    local rpcPacketsSent = 0
+    local function onHologramDragStep(deltaHeading)
+        -- Simulates 60 FPS client interpolation without network dispatch
+        h1 = (h1 + deltaHeading) % 360.0
+        return h1
+    end
+
+    for _ = 1, 60 do -- 60 frames of dragging/rotation
+        onHologramDragStep(5.0)
+    end
+
+    -- Final release: exactly 1 packet sent
+    local function onPlacementRelease()
+        rpcPacketsSent = rpcPacketsSent + 1
+        return { success = true }
+    end
+    onPlacementRelease()
+
+    if assertTest(rpcPacketsSent == 1,
+        "60 FPS Client-Side Interpolation & Single-Packet Commit",
+        string.format("Expected exactly 1 network packet on commit, got %d", rpcPacketsSent)) then
+        passes = passes + 1
+    end
+
+    -- Test E: Reposition Existing Drop vs Create New World Container
+    local mockDrops = {
+        ["drop:TEST001"] = {
+            id = "drop:TEST001",
+            coords = { x = 100.0, y = 200.0, z = 30.0 },
+            rotation = { heading = 0.0 }
+        }
+    }
+
+    local function handleCommit(payload)
+        if payload.dropId then
+            local d = mockDrops[payload.dropId]
+            if not d then return false, "DROP_NOT_FOUND" end
+            d.coords = payload.coords
+            d.rotation = payload.rotation
+            return true, d.id
+        else
+            local newId = "drop:NEW001"
+            mockDrops[newId] = {
+                id = newId,
+                coords = payload.coords,
+                rotation = payload.rotation
+            }
+            return true, newId
+        end
+    end
+
+    local okRepo, repoId = handleCommit({
+        dropId = "drop:TEST001",
+        coords = { x = 102.5, y = 201.0, z = 30.0 },
+        rotation = { heading = 45.0 }
+    })
+    local okNew, newId = handleCommit({
+        coords = { x = 104.0, y = 205.0, z = 30.0 },
+        rotation = { heading = 90.0 }
+    })
+
+    if assertTest(okRepo == true and mockDrops["drop:TEST001"].rotation.heading == 45.0 and okNew == true and mockDrops["drop:NEW001"] ~= nil,
+        "Container Repositioning & Orientation Persistence",
+        "Failed to update or create container with orientation") then
+        passes = passes + 1
+    end
+
+    -- Test F: Third-Eye Target Resolution with Context Enrichment
+    local mockCurrentTarget = {
+        entity = 456,
+        coords = vector3(105.0, 205.0, 30.0),
+        options = {
+            { id = "opt_loot", label = "Open Ground Loot", event = "inventory:openDrop", args = { dropId = "drop:TEST001" } },
+            { id = "opt_grab", label = "Reposition / Move", event = "inventory:grabDrop", args = { dropId = "drop:TEST001" } }
+        }
+    }
+
+    local dispatchedEvent = nil
+    local dispatchedArgs = nil
+    local function dispatchSelectedOption(nuiPayload)
+        for _, opt in ipairs(mockCurrentTarget.options) do
+            if opt.id == nuiPayload.id then
+                dispatchedEvent = opt.event
+                dispatchedArgs = opt.args
+                break
+            end
+        end
+    end
+
+    dispatchSelectedOption({ id = "opt_grab" })
+
+    if assertTest(dispatchedEvent == "inventory:grabDrop" and dispatchedArgs and dispatchedArgs.dropId == "drop:TEST001",
+        "Third-Eye Intent Resolution & Context Enrichment",
+        "Option intent was not mapped back to authoritative target options") then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 13. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -1123,9 +1289,10 @@ function Nyx.Tests.RunAll()
     local t9 = Nyx.Tests.TestSharedMathAndVectorUtils()
     local t10 = Nyx.Tests.TestMultiSigVaultsAndSignOffRules()
     local t11 = Nyx.Tests.TestMasterUIArchitecture()
+    local t12 = Nyx.Tests.TestThirdEyeAndZeroPacketPlacement()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

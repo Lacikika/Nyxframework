@@ -39,10 +39,30 @@ RegisterKeyMapping(Config.ActivationCommand or "+nyx_target", "Activate Eye Targ
 RegisterNetEvent("nyx:interact:client:triggerOption", function(optionData)
     if not optionData then return end
 
-    if optionData.event then
-        TriggerEvent(optionData.event, optionData.args, optionData.entity, optionData.netId)
-    elseif optionData.serverEvent then
-        TriggerServerEvent(optionData.serverEvent, optionData.args, optionData.entity, optionData.netId)
+    local fullOption = nil
+    local currentTarget = Nyx.Interact.CurrentTarget
+
+    if currentTarget and currentTarget.options then
+        for _, opt in ipairs(currentTarget.options) do
+            if opt.id == optionData.id or (optionData.action and opt.action == optionData.action) or (optionData.label and opt.label == optionData.label) then
+                fullOption = opt
+                break
+            end
+        end
+    end
+
+    fullOption = fullOption or optionData
+    local entity = fullOption.entity or (currentTarget and currentTarget.entity)
+    local coords = fullOption.coords or (currentTarget and currentTarget.coords)
+    local netId = fullOption.netId or (currentTarget and currentTarget.netId)
+    local args = fullOption.args or {}
+
+    if fullOption.action and type(fullOption.action) == "function" then
+        fullOption.action(entity, coords, args)
+    elseif fullOption.event then
+        TriggerEvent(fullOption.event, args, entity, netId, coords)
+    elseif fullOption.serverEvent then
+        TriggerServerEvent(fullOption.serverEvent, args, entity, netId, coords)
     end
 end)
 

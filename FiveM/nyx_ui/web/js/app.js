@@ -220,6 +220,17 @@ function setInteractActive(active) {
     }
 }
 
+function setPlacementActive(active, label) {
+    const overlay = document.getElementById('placement-overlay');
+    const labelEl = document.getElementById('placement-item-name');
+    if (overlay) {
+        overlay.classList.toggle('hidden', !active);
+    }
+    if (labelEl && label) {
+        labelEl.textContent = label.toUpperCase();
+    }
+}
+
 function setInteractTarget(targetData) {
     if (!targetData) return clearInteractTarget();
 
@@ -755,13 +766,17 @@ window.addEventListener('message', (event) => {
 
     const action = packet.action;
 
-    // Reticle & Raycasting
-    if (action === 'INTERACT_SET_ACTIVE') {
-        setInteractActive(packet.active);
-    } else if (action === 'INTERACT_SET_TARGET') {
-        setInteractTarget(packet.target);
-    } else if (action === 'INTERACT_CLEAR_TARGET') {
+    // Reticle & Raycasting (nyx_interact)
+    if (action === 'INTERACT_SET_ACTIVE' || (packet.app === 'interact' && action === 'ACTIVATE')) {
+        setInteractActive(packet.active ?? packet.payload?.active ?? true);
+    } else if (action === 'INTERACT_SET_TARGET' || (packet.app === 'interact' && action === 'SET_TARGET')) {
+        setInteractTarget(packet.target ?? packet.payload);
+    } else if (action === 'INTERACT_CLEAR_TARGET' || (packet.app === 'interact' && (action === 'DEACTIVATE' || action === 'CLEAR_TARGET'))) {
         clearInteractTarget();
+    } else if (packet.app === 'placement' && action === 'START') {
+        setPlacementActive(true, packet.payload?.label);
+    } else if (packet.app === 'placement' && action === 'STOP') {
+        setPlacementActive(false);
     }
 
     // HUD Telemetry
@@ -1132,6 +1147,12 @@ function initBrowserDevMode() {
                 ]
             });
         }
+    });
+
+    document.getElementById('dev-btn-place')?.addEventListener('click', () => {
+        const overlay = document.getElementById('placement-overlay');
+        const isHidden = overlay?.classList.contains('hidden');
+        setPlacementActive(isHidden, 'Heavy Freight Crate');
     });
 
     document.getElementById('dev-btn-toast')?.addEventListener('click', () => {

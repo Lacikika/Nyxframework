@@ -16,10 +16,54 @@ RegisterNetEvent("nyx:judiciary:client:evidenceCreated", function(drop)
         type = drop.type or "casing",
         coords = vector3(drop.coords.x, drop.coords.y, drop.coords.z)
     }
+
+    if exports['nyx_interact'] and exports['nyx_interact'].AddTargetCoords then
+        exports['nyx_interact']:AddTargetCoords("evidence_" .. drop.evidenceId, drop.coords, 2.5, {
+            options = {
+                {
+                    icon = "fa-solid fa-box-archive",
+                    label = "Bag Evidence (Gloves): " .. string.upper(drop.type or "casing"),
+                    event = "nyx:judiciary:client:collectEvidenceGloves",
+                    args = { evidenceId = drop.evidenceId },
+                    canInteract = function(entity, dist)
+                        return dist <= 2.5
+                    end
+                },
+                {
+                    icon = "fa-solid fa-hand",
+                    label = "Pick Up (Bare Hands): " .. string.upper(drop.type or "casing"),
+                    event = "nyx:judiciary:client:collectEvidenceBare",
+                    args = { evidenceId = drop.evidenceId },
+                    canInteract = function(entity, dist)
+                        return dist <= 2.5
+                    end
+                }
+            },
+            distance = 2.5
+        })
+    end
 end)
 
 RegisterNetEvent("nyx:judiciary:client:evidenceRemoved", function(evidenceId)
     LocalEvidence[evidenceId] = nil
+    if exports['nyx_interact'] and exports['nyx_interact'].RemoveTargetCoords then
+        exports['nyx_interact']:RemoveTargetCoords("evidence_" .. evidenceId)
+    end
+end)
+
+-- Event handlers for Third-Eye forensic evidence collection
+RegisterNetEvent("nyx:judiciary:client:collectEvidenceGloves", function(args)
+    local evidenceId = (type(args) == "table" and args.evidenceId) or args
+    if evidenceId and exports['nyx_core'] and exports['nyx_core'].TriggerServerRPC then
+        exports['nyx_core']:TriggerServerRPC("judiciary:collectEvidence", evidenceId, true)
+    end
+end)
+
+RegisterNetEvent("nyx:judiciary:client:collectEvidenceBare", function(args)
+    local evidenceId = (type(args) == "table" and args.evidenceId) or args
+    if evidenceId and exports['nyx_core'] and exports['nyx_core'].TriggerServerRPC then
+        exports['nyx_core']:TriggerServerRPC("judiciary:collectEvidence", evidenceId, false)
+    end
 end)
 
 -- 1. Weapon Discharge Detection Loop (Tick rate adaptive: 100ms when armed, 1000ms when unarmed)
@@ -45,7 +89,7 @@ CreateThread(function()
     end
 end)
 
--- 2. Proximity Evidence Marker & Collection Thread (Zero Wait(0) unless in close proximity < 2.5m)
+-- 2. Relaxed Forensic Clue Ring Visual Thread (Sleeps 250-1000ms, zero Wait(0) busy-wait)
 CreateThread(function()
     while true do
         local sleep = 1000
@@ -53,56 +97,13 @@ CreateThread(function()
 
         if DoesEntityExist(ped) and not IsPedDeadOrDying(ped, true) then
             local pCoords = GetEntityCoords(ped)
-            local nearestEvidence = nil
-            local nearestDist = 999.0
 
             for id, data in pairs(LocalEvidence) do
                 local d = #(pCoords - data.coords)
                 if d < (Config.Forensics and Config.Forensics.DetectionRadius or 15.0) then
-                    if d < nearestDist then
-                        nearestDist = d
-                        nearestEvidence = data
-                    end
-                end
-            end
-
-            if nearestEvidence then
-                if nearestDist < 10.0 then
-                    sleep = 0
-
-                    -- Render localized forensic clue ring
-                    local c = nearestEvidence.coords
-                    DrawMarker(1, c.x, c.y, c.z - 0.95, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.35, 0.35, 0.15, 200, 180, 50, 180, false, false, 2, false, nil, nil, false)
-
-                    if nearestDist <= (Config.Forensics and Config.Forensics.MaxCollectionDistance or 2.5) then
-                        -- Display 3D interaction text
-                        BeginTextCommandDisplayText("STRING")
-                        local prompt = string.format("[~g~E~w~] Bag Evidence (Gloves) | [~r~G~w~] Pick Up (Bare Hands)\n~y~Type:~w~ %s", nearestEvidence.type:upper())
-                        AddTextComponentSubstringPlayerName(prompt)
-                        SetTextFont(0)
-                        SetTextScale(0.32, 0.32)
-                        SetTextColour(255, 255, 255, 230)
-                        SetTextCentre(true)
-
-                        SetDrawOrigin(c.x, c.y, c.z + 0.25, 0)
-                        EndTextCommandDisplayText(0.0, 0.0)
-                        ClearDrawOrigin()
-
-                        -- Handle key inputs
-                        if IsControlJustPressed(0, 38) then -- E key: With Gloves
-                            if exports['nyx_core'] and exports['nyx_core'].TriggerServerRPC then
-                                exports['nyx_core']:TriggerServerRPC("judiciary:collectEvidence", nearestEvidence.evidenceId, true)
-                            end
-                            Wait(500)
-                        elseif IsControlJustPressed(0, 47) then -- G key: Bare Hands (Contaminated)
-                            if exports['nyx_core'] and exports['nyx_core'].TriggerServerRPC then
-                                exports['nyx_core']:TriggerServerRPC("judiciary:collectEvidence", nearestEvidence.evidenceId, false)
-                            end
-                            Wait(500)
-                        end
-                    end
-                else
                     sleep = 250
+                    local c = data.coords
+                    DrawMarker(1, c.x, c.y, c.z - 0.95, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.35, 0.35, 0.15, 200, 180, 50, 140, false, false, 2, false, nil, nil, false)
                 end
             end
         end

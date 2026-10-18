@@ -22,6 +22,7 @@
             <button id="dev-btn-treasury"><i class="fa-solid fa-scale-balanced"></i> Treasury</button>
             <button id="dev-btn-freight"><i class="fa-solid fa-truck"></i> Freight</button>
             <button id="dev-btn-interact"><i class="fa-solid fa-crosshairs"></i> Target</button>
+            <button id="dev-btn-place"><i class="fa-solid fa-arrows-up-down-left-right"></i> Place</button>
             <button id="dev-btn-toast"><i class="fa-solid fa-bell"></i> Toast</button>
         </div>
 
@@ -53,6 +54,24 @@
                 <div id="target-options" class="options-list">
                     <!-- Dynamic option buttons -->
                 </div>
+        </div>
+
+        <!-- ================================================================
+             1B. ZERO-PACKET WORLD ITEM PLACEMENT HUD
+             ================================================================ -->
+        <div id="placement-overlay" class="placement-hud hidden">
+            <div class="placement-badge">
+                <i class="fa-solid fa-arrows-up-down-left-right"></i>
+                <span id="placement-item-name">PLACING OBJECT</span>
+            </div>
+            <div class="placement-controls">
+                <span class="control-key">LMB</span> Confirm
+                <span class="control-divider">•</span>
+                <span class="control-key">SCROLL / Q-E</span> Rotate
+                <span class="control-divider">•</span>
+                <span class="control-key">SHIFT</span> Fine Adjust
+                <span class="control-divider">•</span>
+                <span class="control-key">RMB / ESC</span> Cancel
             </div>
         </div>
 

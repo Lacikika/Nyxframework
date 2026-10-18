@@ -1,52 +1,69 @@
 --[[
     Nyxframework: nyx_logistics
     File: client/harvesting.lua
-    Description: Client spatial node detection, 3D markers, gathering animations, and RPC invocation.
+    Description: Spatial harvesting node Third-Eye (LALT) target registration,
+                 gathering animations, and zero-busywait interaction dispatching.
 ]]
 
 Nyx = Nyx or {}
 Nyx.Logistics = Nyx.Logistics or {}
 Nyx.Logistics.IsHarvesting = false
 
--- Proximity loop for natural extraction points
+-- Register Natural Resource Extraction Nodes with Third-Eye (LALT) Raycast Engine
+CreateThread(function()
+    while not exports['nyx_interact'] do
+        Wait(200)
+    end
+
+    local interactDist = Config.HarvestInteractDistance or 3.0
+
+    for nodeId, node in pairs(Nyx.Logistics.Nodes.Registry or {}) do
+        exports['nyx_interact']:AddTargetCoords("logistics_harvest_" .. nodeId, node.coords, interactDist, {
+            options = {
+                {
+                    icon = "fa-solid fa-gem",
+                    label = "Extract " .. (node.label or "Resources"),
+                    event = "nyx:logistics:client:harvestNode",
+                    args = { nodeId = nodeId },
+                    canInteract = function(entity, dist)
+                        return dist <= interactDist and not Nyx.Logistics.IsHarvesting
+                    end
+                }
+            },
+            distance = interactDist
+        })
+    end
+end)
+
+-- Event hook for node extraction
+RegisterNetEvent("nyx:logistics:client:harvestNode", function(args)
+    local nodeId = (type(args) == "table" and args.nodeId) or args
+    local node = nodeId and Nyx.Logistics.Nodes.Registry[nodeId]
+    if node and not Nyx.Logistics.IsHarvesting then
+        Nyx.Logistics.StartHarvesting(nodeId, node)
+    end
+end)
+
+-- Relaxed visual beacon thread (Sleeps 1000ms, zero Wait(0) busy-wait)
 CreateThread(function()
     while true do
+        local sleep = 1000
         local ped = PlayerPedId()
         local playerCoords = GetEntityCoords(ped)
-        local nearNode = false
-        local interactDist = Config.HarvestInteractDistance or 3.0
 
-        for nodeId, node in pairs(Nyx.Logistics.Nodes.Registry) do
+        for nodeId, node in pairs(Nyx.Logistics.Nodes.Registry or {}) do
             local dist = #(playerCoords - node.coords)
-
             if dist <= 20.0 then
-                -- Render 3D gathering beacon marker
+                sleep = 250
                 DrawMarker(1, node.coords.x, node.coords.y, node.coords.z - 1.0,
                     0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                    1.5, 1.5, 0.8, 205, 133, 63, 160,
+                    1.5, 1.5, 0.8, 205, 133, 63, 140,
                     false, false, 2, false, nil, nil, false
                 )
-
-                if dist <= interactDist then
-                    nearNode = true
-                    if not Nyx.Logistics.IsHarvesting then
-                        BeginTextCommandDisplayHelp("STRING")
-                        AddTextComponentSubstringPlayerName(string.format("Press ~INPUT_CONTEXT~ to extract ~y~%s~s~", node.label))
-                        EndTextCommandDisplayHelp(0, false, true, -1)
-
-                        if IsControlJustPressed(0, 38) then -- INPUT_CONTEXT (E)
-                            Nyx.Logistics.StartHarvesting(nodeId, node)
-                        end
-                    end
-                end
             end
         end
 
-        if nearNode or Nyx.Logistics.IsHarvesting then
-            Wait(0)
-        else
-            Wait(500)
-        end
+        Wait(sleep)
     end
 end)
 
@@ -91,7 +108,7 @@ end
 
 -- Real-time Node Reserve Update Broadcast Listener
 RegisterNetEvent("nyx:logistics:client:nodeUpdated", function(nodeId, currentReserve, maxReserve)
-    local reg = Nyx.Logistics.Nodes.Registry[nodeId]
+    local reg = Nyx.Logistics.Nodes.Registry and Nyx.Logistics.Nodes.Registry[nodeId]
     if reg then
         reg.currentReserve = currentReserve
     end

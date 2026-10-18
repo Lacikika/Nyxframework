@@ -42,6 +42,16 @@ Config.DropZOffset = -0.95         -- Vertical placement correction to sit flush
 -- Degradation & Decay Engine
 Config.DecayInterval = 300 -- 5 minutes per decay evaluation tick
 
+-- World Item Hologram Placement
+Config.Placement = {
+    MaxDistance = 6.0,          -- Max placement raycast distance in meters
+    MinDistance = 0.5,          -- Minimum placement distance
+    RotationStep = 5.0,         -- Rotation delta in degrees per scroll wheel notch
+    FineRotationStep = 1.0,     -- Fine rotation delta with Shift held
+    HologramAlpha = 180,        -- Ghost entity translucency alpha (0-255)
+    GroundSnapZ = -0.95         -- Vertical placement correction to sit flush on terrain
+}
+
 -- Keybinds & Interaction
 Config.OpenInventoryKey = "TAB"
 Config.OpenInventoryCommand = "inventory"

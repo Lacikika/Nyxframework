@@ -1317,6 +1317,62 @@ html, body {
 }
 
 /* ==========================================================================
+   7B. ZERO-PACKET WORLD ITEM PLACEMENT HUD
+   ========================================================================== */
+.placement-hud {
+    position: fixed;
+    bottom: 45px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(12, 15, 22, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 10px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    z-index: 500;
+    pointer-events: none;
+    user-select: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+    animation: fadeIn 0.15s ease-out;
+}
+
+.placement-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--accent-cyan);
+}
+
+.placement-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+}
+
+.placement-controls .control-key {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text-main);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.placement-controls .control-divider {
+    color: var(--text-muted);
+}
+
+/* ==========================================================================
    8. DESKTOP BROWSER DEV MODE CONTROLS
    ========================================================================== */
 #dev-mode-bar {

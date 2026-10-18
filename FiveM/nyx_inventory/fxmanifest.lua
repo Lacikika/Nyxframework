@@ -13,6 +13,7 @@ dependencies {
 }
 
 shared_scripts {
+    '@nyx_core/shared/math.lua',
     'config.lua',
     'shared/items.lua'
 }
@@ -28,6 +29,7 @@ server_scripts {
 }
 
 client_scripts {
+    'client/placement.lua',
     'client/drops.lua',
     'client/main.lua',
     'client/exports.lua'
