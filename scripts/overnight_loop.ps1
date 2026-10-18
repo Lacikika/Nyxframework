@@ -57,6 +57,11 @@ Write-Host " Log File   : $LogFile" -ForegroundColor Gray
 Write-Host " Stop Signal: Create a file named 'STOP_LOOP' to exit gracefully" -ForegroundColor Gray
 Write-Host "================================================================`n" -ForegroundColor Cyan
 
+function Write-Log {
+    param([string]$Text)
+    $Text | Out-File -FilePath $LogFile -Append -Encoding utf8
+}
+
 $CycleCount = 0
 
 while ($true) {
@@ -71,27 +76,27 @@ while ($true) {
     $Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $Header = "[$Timestamp] [Cycle $CycleCount] >>> Starting Agent Iteration <<<"
     Write-Host $Header -ForegroundColor Yellow
-    Add-Content -Path $LogFile -Value "`n$Header"
+    Write-Log "`n$Header"
 
     # 1. Run Agent Headless
     $AgentExitCode = 0
     if ($CustomAgentCommand) {
-        Invoke-Expression "$CustomAgentCommand" *>> $LogFile
+        Invoke-Expression "$CustomAgentCommand" 2>&1 | Out-File -FilePath $LogFile -Append -Encoding utf8
         $AgentExitCode = $LASTEXITCODE
     } elseif ($AgentExecutable -like "*agy*") {
         # Run agy in headless print mode with auto-approvals
-        & $AgentExecutable --print $AgentPrompt --dangerously-skip-permissions --mode auto *>> $LogFile
+        & $AgentExecutable --print $AgentPrompt --dangerously-skip-permissions --mode auto 2>&1 | Out-File -FilePath $LogFile -Append -Encoding utf8
         $AgentExitCode = $LASTEXITCODE
     } else {
         # Generic fallback
-        & $AgentExecutable --headless --message $AgentPrompt *>> $LogFile
+        & $AgentExecutable --headless --message $AgentPrompt 2>&1 | Out-File -FilePath $LogFile -Append -Encoding utf8
         $AgentExitCode = $LASTEXITCODE
     }
 
     if ($AgentExitCode -ne 0) {
         $ErrMsg = "[$Timestamp] Agent process exited with code $AgentExitCode. Stopping loop (possible quota, token limit, or runtime error)."
         Write-Host $ErrMsg -ForegroundColor Red
-        Add-Content -Path $LogFile -Value $ErrMsg
+        Write-Log $ErrMsg
         break
     }
 
@@ -99,7 +104,7 @@ while ($true) {
     Write-Host "[$Timestamp] Running automated validation checks..." -ForegroundColor Cyan
     $VerifyOutput = & powershell -ExecutionPolicy Bypass -File "$PSScriptRoot\verify.ps1" 2>&1
     $VerifyExit = $LASTEXITCODE
-    $VerifyOutput | Out-File -Append -FilePath $LogFile
+    $VerifyOutput | Out-File -FilePath $LogFile -Append -Encoding utf8
 
     if ($VerifyExit -eq 0) {
         Write-Host "[$Timestamp] Verification PASSED!" -ForegroundColor Green
@@ -110,24 +115,24 @@ while ($true) {
             Write-Host "[$Timestamp] Committing verified changes..." -ForegroundColor Green
             git add -A
             $CommitMsg = "autonomous: feature iteration $Timestamp (cycle $CycleCount)"
-            git commit -m $CommitMsg *>> $LogFile
+            git commit -m $CommitMsg 2>&1 | Out-File -FilePath $LogFile -Append -Encoding utf8
 
             # Attempt push if remote is configured
             $HasRemote = git remote
             if ($HasRemote) {
                 Write-Host "[$Timestamp] Pushing to remote branch $BranchName..." -ForegroundColor Gray
-                git push origin $BranchName *>> $LogFile 2>&1
+                git push origin $BranchName 2>&1 | Out-File -FilePath $LogFile -Append -Encoding utf8
             }
-            Add-Content -Path $LogFile -Value "[$Timestamp] Successfully committed: $CommitMsg"
+            Write-Log "[$Timestamp] Successfully committed: $CommitMsg"
         } else {
             Write-Host "[$Timestamp] Verification passed, but no working tree modifications detected." -ForegroundColor Gray
-            Add-Content -Path $LogFile -Value "[$Timestamp] Cycle finished with no file changes."
+            Write-Log "[$Timestamp] Cycle finished with no file changes."
         }
     } else {
         Write-Host "[$Timestamp] Verification FAILED! Rolling back broken changes..." -ForegroundColor Red
-        Add-Content -Path $LogFile -Value "[$Timestamp] [ROLLBACK] Verification failed. Reverting dirty working tree..."
-        git reset --hard HEAD *>> $LogFile
-        git clean -fd *>> $LogFile
+        Write-Log "[$Timestamp] [ROLLBACK] Verification failed. Reverting dirty working tree..."
+        git reset --hard HEAD 2>&1 | Out-File -FilePath $LogFile -Append -Encoding utf8
+        git clean -fd 2>&1 | Out-File -FilePath $LogFile -Append -Encoding utf8
         Write-Host "[$Timestamp] Working tree reset to clean HEAD." -ForegroundColor Yellow
     }
 
