@@ -240,3 +240,65 @@ exports("EvaluateAlarmStatus", function(hasAlarm, isPowered, hasBackupGen, isDoo
     return Nyx.Sabotage.EvaluateAlarmStatus(hasAlarm, isPowered, hasBackupGen, isDoorBreached)
 end)
 
+-- Hospital Beds & Clinical Triage Recovery
+exports("GetHospitalBed", function(bedId)
+    local bed = Nyx.Services.HospitalBeds and Nyx.Services.HospitalBeds[bedId]
+    return bed and Nyx.HospitalBeds.FormatBedSummary(bed) or nil
+end)
+
+exports("GetHospitalBeds", function(hospitalId)
+    local results = {}
+    if Nyx.Services.HospitalBeds then
+        for _, bed in pairs(Nyx.Services.HospitalBeds) do
+            if not hospitalId or bed.hospital_id == hospitalId then
+                table.insert(results, Nyx.HospitalBeds.FormatBedSummary(bed))
+            end
+        end
+    end
+    return results
+end)
+
+exports("AdmitToHospitalBed", function(bedId, patientSrc)
+    return Nyx.Services.AdmitPatientToBed(bedId, patientSrc)
+end)
+
+exports("DischargeFromHospitalBed", function(bedId, reason)
+    return Nyx.Services.DischargePatientFromBed(bedId, reason)
+end)
+
+exports("SanitizeHospitalBed", function(src, bedId, itemKey)
+    return Nyx.Services.SanitizeBed(src, bedId, itemKey)
+end)
+
+exports("AdministerHospitalBedTreatment", function(bedId, item)
+    return Nyx.Services.AdministerBedTreatment(bedId, item)
+end)
+
+exports("GetPlayerOccupiedBed", function(src)
+    return Nyx.Services.OccupiedBedSources and Nyx.Services.OccupiedBedSources[src] or nil
+end)
+
+-- Chemical & Pharmaceutical Synthesis Laboratories
+exports("GetChemicalLab", function(labId)
+    local lab = Nyx.Services.ChemicalLabs and Nyx.Services.ChemicalLabs[labId]
+    return lab and Nyx.ChemicalLabs.FormatLabDisplay(lab) or nil
+end)
+
+exports("GetChemicalLabs", function()
+    local results = {}
+    if Nyx.Services.ChemicalLabs then
+        for _, lab in pairs(Nyx.Services.ChemicalLabs) do
+            table.insert(results, Nyx.ChemicalLabs.FormatLabDisplay(lab))
+        end
+    end
+    return results
+end)
+
+exports("StartChemicalSynthesis", function(src, labId, recipeKey, quantity)
+    return Nyx.Services.StartChemicalSynthesis(src, labId, recipeKey, quantity)
+end)
+
+exports("SterilizeChemicalLab", function(src, labId)
+    return Nyx.Services.StartLabSterilization(src, labId)
+end)
+

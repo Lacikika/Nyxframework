@@ -525,6 +525,11 @@ Nyx.RPC.Register("logistics:deliverContract", function(src, payload)
         targetShelf.current_price = newPrice
         MySQL.prepare("UPDATE `nyx_logistics_shelves` SET `current_price` = ? WHERE `inventory_id` = ?", { newPrice, destInvId })
         TriggerClientEvent("nyx:logistics:client:shelfUpdated", -1, targetShelf.id or destInvId, newPrice, newStock, targetShelf.zone_id, newRatio)
+
+        -- Synchronize physical shelf prop visual state (swaps back to stocked_model if restocked from 0)
+        if Nyx.Logistics.NotifyShelfStockChanged then
+            Nyx.Logistics.NotifyShelfStockChanged(targetShelf.id or destInvId, newStock, "DELIVERY_FULFILLED", player.citizenId, newPrice, 0.0)
+        end
     end
 
     -- Notify medical services if destination is a hospital clinical stash

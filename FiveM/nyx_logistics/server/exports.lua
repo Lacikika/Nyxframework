@@ -138,3 +138,40 @@ exports("BookHaulerDispatch", function(src, payload)
     return Nyx.Logistics.BookHaulerDispatch and Nyx.Logistics.BookHaulerDispatch(src, payload)
 end)
 
+-- Physical Retail Shelves & In-World Point of Sale Displays
+exports("GetRetailShelf", function(shelfId)
+    local s = Nyx.Logistics.RetailShelves and Nyx.Logistics.RetailShelves[shelfId]
+    if not s then return nil end
+    local stock = exports['nyx_inventory']:GetItemCount(s.inventory_id, s.item_id)
+    return Nyx.RetailShelves.FormatShelfDisplay(s, stock, s.current_price)
+end)
+
+exports("GetRetailShelves", function()
+    local list = {}
+    if Nyx.Logistics.RetailShelves then
+        for _, s in pairs(Nyx.Logistics.RetailShelves) do
+            local stock = exports['nyx_inventory']:GetItemCount(s.inventory_id, s.item_id)
+            list[#list + 1] = Nyx.RetailShelves.FormatShelfDisplay(s, stock, s.current_price)
+        end
+    end
+    return list
+end)
+
+exports("RestockRetailShelf", function(src, shelfId, quantity)
+    return Nyx.Logistics.RestockShelf and Nyx.Logistics.RestockShelf(src, shelfId, quantity)
+end)
+
+exports("GetShelfVisualState", function(shelfId)
+    local s = Nyx.Logistics.RetailShelves and Nyx.Logistics.RetailShelves[shelfId]
+    if not s then return nil end
+    local stock = exports['nyx_inventory']:GetItemCount(s.inventory_id, s.item_id)
+    local model = Nyx.RetailShelves.ResolveShelfPropModel(s, stock)
+    local state = Nyx.RetailShelves.GetFullnessState(stock, s.target_capacity)
+    return {
+        shelfId = shelfId,
+        stock = stock,
+        activeModel = model,
+        fullnessState = state
+    }
+end)
+

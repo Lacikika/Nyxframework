@@ -51,3 +51,85 @@ exports("PayUtilityBill", function(meterId, amount, cb)
         end, meterId, amount)
     end
 end)
+
+-- Hospital Beds & Clinical Triage Recovery Client Exports
+exports("GetCurrentHospitalBed", function()
+    return Nyx.Services and Nyx.Services.CurrentBed or nil
+end)
+
+exports("GetNearbyHospitalBeds", function(maxDist)
+    return Nyx.Services and Nyx.Services.GetNearbyBeds and Nyx.Services.GetNearbyBeds(maxDist) or {}
+end)
+
+exports("AdmitToNearbyHospitalBed", function()
+    local nearby = Nyx.Services and Nyx.Services.GetNearbyBeds and Nyx.Services.GetNearbyBeds(3.0) or {}
+    if #nearby > 0 then
+        local targetBed = nearby[1].bed
+        Nyx.Services.AdmitToBedClient(targetBed.bed_id or targetBed.bedId)
+        return true
+    end
+    return false
+end)
+
+exports("ExitCurrentHospitalBed", function()
+    if Nyx.Services and Nyx.Services.DischargeCurrentBedClient then
+        Nyx.Services.DischargeCurrentBedClient()
+        return true
+    end
+    return false
+end)
+
+exports("SanitizeHospitalBed", function(bedId, itemKey)
+    if Nyx.Services and Nyx.Services.SanitizeBedClient then
+        Nyx.Services.SanitizeBedClient(bedId, itemKey)
+        return true
+    end
+    return false
+end)
+
+-- Chemical & Pharmaceutical Synthesis Laboratories Client Exports
+exports("GetClosestChemicalLab", function(maxDist)
+    maxDist = maxDist or 50.0
+    local ped = PlayerPedId()
+    local pCoords = GetEntityCoords(ped)
+    local closestLab = nil
+    local closestDist = maxDist
+
+    local knownPoints = {
+        ['chemlab_humane_biotech'] = vector3(3538.5, 3660.2, 28.1),
+        ['chemlab_cypress_refinery'] = vector3(922.5, -2148.0, 30.5),
+        ['chemlab_pillbox_pharmacy'] = vector3(356.2, -598.4, 43.3),
+        ['chemlab_sandy_lab'] = vector3(1852.3, 3680.1, 34.2)
+    }
+
+    for labId, coords in pairs(knownPoints) do
+        local dist = #(pCoords - coords)
+        if dist <= closestDist then
+            closestDist = dist
+            closestLab = { labId = labId, coords = coords, distance = dist }
+        end
+    end
+    return closestLab
+end)
+
+exports("GetNearbyChemicalLabs", function(maxDist)
+    maxDist = maxDist or 100.0
+    local ped = PlayerPedId()
+    local pCoords = GetEntityCoords(ped)
+    local results = {}
+
+    local knownPoints = {
+        ['chemlab_humane_biotech'] = vector3(3538.5, 3660.2, 28.1),
+        ['chemlab_cypress_refinery'] = vector3(922.5, -2148.0, 30.5),
+        ['chemlab_pillbox_pharmacy'] = vector3(356.2, -598.4, 43.3),
+        ['chemlab_sandy_lab'] = vector3(1852.3, 3680.1, 34.2)
+    }
+
+    for labId, coords in pairs(knownPoints) do
+        local dist = #(pCoords - coords)
+        if dist <= maxDist then
+            table.insert(results, { labId = labId, coords = coords, distance = dist })
+        end
+    end
+    return results
+end)

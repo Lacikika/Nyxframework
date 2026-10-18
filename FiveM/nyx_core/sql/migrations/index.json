@@ -58,5 +58,8 @@
   "057_auditable_public_treasury_ledger_and_department_monitor.sql",
   "058_commercial_real_estate_leasing_and_storefront_cycles.sql",
   "059_dynamic_speed_limits_statutory_laws_and_mdt_overlays.sql",
-  "060_organizational_warehousing_and_storage_networks.sql"
+  "060_organizational_warehousing_and_storage_networks.sql",
+  "061_hospital_bed_maintenance_and_clinical_recovery.sql",
+  "062_point_of_sale_physical_stocking_and_empty_shelf_displays.sql",
+  "063_pharmaceutical_refining_and_player_chemical_labs.sql"
 ]

@@ -216,6 +216,42 @@ Nyx.Items.Registry = {
         type = 'medical',
         description = 'Autoclaved surgical pack with hemostats, scalpel, and suturing gear.'
     },
+    ['saline_solution'] = {
+        name = 'saline_solution',
+        label = 'Purified Isotonic Saline IV',
+        weight = 500,
+        stackable = true,
+        maxStack = 10,
+        type = 'medical',
+        description = 'Sterile 0.9% sodium chloride isotonic solution for intravenous resuscitation and medication delivery.'
+    },
+    ['item_disinfectant'] = {
+        name = 'item_disinfectant',
+        label = 'Clinical Hospital Disinfectant',
+        weight = 800,
+        stackable = true,
+        maxStack = 10,
+        type = 'medical',
+        description = 'Hospital-grade bactericidal and virucidal surface sanitizer for medical beds and surgical suites.'
+    },
+    ['clean_linens'] = {
+        name = 'clean_linens',
+        label = 'Sterilized Hospital Bed Linens',
+        weight = 1200,
+        stackable = true,
+        maxStack = 5,
+        type = 'medical',
+        description = 'Autoclaved hypoallergenic cotton bed linens for maintaining clinical triage recovery beds.'
+    },
+    ['bleach'] = {
+        name = 'bleach',
+        label = 'Industrial Chemical Bleach (5L)',
+        weight = 2500,
+        stackable = true,
+        maxStack = 5,
+        type = 'utility',
+        description = 'High-strength sodium hypochlorite solution for industrial sterilization and deep disinfection.'
+    },
     ['bandage_sterile'] = {
         name = 'bandage_sterile',
         label = 'Sterile Pressure Bandage',
@@ -341,6 +377,33 @@ Nyx.Items.Registry = {
         maxStack = 20,
         type = 'material',
         description = 'Heavy-grade milled timber planks and lumber studs for civic and industrial assembly.'
+    },
+    ['raw_saline_brine'] = {
+        name = 'raw_saline_brine',
+        label = 'Raw Saline Mineral Brine',
+        weight = 1000,
+        stackable = true,
+        maxStack = 20,
+        type = 'material',
+        description = 'Concentrated mineral salt water harvested from coastal estuaries and subterranean saline aquifers.'
+    },
+    ['organic_compounds'] = {
+        name = 'organic_compounds',
+        label = 'Medicinal Organic Compounds',
+        weight = 400,
+        stackable = true,
+        maxStack = 50,
+        type = 'material',
+        description = 'Extracted botanical alkaloids and active organic biological compounds for pharmaceutical synthesis.'
+    },
+    ['chemical_precursors'] = {
+        name = 'chemical_precursors',
+        label = 'Petrochemical & Sulfur Precursors',
+        weight = 600,
+        stackable = true,
+        maxStack = 50,
+        type = 'material',
+        description = 'Purified chemical reagents and petrochemical feedstocks required for synthetic drug compounding.'
     },
     ['civic_license_plate'] = {
         name = 'civic_license_plate',
@@ -880,6 +943,27 @@ function Nyx.Items.CreateDefaultMetadata(name, extra)
             meta.destinationVault = (type(extra) == "table" and extra.destinationVault) or "vault:pacific_standard"
             meta.tamperState = (type(extra) == "table" and extra.tamperState) or "sealed"
             meta.dispatchedAt = os.time()
+        elseif item.name == 'saline_solution' then
+            meta.sterile = true
+            meta.osmolarity = 308
+            meta.batchNumber = (type(extra) == "table" and extra.batchNumber) or string.format("SAL-%05d", math.random(10000, 99999))
+            meta.synthesizedAt = os.time()
+        elseif item.name == 'med_plasma' then
+            meta.sterile = true
+            meta.bloodType = (type(extra) == "table" and extra.bloodType) or "O-Universal"
+            meta.batchNumber = (type(extra) == "table" and extra.batchNumber) or string.format("PLZ-%05d", math.random(10000, 99999))
+            meta.synthesizedAt = os.time()
+        elseif item.name == 'med_surgical_pack' then
+            meta.sterile = true
+            meta.autoclavedAt = os.time()
+            meta.facility = (type(extra) == "table" and extra.facility) or "chemlab_humane_biotech"
+        elseif item.name == 'item_disinfectant' then
+            meta.sterility = 100.0
+            meta.concentration = "0.5% Chlorhexidine"
+            meta.batchNumber = (type(extra) == "table" and extra.batchNumber) or string.format("DSF-%05d", math.random(10000, 99999))
+        elseif item.name == 'clean_linens' then
+            meta.sanitizedAt = os.time()
+            meta.threadCount = 300
         elseif item.name == 'cash_transit_manifest' then
             meta.manifestUuid = (type(extra) == "table" and extra.manifestUuid) or string.format("MNF-CIT-%06d", math.random(100000, 999999))
             meta.boxUuid = (type(extra) == "table" and extra.boxUuid) or "BOX-CIT-000000"

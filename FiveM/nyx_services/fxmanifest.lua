@@ -20,7 +20,9 @@ shared_scripts {
     'shared/medical.lua',
     'shared/agriculture.lua',
     'shared/sabotage.lua',
-    'shared/metering.lua'
+    'shared/metering.lua',
+    'shared/hospital_beds.lua',
+    'shared/chemical_labs.lua'
 }
 
 server_scripts {
@@ -30,6 +32,8 @@ server_scripts {
     'server/billing.lua',
     'server/medical.lua',
     'server/trauma.lua',
+    'server/beds.lua',
+    'server/chemlabs.lua',
     'server/agriculture.lua',
     'server/repair_stations.lua',
     'server/main.lua',
@@ -43,6 +47,8 @@ client_scripts {
     'client/metering.lua',
     'client/repair_stations.lua',
     'client/trauma.lua',
+    'client/beds.lua',
+    'client/chemlabs.lua',
     'client/agriculture.lua',
     'client/main.lua',
     'client/exports.lua'

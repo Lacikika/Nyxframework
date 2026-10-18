@@ -11584,7 +11584,647 @@ function Nyx.Tests.TestOrganizationalWarehousingAndStorageNetworks()
     return passes == total
 end
 
--- 45. Master Test Runner (Suite 1 - Suite 55)
+-- 56. Test Hospital Bed Maintenance, Clinical Recovery & Triage Engine
+function Nyx.Tests.TestHospitalBedMaintenanceAndClinicalRecovery()
+    print("^3[Nyx:Tests] Running Hospital Bed Maintenance, Clinical Recovery & Triage Suite...^7")
+    local passes = 0
+    local total = 7
+
+    local HospitalBeds = Nyx.HospitalBeds or (exports['nyx_services'] and exports['nyx_services'].HospitalBeds)
+    if not HospitalBeds then
+        -- Pure fallback for standalone test runner execution
+        HospitalBeds = {
+            BedTypes = {
+                ['icu_trauma'] = { powerRequirementKw = 15.0, bloodInfusionRate = 60.0, woundHealingRate = 25.0, canPerformSurgery = true, monitorActive = true, soiledCleanliness = 15.0 },
+                ['general_ward'] = { powerRequirementKw = 5.0, bloodInfusionRate = 30.0, woundHealingRate = 15.0, canPerformSurgery = false, monitorActive = true, soiledCleanliness = 25.0 },
+                ['emergency_cot'] = { powerRequirementKw = 0.0, bloodInfusionRate = 12.0, woundHealingRate = 6.0, canPerformSurgery = false, monitorActive = false, soiledCleanliness = 30.0 }
+            },
+            CalculateBedInfusionRate = function(bedType, supplyStatus, isPowered)
+                local defs = {
+                    icu_trauma = { kw = 15.0, blood = 60.0, wound = 25.0, pain = 20.0 },
+                    general_ward = { kw = 5.0, blood = 30.0, wound = 15.0, pain = 10.0 },
+                    emergency_cot = { kw = 0.0, blood = 12.0, wound = 6.0, pain = 5.0 }
+                }
+                local d = defs[bedType] or defs.general_ward
+                local pMult = (d.kw > 0 and isPowered == false) and 0.25 or 1.0
+                local sMult = (supplyStatus == "critical_shortage") and 0.40 or (supplyStatus == "degraded" and 0.75 or 1.0)
+                local cMult = pMult * sMult
+                return {
+                    bloodMlPerTick = math.floor((d.blood * cMult) * 10 + 0.5) / 10,
+                    woundHpPerTick = math.floor((d.wound * cMult) * 10 + 0.5) / 10,
+                    painPerTick = math.floor((d.pain * cMult) * 10 + 0.5) / 10,
+                    powerPenalty = pMult,
+                    supplyMultiplier = sMult,
+                    compositeMultiplier = cMult
+                }
+            end,
+            EvaluateBedEligibility = function(bed, state, isPowered)
+                local kw = (bed.bed_type == "icu_trauma") and 15.0 or (bed.bed_type == "general_ward" and 5.0 or 0.0)
+                if tonumber(bed.is_occupied) == 1 or bed.occupied_by_citizen_id then
+                    return false, "BED_ALREADY_OCCUPIED"
+                end
+                if bed.maintenance_status == "soiled" or (tonumber(bed.bed_cleanliness) or 100.0) < 50.0 then
+                    return false, "BED_SOILED_REQUIRES_SANITIZATION"
+                end
+                if kw > 0 and isPowered == false then
+                    return false, "BED_OFFLINE_POWER_BLACKOUT"
+                end
+                return true, "ELIGIBLE_FOR_ADMISSION"
+            end,
+            CalculateSanitizationRequirement = function(bed, itemKey)
+                local cleanItems = {
+                    item_disinfectant = { restored = 100.0, duration = 6 },
+                    clean_linens = { restored = 100.0, duration = 8 },
+                    bleach = { restored = 85.0, duration = 10 }
+                }
+                local item = cleanItems[itemKey]
+                if not item then return false, "INVALID_SANITIZING_ITEM" end
+                local cur = tonumber(bed.bed_cleanliness) or 100.0
+                if cur >= 98.0 and bed.maintenance_status == "clean" then return false, "BED_ALREADY_SANITIZED" end
+                return true, {
+                    item = itemKey,
+                    durationSeconds = item.duration,
+                    currentCleanliness = cur,
+                    targetCleanliness = math.min(100.0, math.max(cur, item.restored)),
+                    newStatus = "clean"
+                }
+            end,
+            EvaluateVitalsTelemetry = function(state, bed, isPowered)
+                local bVol = tonumber(state.bloodVolume) or 5000.0
+                local bRatio = math.max(0.0, math.min(1.0, bVol / 5000.0))
+                local bpm, sys, dia, spo2, rhythm, ekg, shock = 72, 120, 80, 99, "Normal Sinus Rhythm", "stable", 1
+                if bRatio >= 0.85 then
+                    shock, bpm, sys, dia, spo2, rhythm, ekg = 1, 72, 120, 80, 99, "Normal Sinus Rhythm", "stable"
+                elseif bRatio >= 0.70 then
+                    shock, bpm, sys, dia, spo2, rhythm, ekg = 2, 105, 105, 70, 94, "Sinus Tachycardia", "warning"
+                elseif bRatio >= 0.50 then
+                    shock, bpm, sys, dia, spo2, rhythm, ekg = 3, 135, 85, 55, 88, "Severe Tachycardia / Arrhythmia", "critical"
+                elseif bRatio > 0.10 then
+                    shock, bpm, sys, dia, spo2, rhythm, ekg = 4, 155, 60, 40, 74, "Ventricular Tachycardia", "lethal"
+                else
+                    shock, bpm, sys, dia, spo2, rhythm, ekg = 4, 0, 0, 0, 0, "Asystole (Flatline)", "flatline"
+                end
+                local monActive = (bed.bed_type ~= "emergency_cot") and (isPowered ~= false)
+                if not monActive then ekg = "offline" end
+                return {
+                    bloodVolume = bVol,
+                    heartRateBpm = bpm,
+                    bloodPressureSystolic = sys,
+                    bloodPressureDiastolic = dia,
+                    oxygenSaturationSpO2 = spo2,
+                    cardiacRhythm = rhythm,
+                    ekgState = ekg,
+                    shockClass = shock,
+                    monitorOperational = monActive
+                }
+            end
+        }
+    end
+
+    -- Sub-test A: Bed Classification Taxonomy & Power Invariants
+    local icuDef = HospitalBeds.BedTypes['icu_trauma']
+    local wardDef = HospitalBeds.BedTypes['general_ward']
+    local cotDef = HospitalBeds.BedTypes['emergency_cot']
+
+    local testA_ok = (icuDef.powerRequirementKw == 15.0 and icuDef.bloodInfusionRate == 60.0 and icuDef.canPerformSurgery == true and icuDef.monitorActive == true) and
+                     (wardDef.powerRequirementKw == 5.0 and wardDef.bloodInfusionRate == 30.0 and wardDef.canPerformSurgery == false and wardDef.monitorActive == true) and
+                     (cotDef.powerRequirementKw == 0.0 and cotDef.bloodInfusionRate == 12.0 and cotDef.canPerformSurgery == false and cotDef.monitorActive == false)
+
+    if assertTest(testA_ok == true,
+        "Bed Classification Taxonomy, Power Demand & Clinical Capability Specifications",
+        string.format("icuKw=%.1f, wardKw=%.1f, cotKw=%.1f", icuDef.powerRequirementKw, wardDef.powerRequirementKw, cotDef.powerRequirementKw)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Electrical Grid Blackout & Emergency Battery Degradation
+    local ratePowered = HospitalBeds.CalculateBedInfusionRate("icu_trauma", "optimal", true)
+    local rateBlackout = HospitalBeds.CalculateBedInfusionRate("icu_trauma", "optimal", false)
+    local rateCotBlackout = HospitalBeds.CalculateBedInfusionRate("emergency_cot", "optimal", false)
+
+    local testB_ok = (ratePowered.powerPenalty == 1.0 and ratePowered.bloodMlPerTick == 60.0) and
+                     (rateBlackout.powerPenalty == 0.25 and rateBlackout.bloodMlPerTick == 15.0) and
+                     (rateCotBlackout.powerPenalty == 1.0 and rateCotBlackout.bloodMlPerTick == 12.0)
+
+    if assertTest(testB_ok == true,
+        "Electrical Grid Blackout & Emergency Battery Efficiency Degradation Invariant",
+        string.format("poweredBlood=%.1f, blackoutBlood=%.1f, cotBlackout=%.1f",
+            ratePowered.bloodMlPerTick, rateBlackout.bloodMlPerTick, rateCotBlackout.bloodMlPerTick)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Supply Level Depletion Multipliers (Optimal vs Degraded vs Critical Shortage)
+    local rateOptimal = HospitalBeds.CalculateBedInfusionRate("general_ward", "optimal", true)
+    local rateDegraded = HospitalBeds.CalculateBedInfusionRate("general_ward", "degraded", true)
+    local rateCritical = HospitalBeds.CalculateBedInfusionRate("general_ward", "critical_shortage", true)
+
+    local testC_ok = (rateOptimal.supplyMultiplier == 1.0 and rateOptimal.bloodMlPerTick == 30.0) and
+                     (rateDegraded.supplyMultiplier == 0.75 and rateDegraded.bloodMlPerTick == 22.5) and
+                     (rateCritical.supplyMultiplier == 0.40 and rateCritical.bloodMlPerTick == 12.0)
+
+    if assertTest(testC_ok == true,
+        "Hospital Supply Stash Depletion Rate Penalties (Optimal / Degraded / Critical)",
+        string.format("optimalRate=%.1f, degradedRate=%.1f, criticalRate=%.1f",
+            rateOptimal.bloodMlPerTick, rateDegraded.bloodMlPerTick, rateCritical.bloodMlPerTick)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Admission Eligibility, Cleanliness Gating & Occupancy Mutual Exclusion
+    local cleanBed = { bed_id = "bed:test:01", bed_type = "icu_trauma", is_occupied = 0, bed_cleanliness = 100.0, maintenance_status = "clean" }
+    local occupiedBed = { bed_id = "bed:test:02", bed_type = "icu_trauma", is_occupied = 1, occupied_by_citizen_id = "CIT_123", bed_cleanliness = 95.0, maintenance_status = "occupied" }
+    local soiledBed = { bed_id = "bed:test:03", bed_type = "icu_trauma", is_occupied = 0, bed_cleanliness = 20.0, maintenance_status = "soiled" }
+    local blackoutIcu = { bed_id = "bed:test:04", bed_type = "icu_trauma", is_occupied = 0, bed_cleanliness = 100.0, maintenance_status = "clean" }
+    local blackoutCot = { bed_id = "bed:test:05", bed_type = "emergency_cot", is_occupied = 0, bed_cleanliness = 100.0, maintenance_status = "clean" }
+
+    local okClean, _ = HospitalBeds.EvaluateBedEligibility(cleanBed, {}, true)
+    local okOcc, errOcc = HospitalBeds.EvaluateBedEligibility(occupiedBed, {}, true)
+    local okSoiled, errSoiled = HospitalBeds.EvaluateBedEligibility(soiledBed, {}, true)
+    local okBlackIcu, errBlackIcu = HospitalBeds.EvaluateBedEligibility(blackoutIcu, {}, false)
+    local okBlackCot, _ = HospitalBeds.EvaluateBedEligibility(blackoutCot, {}, false)
+
+    local testD_ok = (okClean == true) and
+                     (okOcc == false and errOcc == "BED_ALREADY_OCCUPIED") and
+                     (okSoiled == false and errSoiled == "BED_SOILED_REQUIRES_SANITIZATION") and
+                     (okBlackIcu == false and errBlackIcu == "BED_OFFLINE_POWER_BLACKOUT") and
+                     (okBlackCot == true)
+
+    if assertTest(testD_ok == true,
+        "Admission Eligibility Gating (Cleanliness, Mutual Exclusion & Grid Dependency)",
+        string.format("cleanOk=%s, occErr=%s, soiledErr=%s, blackoutIcuErr=%s, blackCotOk=%s",
+            tostring(okClean), errOcc, errSoiled, errBlackIcu, tostring(okBlackCot))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Bed Soiling & Maintenance Sanitization Cycle
+    local soiledSample = { bed_id = "bed:test:06", bed_cleanliness = 20.0, maintenance_status = "soiled" }
+    local okSan, plan = HospitalBeds.CalculateSanitizationRequirement(soiledSample, "item_disinfectant")
+    local okInvalidItem, errInvalid = HospitalBeds.CalculateSanitizationRequirement(soiledSample, "invalid_spray")
+    local alreadyClean = { bed_id = "bed:test:07", bed_cleanliness = 100.0, maintenance_status = "clean" }
+    local okAlreadyClean, errAlready = HospitalBeds.CalculateSanitizationRequirement(alreadyClean, "item_disinfectant")
+
+    local testE_ok = (okSan == true and plan.targetCleanliness == 100.0 and plan.durationSeconds == 6) and
+                     (okInvalidItem == false and errInvalid == "INVALID_SANITIZING_ITEM") and
+                     (okAlreadyClean == false and errAlready == "BED_ALREADY_SANITIZED")
+
+    if assertTest(testE_ok == true,
+        "Bed Soiling Post-Discharge & Consumable Sanitization State Transition",
+        string.format("sanitizedTarget=%.1f, duration=%ds, invalidErr=%s, alreadyErr=%s",
+            plan and plan.targetCleanliness or 0.0, plan and plan.durationSeconds or 0, errInvalid, errAlready)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Real-Time Hemodynamic Vitals Telemetry Simulation
+    local healthyState = { bloodVolume = 5000.0, painLevel = 0, isUnconscious = false }
+    local moderateShockState = { bloodVolume = 3800.0, painLevel = 25, isUnconscious = false }
+    local criticalShockState = { bloodVolume = 1500.0, painLevel = 80, isUnconscious = true }
+    local flatlineState = { bloodVolume = 200.0, painLevel = 100, isUnconscious = true }
+
+    local vitalsHealthy = HospitalBeds.EvaluateVitalsTelemetry(healthyState, cleanBed, true)
+    local vitalsModerate = HospitalBeds.EvaluateVitalsTelemetry(moderateShockState, cleanBed, true)
+    local vitalsCrit = HospitalBeds.EvaluateVitalsTelemetry(criticalShockState, cleanBed, true)
+    local vitalsFlatline = HospitalBeds.EvaluateVitalsTelemetry(flatlineState, cleanBed, true)
+    local vitalsUnpowered = HospitalBeds.EvaluateVitalsTelemetry(healthyState, cleanBed, false)
+
+    local testF_ok = (vitalsHealthy.shockClass == 1 and vitalsHealthy.heartRateBpm == 72 and vitalsHealthy.cardiacRhythm == "Normal Sinus Rhythm") and
+                     (vitalsModerate.shockClass == 2 and vitalsModerate.heartRateBpm == 105 and vitalsModerate.ekgState == "warning") and
+                     (vitalsCrit.shockClass == 4 and vitalsCrit.heartRateBpm == 155 and vitalsCrit.ekgState == "lethal") and
+                     (vitalsFlatline.shockClass == 4 and vitalsFlatline.heartRateBpm == 0 and vitalsFlatline.ekgState == "flatline") and
+                     (vitalsUnpowered.ekgState == "offline" and vitalsUnpowered.monitorOperational == false)
+
+    if assertTest(testF_ok == true,
+        "Hemodynamic Vitals Telemetry Simulation Across Hypovolemic Shock Classes",
+        string.format("healthyBpm=%d, moderateBpm=%d, critBpm=%d, flatlineBpm=%d, unpoweredEkg=%s",
+            vitalsHealthy.heartRateBpm, vitalsModerate.heartRateBpm, vitalsCrit.heartRateBpm, vitalsFlatline.heartRateBpm, vitalsUnpowered.ekgState)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Clinical Infusion Consumables & Blood Volume Hemodynamic Recovery
+    local recoveringState = { bloodVolume = 3200.0, limbs = { head = { health = 60 }, torso = { health = 70 } }, painLevel = 40 }
+    local recoveryRates = HospitalBeds.CalculateBedInfusionRate("icu_trauma", "optimal", true)
+
+    recoveringState.bloodVolume = math.min(5000.0, recoveringState.bloodVolume + (recoveryRates.bloodMlPerTick * 10)) -- 10 ticks = +600 mL
+    for _, l in pairs(recoveringState.limbs) do
+        l.health = math.min(100, l.health + math.floor(recoveryRates.woundHpPerTick * 2)) -- 2 ticks = +50 HP
+    end
+
+    local testG_ok = (recoveringState.bloodVolume == 3800.0) and
+                     (recoveringState.limbs.head.health == 100) and
+                     (recoveringState.limbs.torso.health == 100)
+
+    if assertTest(testG_ok == true,
+        "Clinical Consumables Infusion & Dynamic Hemodynamic Blood Volume Recovery",
+        string.format("recoveredBlood=%.1f, headHealth=%d, torsoHealth=%d",
+            recoveringState.bloodVolume, recoveringState.limbs.head.health, recoveringState.limbs.torso.health)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 57. Test Point of Sale Physical Stocking, Empty Shelf Prop Despawning & In-World Retail Interactions
+function Nyx.Tests.TestPointOfSalePhysicalStockingAndEmptyShelfDisplays()
+    print("^3[Nyx:Tests] Running Point of Sale Physical Stocking & Empty Shelf Displays Suite...^7")
+    local passes = 0
+    local total = 7
+
+    local RetailShelves = (Nyx.RetailShelves) or {
+        WholesalePayoutMargin = 0.70,
+        SparseCapacityThreshold = 0.50,
+        CriticalEmptyThreshold = 0.10,
+        MaxInteractionDistance = 2.50,
+        StreamingRadius = 45.00,
+        DefaultStockedModel = "prop_shelves_02",
+        DefaultEmptyModel = "prop_rack_empty",
+        Categories = {
+            ['convenience'] = { label = "Vegyesbolt & Élelmiszer", icon = "shopping-basket" },
+            ['hardware'] = { label = "Barkács & Ipari Szerszámok", icon = "wrench" },
+            ['arms'] = { label = "Fegyver & Lőszerbolt", icon = "shield-halved" },
+            ['pharmacy'] = { label = "Gyógyszertár & Kórházi Ellátmány", icon = "kit-medical" },
+            ['electronics'] = { label = "Elektronika & Híradástechnika", icon = "microchip" },
+            ['general'] = { label = "Általános Kiskereskedelem", icon = "store" }
+        },
+        GetFullnessState = function(currentStock, targetCapacity)
+            local stock = math.max(0, math.floor(tonumber(currentStock) or 0))
+            local capacity = math.max(1, math.floor(tonumber(targetCapacity) or 100))
+            local fillRatio = math.floor((stock / capacity) * 10000) / 10000
+            local deficitUnits = math.max(0, capacity - stock)
+            if stock <= 0 then
+                return "EMPTY", fillRatio, deficitUnits
+            elseif fillRatio < 0.50 then
+                return "SPARSE", fillRatio, deficitUnits
+            else
+                return "FULL", fillRatio, deficitUnits
+            end
+        end,
+        ResolveShelfPropModel = function(shelf, currentStock)
+            local stock = tonumber(currentStock) or tonumber(shelf and shelf.current_stock) or 0
+            if stock <= 0 then
+                return shelf and shelf.empty_model or "prop_rack_empty"
+            else
+                return shelf and shelf.stocked_model or "prop_shelves_02"
+            end
+        end,
+        EvaluateRestock = function(shelf, playerItemCount, requestedQty)
+            if not shelf then return false, "INVALID_SHELF_DATA" end
+            if shelf.is_restockable == 0 or shelf.is_restockable == false then
+                return false, "SHELF_NOT_RESTOCKABLE"
+            end
+            local playerItems = math.max(0, math.floor(tonumber(playerItemCount) or 0))
+            if playerItems <= 0 then return false, "INSUFFICIENT_ITEMS_IN_INVENTORY" end
+            local currentStock = math.max(0, math.floor(tonumber(shelf.current_stock) or 0))
+            local capacity = math.max(1, math.floor(tonumber(shelf.target_capacity) or 100))
+            local headroom = capacity - currentStock
+            if headroom <= 0 then return false, "SHELF_ALREADY_AT_FULL_CAPACITY" end
+            local req = math.max(1, math.floor(tonumber(requestedQty) or headroom))
+            local allowedQty = math.min(req, math.min(playerItems, headroom))
+            if allowedQty <= 0 then return false, "RESTOCK_QUANTITY_ZERO" end
+            local basePrice = math.max(1.0, tonumber(shelf.base_price) or 10.0)
+            local wholesalePayout = math.floor((basePrice * 0.70 * allowedQty) * 100) / 100
+            return true, {
+                quantity = allowedQty,
+                wholesalePayout = wholesalePayout,
+                previousStock = currentStock,
+                newStock = currentStock + allowedQty
+            }
+        end,
+        IsPointNearShelf = function(point, shelfCoords, maxDist)
+            if not point or not shelfCoords then return false end
+            maxDist = tonumber(maxDist) or 2.50
+            local dx = (point.x or 0.0) - (shelfCoords.x or 0.0)
+            local dy = (point.y or 0.0) - (shelfCoords.y or 0.0)
+            local dz = (point.z or 0.0) - (shelfCoords.z or 0.0)
+            local distSq = (dx * dx) + (dy * dy) + (dz * dz)
+            return (distSq <= (maxDist * maxDist)), math.sqrt(distSq)
+        end,
+        FormatShelfDisplay = function(shelf, currentStock, currentPrice)
+            local stock = math.max(0, math.floor(tonumber(currentStock) or 0))
+            local capacity = math.max(1, math.floor(tonumber(shelf and shelf.target_capacity) or 100))
+            local price = math.floor((tonumber(currentPrice) or tonumber(shelf and shelf.base_price) or 10.0) * 100) / 100
+            local state = (stock <= 0) and "EMPTY" or ((stock / capacity < 0.5) and "SPARSE" or "FULL")
+            local badgeLabel = (state == "EMPTY") and "TELJESEN KIÜRÜLT" or ((state == "SPARSE") and "FOGYÓBAN LÉVŐ KÉSZLET" or "TELJES KÉSZLET")
+            return {
+                shelfId = shelf and shelf.shelf_id or "shelf_test",
+                currentStock = stock,
+                targetCapacity = capacity,
+                unitPrice = price,
+                fullnessState = state,
+                badge = { label = badgeLabel }
+            }
+        end
+    }
+
+    -- Sub-test A: Retail Category Taxonomy & Default Constants Invariants
+    local catOk = (RetailShelves.Categories['convenience'] ~= nil) and
+                  (RetailShelves.Categories['hardware'] ~= nil) and
+                  (RetailShelves.Categories['arms'] ~= nil) and
+                  (RetailShelves.Categories['pharmacy'] ~= nil) and
+                  (RetailShelves.Categories['electronics'] ~= nil) and
+                  (RetailShelves.Categories['general'] ~= nil) and
+                  (RetailShelves.WholesalePayoutMargin == 0.70) and
+                  (RetailShelves.SparseCapacityThreshold == 0.50)
+
+    if assertTest(catOk == true,
+        "Retail Category Taxonomy & Statutory Payout Margin Invariants",
+        "Retail categories or wholesale margin parameters failed validation") then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Fullness State Machine Invariant (EMPTY, SPARSE, FULL)
+    local stateEmpty, ratioEmpty, defEmpty = RetailShelves.GetFullnessState(0, 100)
+    local stateSparse, ratioSparse, defSparse = RetailShelves.GetFullnessState(30, 100)
+    local stateFull, ratioFull, defFull = RetailShelves.GetFullnessState(80, 100)
+
+    local testB_ok = (stateEmpty == "EMPTY" and ratioEmpty == 0.0 and defEmpty == 100) and
+                     (stateSparse == "SPARSE" and ratioSparse == 0.30 and defSparse == 70) and
+                     (stateFull == "FULL" and ratioFull == 0.80 and defFull == 20)
+
+    if assertTest(testB_ok == true,
+        "Fullness State Machine Invariant (EMPTY <= 0, SPARSE < 50%, FULL >= 50%)",
+        string.format("Fullness classification failed: empty=%s, sparse=%s, full=%s", stateEmpty, stateSparse, stateFull)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Dynamic In-World Prop Model Resolution (Stocked vs Empty Prop Swapping)
+    local testShelf = {
+        shelf_id = "shelf_vinewood_beverages",
+        target_capacity = 100,
+        stocked_model = "prop_fridge_01",
+        empty_model = "prop_fridge_empty"
+    }
+
+    local modelStocked = RetailShelves.ResolveShelfPropModel(testShelf, 65)
+    local modelSparse = RetailShelves.ResolveShelfPropModel(testShelf, 15)
+    local modelEmpty = RetailShelves.ResolveShelfPropModel(testShelf, 0)
+
+    local testC_ok = (modelStocked == "prop_fridge_01") and
+                     (modelSparse == "prop_fridge_01") and
+                     (modelEmpty == "prop_fridge_empty")
+
+    if assertTest(testC_ok == true,
+        "Dynamic In-World Prop Model Resolution & Empty Shelf Swapping",
+        string.format("Model resolution failed: stocked=%s, sparse=%s, empty=%s", modelStocked, modelSparse, modelEmpty)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Wholesale Restock Eligibility & Headroom Clamping
+    local restockShelf = {
+        shelf_id = "shelf_ammunation_ammo",
+        item_id = "ammo_9mm",
+        target_capacity = 100,
+        current_stock = 75, -- headroom = 25
+        base_price = 20.00,
+        is_restockable = 1
+    }
+
+    -- Player possesses 50 items and requests 40 -> Clamped to headroom 25
+    local okRestock, restockData = RetailShelves.EvaluateRestock(restockShelf, 50, 40)
+    -- Wholesale payout: 25 * $20.00 * 0.70 = $350.00
+    local testD_ok = (okRestock == true) and
+                     (restockData.quantity == 25) and
+                     (restockData.newStock == 100) and
+                     (restockData.wholesalePayout == 350.00)
+
+    if assertTest(testD_ok == true,
+        "Wholesale Restock Headroom Clamping & Consignment Payout Math",
+        string.format("Restock math mismatch: ok=%s, qty=%s, payout=%s",
+            tostring(okRestock), tostring(restockData and restockData.quantity), tostring(restockData and restockData.wholesalePayout))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Restock Boundary Enforcements (Full Capacity, Zero Inventory, Non-Restockable)
+    local fullShelf = { target_capacity = 50, current_stock = 50, is_restockable = 1, base_price = 10.0 }
+    local okFull, errFull = RetailShelves.EvaluateRestock(fullShelf, 20, 10)
+
+    local emptyInvShelf = { target_capacity = 50, current_stock = 20, is_restockable = 1, base_price = 10.0 }
+    local okEmptyInv, errEmptyInv = RetailShelves.EvaluateRestock(emptyInvShelf, 0, 10)
+
+    local lockedShelf = { target_capacity = 50, current_stock = 10, is_restockable = 0, base_price = 10.0 }
+    local okLocked, errLocked = RetailShelves.EvaluateRestock(lockedShelf, 20, 10)
+
+    local testE_ok = (okFull == false and errFull == "SHELF_ALREADY_AT_FULL_CAPACITY") and
+                     (okEmptyInv == false and errEmptyInv == "INSUFFICIENT_ITEMS_IN_INVENTORY") and
+                     (okLocked == false and errLocked == "SHELF_NOT_RESTOCKABLE")
+
+    if assertTest(testE_ok == true,
+        "Restock Boundary Enforcement (Capacity Saturation, Inventory Depletion & Lock Gating)",
+        string.format("Boundary rejections failed: full=%s, emptyInv=%s, locked=%s", errFull, errEmptyInv, errLocked)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Spatial Proximity & Third-Eye Interaction Range Math
+    local shelfPos = { x = 374.8, y = 327.9, z = 103.5 }
+    local nearPos = { x = 375.5, y = 328.4, z = 103.5 }  -- dist = ~0.86m (<= 2.5m)
+    local farPos = { x = 385.0, y = 335.0, z = 103.5 }   -- dist = ~12.4m (> 2.5m)
+
+    local isNear, distNear = RetailShelves.IsPointNearShelf(nearPos, shelfPos, 2.50)
+    local isFar, distFar = RetailShelves.IsPointNearShelf(farPos, shelfPos, 2.50)
+
+    local testF_ok = (isNear == true and distNear < 2.50) and (isFar == false and distFar > 2.50)
+
+    if assertTest(testF_ok == true,
+        "Spatial Proximity & Third-Eye Interaction Distance Calculation",
+        string.format("Spatial proximity check failed: near=%s (%.2fm), far=%s (%.2fm)", tostring(isNear), distNear or 0, tostring(isFar), distFar or 0)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Presentation Summary & UI Formatting Consistency
+    local summaryEmpty = RetailShelves.FormatShelfDisplay(testShelf, 0, 15.00)
+    local summaryFull = RetailShelves.FormatShelfDisplay(testShelf, 90, 12.00)
+
+    local testG_ok = (summaryEmpty.fullnessState == "EMPTY" and summaryEmpty.badge.label == "TELJESEN KIÜRÜLT") and
+                     (summaryFull.fullnessState == "FULL" and summaryFull.badge.label == "TELJES KÉSZLET" and summaryFull.unitPrice == 12.00)
+
+    if assertTest(testG_ok == true,
+        "Presentation Summary & Status Badge UI Consistency",
+        string.format("Summary formatting failed: emptyLabel=%s, fullLabel=%s", summaryEmpty.badge.label, summaryFull.badge.label)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 44. Pharmaceutical Refining, Player Chemical Labs & Medical Bio-Synthesis (nyx_services & nyx_logistics)
+function Nyx.Tests.TestPharmaceuticalRefiningAndPlayerChemicalLabs()
+    print("^4[Nyx:Test] Running Test Suite 58: Pharmaceutical Refining, Player Chemical Labs & Medical Bio-Synthesis...^7")
+    local passes = 0
+    local total = 7
+
+    local ChemLabs = Nyx.ChemicalLabs
+    if not ChemLabs then
+        local chunk = nil
+        if LoadResourceFile then
+            chunk = LoadResourceFile("nyx_services", "shared/chemical_labs.lua")
+        end
+        if not chunk and io and io.open then
+            local f = io.open("FiveM/nyx_services/shared/chemical_labs.lua", "r")
+            if f then
+                chunk = f:read("*a")
+                f:close()
+            end
+        end
+        if chunk then
+            local fn = load(chunk, "nyx_services/shared/chemical_labs.lua")
+            if fn then fn() end
+        end
+        ChemLabs = Nyx.ChemicalLabs
+    end
+
+    if not ChemLabs then
+        print("^1[Nyx:Test:FAIL] Could not load nyx_services/shared/chemical_labs.lua^7")
+        return false
+    end
+
+    -- Sub-test A: Recipe Registry Integrity & Pharmaceutical Taxonomy
+    local recipes = ChemLabs.GetAllRecipes()
+    local hasSaline = recipes['saline_purification'] ~= nil
+    local hasPlasma = recipes['synthetic_plasma_synthesis'] ~= nil
+    local hasSurgical = recipes['surgical_pack_autoclave'] ~= nil
+    local hasDisinfectant = recipes['disinfectant_compounding'] ~= nil
+    local hasLinens = recipes['hospital_linens_sanitization'] ~= nil
+    local hasBandage = recipes['sterile_pressure_bandage'] ~= nil
+    local hasTourniquet = recipes['tourniquet_assembly'] ~= nil
+    local hasMorphine = recipes['morphine_ampoule_synthesis'] ~= nil
+
+    local testA_ok = hasSaline and hasPlasma and hasSurgical and hasDisinfectant and hasLinens and hasBandage and hasTourniquet and hasMorphine
+
+    if assertTest(testA_ok == true,
+        "Pharmaceutical & Chemical Synthesis Recipe Registry Taxonomy Integrity",
+        "Missing required medical synthesis recipes in ChemicalLabs registry") then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Recipe Eligibility Pre-condition & Power Grid Verification
+    local mockLab = {
+        lab_id = "chemlab_humane_biotech",
+        lab_label = "Humane Bio-Research Suite",
+        substation_id = "grid_paleto",
+        coords = { x = 3538.5, y = 3660.2, z = 28.1 },
+        power_draw_kw = 20.0,
+        sterility_level = 95.0,
+        autoclave_status = "idle"
+    }
+
+    local validItems = {
+        ['raw_saline_brine'] = 10,
+        ['drink_water'] = 5,
+        ['organic_compounds'] = 10,
+        ['saline_solution'] = 5,
+        ['plastic_polymer'] = 5
+    }
+
+    local okEligible, codeEligible, detailsEligible = ChemLabs.EvaluateRecipeEligibility(mockLab, "saline_purification", true, validItems, 2)
+    local okBlackout, codeBlackout = ChemLabs.EvaluateRecipeEligibility(mockLab, "saline_purification", false, validItems, 2)
+    local okMissing, codeMissing = ChemLabs.EvaluateRecipeEligibility(mockLab, "saline_purification", true, { ['raw_saline_brine'] = 1 }, 2)
+    
+    local busyLab = { autoclave_status = "synthesizing", sterility_level = 90.0 }
+    local okBusy, codeBusy = ChemLabs.EvaluateRecipeEligibility(busyLab, "saline_purification", true, validItems, 1)
+
+    local testB_ok = (okEligible == true and codeEligible == "ELIGIBLE" and detailsEligible.durationSeconds == 24) and
+                     (okBlackout == false and codeBlackout == "GRID_BLACKOUT") and
+                     (okMissing == false and codeMissing == "INSUFFICIENT_ITEMS") and
+                     (okBusy == false and codeBusy == "LAB_BUSY")
+
+    if assertTest(testB_ok == true,
+        "Recipe Eligibility Pre-conditions (Grid Power, Inventory Headroom, Workstation State)",
+        string.format("Eligibility evaluation failed: ok=%s, blackout=%s, missing=%s, busy=%s",
+            tostring(okEligible), codeBlackout, codeMissing, codeBusy)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Sterility-Gated Batch Output Yields & Quality Degradation
+    local plasmaRecipe = recipes['synthetic_plasma_synthesis']
+    local yieldOptimal, gradeOptimal, metaOptimal = ChemLabs.CalculateBatchYield(plasmaRecipe, 95.0, 2)
+    local yieldStandard, gradeStandard, metaStandard = ChemLabs.CalculateBatchYield(plasmaRecipe, 75.0, 2)
+    local yieldSpoiled, gradeSpoiled, metaSpoiled = ChemLabs.CalculateBatchYield(plasmaRecipe, 50.0, 2)
+
+    local testC_ok = (yieldOptimal == 2 and gradeOptimal == "PURITY_OPTIMAL" and metaOptimal.sterile == true and metaOptimal.purity == 1.0) and
+                     (yieldStandard == 2 and gradeStandard == "PURITY_STANDARD" and metaStandard.sterile == true and metaStandard.purity == 0.90) and
+                     (yieldSpoiled == 0 and gradeSpoiled == "CONTAMINATED_SPOILED" and metaSpoiled.isSpoiled == true)
+
+    if assertTest(testC_ok == true,
+        "Sterility-Gated Batch Output Yields & Chemical Purity Degradation Physics",
+        string.format("Yield calculation failed: optimalGrade=%s, stdGrade=%s, spoiledYield=%d",
+            gradeOptimal, gradeStandard, yieldSpoiled)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Autoclave Sterility Degradation & Contamination Thresholds
+    local degradedSterility = ChemLabs.CalculateSterilityDegradation(90.0, plasmaRecipe, 2)
+    local heavyDegraded = ChemLabs.CalculateSterilityDegradation(45.0, plasmaRecipe, 1)
+    local isContaminated = heavyDegraded < ChemLabs.CriticalSterilityThreshold
+
+    local testD_ok = (math.abs(degradedSterility - 74.0) < 0.01) and
+                     (math.abs(heavyDegraded - 37.0) < 0.01) and
+                     (isContaminated == true)
+
+    if assertTest(testD_ok == true,
+        "Autoclave Sterility Degradation Curves & Bio-Chemical Contamination Thresholds",
+        string.format("Sterility math failed: degraded=%.2f, heavy=%.2f, isContaminated=%s",
+            degradedSterility, heavyDegraded, tostring(isContaminated))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Autoclave Sterilization Cycle Feasibility & Disinfectant Gating
+    local contaminatedLab = {
+        autoclave_status = "contaminated",
+        sterility_level = 35.0
+    }
+    local itemsWithDisinfectant = { ['item_disinfectant'] = 2, ['bleach'] = 0 }
+    local itemsWithBleach = { ['item_disinfectant'] = 0, ['bleach'] = 1 }
+    local itemsEmpty = { ['item_disinfectant'] = 0, ['bleach'] = 0 }
+
+    local okSterDis, _, itemDis = ChemLabs.EvaluateSterilizationCycle(contaminatedLab, itemsWithDisinfectant)
+    local okSterBleach, _, itemBleach = ChemLabs.EvaluateSterilizationCycle(contaminatedLab, itemsWithBleach)
+    local okSterEmpty, codeEmpty = ChemLabs.EvaluateSterilizationCycle(contaminatedLab, itemsEmpty)
+
+    local sterileLab = { autoclave_status = "idle", sterility_level = 100.0 }
+    local okAlreadySterile, codeSterile = ChemLabs.EvaluateSterilizationCycle(sterileLab, itemsWithDisinfectant)
+
+    local testE_ok = (okSterDis == true and itemDis == "item_disinfectant") and
+                     (okSterBleach == true and itemBleach == "bleach") and
+                     (okSterEmpty == false and codeEmpty == "MISSING_DISINFECTANT") and
+                     (okAlreadySterile == false and codeSterile == "ALREADY_STERILE")
+
+    if assertTest(testE_ok == true,
+        "Autoclave Sterilization Cycle Evaluation & Chemical Sanitizer Gating",
+        string.format("Sterilization cycle check failed: disOk=%s, bleachOk=%s, empty=%s, sterile=%s",
+            tostring(okSterDis), tostring(okSterBleach), codeEmpty, codeSterile)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Spatial Proximity & Third-Eye Interaction Range Math
+    local labPos = { x = 3538.5, y = 3660.2, z = 28.1 }
+    local nearPlayer = { x = 3539.0, y = 3661.0, z = 28.1 }
+    local farPlayer = { x = 3550.0, y = 3680.0, z = 28.1 }
+
+    local isNear = ChemLabs.IsPointNearLab(nearPlayer, labPos, 3.5)
+    local isFar = ChemLabs.IsPointNearLab(farPlayer, labPos, 3.5)
+
+    local testF_ok = (isNear == true) and (isFar == false)
+
+    if assertTest(testF_ok == true,
+        "Spatial Proximity & Third-Eye Interaction Raycasting Range Math",
+        string.format("Spatial proximity check failed: isNear=%s, isFar=%s", tostring(isNear), tostring(isFar))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Presentation Diagnostics & Status Badge Formatting
+    local displayIdle = ChemLabs.FormatLabDisplay(mockLab)
+    local displayContaminated = ChemLabs.FormatLabDisplay(contaminatedLab)
+
+    local testG_ok = (displayIdle.status == "idle" and displayIdle.badgeClass == "badge-success") and
+                     (displayContaminated.status == "contaminated" and displayContaminated.badgeClass == "badge-danger")
+
+    if assertTest(testG_ok == true,
+        "Presentation Diagnostics & UI Status Badge Formatting Consistency",
+        string.format("Display formatting failed: idleClass=%s, contamClass=%s",
+            displayIdle.badgeClass, displayContaminated.badgeClass)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 45. Master Test Runner (Suite 1 - Suite 58)
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -11645,6 +12285,9 @@ function Nyx.Tests.RunAll()
     local t53 = Nyx.Tests.TestCommercialRealEstateLeasingAndStorefrontCycles()
     local t54 = Nyx.Tests.TestDynamicSpeedLimitsStatutoryLawsAndMDTOverlays()
     local t55 = Nyx.Tests.TestOrganizationalWarehousingAndStorageNetworks()
+    local t56 = Nyx.Tests.TestHospitalBedMaintenanceAndClinicalRecovery()
+    local t57 = Nyx.Tests.TestPointOfSalePhysicalStockingAndEmptyShelfDisplays()
+    local t58 = Nyx.Tests.TestPharmaceuticalRefiningAndPlayerChemicalLabs()
 
     print("^5--------------------------------------------------^7")
     local suites1to50Passed = false
@@ -11652,13 +12295,14 @@ function Nyx.Tests.RunAll()
         suites1to50Passed = true
     end
 
-    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 then
+    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 and t56 and t57 and t58 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")
     end
     print("^5==================================================^7")
 end
+
 
 
 

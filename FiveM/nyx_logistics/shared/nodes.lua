@@ -87,6 +87,45 @@ Nyx.Logistics.Nodes.Registry = {
             dict = 'amb@world_human_gardener_plant@male@base',
             name = 'base'
         }
+    },
+    ['node_humane_botanicals'] = {
+        id = 'node_humane_botanicals',
+        label = 'Humane Research Botanical Conservatory',
+        resource = 'organic_compounds',
+        maxReserve = 600,
+        regenRatePerHour = 60,
+        requiredTool = nil,
+        coords = vector3(3558.2, 3672.4, 28.1),
+        anim = {
+            dict = 'amb@world_human_gardener_plant@male@base',
+            name = 'base'
+        }
+    },
+    ['node_el_burro_petrochem'] = {
+        id = 'node_el_burro_petrochem',
+        label = 'El Burro Petrochemical Runoff Sump',
+        resource = 'chemical_precursors',
+        maxReserve = 800,
+        regenRatePerHour = 80,
+        requiredTool = nil,
+        coords = vector3(1390.5, -2080.2, 52.0),
+        anim = {
+            dict = 'anim@amb@clubhouse@tutorial@bkr_tut_ig3@',
+            name = 'machinic_loop_mechandplayer'
+        }
+    },
+    ['node_zancudo_brine'] = {
+        id = 'node_zancudo_brine',
+        label = 'Lago Zancudo Saline Mineral Aquifer',
+        resource = 'raw_saline_brine',
+        maxReserve = 1000,
+        regenRatePerHour = 100,
+        requiredTool = nil,
+        coords = vector3(-2210.4, 2775.8, 2.8),
+        anim = {
+            dict = 'amb@world_human_bum_wash@male@high@base',
+            name = 'base'
+        }
     }
 }
 

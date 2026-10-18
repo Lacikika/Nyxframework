@@ -59,9 +59,9 @@ created: 2026-09-20
 5. **Point of Sale Stocking:** Convenience stores, hardware shops, and arms dealerships function purely as stock containers. Zero stock = physical shelves display empty.
 
 ### 2.2 Elastic Item Pricing
-- [ ] Base prices dynamically calculate based on the stock-to-demand ratio within individual delivery zones:
+- [x] Base prices dynamically calculate based on the stock-to-demand ratio within individual delivery zones:
   $$\text{ItemPrice} = \text{BasePrice} \times \left(1 + \frac{\text{TargetStock} - \text{CurrentStock}}{\text{TargetStock}}\right)$$
-- [ ] Localized supply shortages visually generate freight contracts on public logistics boards for truckers.
+- [x] Localized supply shortages visually generate freight contracts on public logistics boards for truckers.
 
 ---
 
@@ -76,8 +76,8 @@ created: 2026-09-20
 - [x] **Term Limits & Recall Referendums:** Automated expiration of official powers after configurable day cycles (e.g., 30 days). If approval drops below critical margins, citizens can trigger early recall petitions.
 
 ### 3.2 Dynamic Law Creation
-- [ ] **Bill Formulation UI:** Officials author structured legislation (penal code fine maximums, speed limits, legal sales tax caps, zoning classifications).
-- [ ] **Automated Enforcement Sync:** Passing a bill instantly updates:
+- [x] **Bill Formulation UI:** Officials author structured legislation (penal code fine maximums, speed limits, legal sales tax caps, zoning classifications).
+- [x] **Automated Enforcement Sync:** Passing a bill instantly updates:
   - Mobile Data Terminal (MDT) maximum citation values and jail times.
   - In-game sales tax calculators across all registered points of sale.
   - Dispatch warning overlays for law enforcement.
@@ -91,9 +91,9 @@ created: 2026-09-20
 - [x] **Subpoenas & Public Warrants:** Judicial council members sign active warrants directly through the UI, exposing suspect tracking pings across police dispatch stations only after legal authorization.
 
 ### 4.2 Automated Civic Jury Pools
-- [ ] **Jury Summons Routing:** Random active citizens receive automated summons when a trial is scheduled.
-- [ ] **Jury Deliberation Channel:** Isolated voice and text instance accessible only to active jurors during trial deliberations.
-- [ ] **Automated Sentence Execution:** Upon jury verdict entry, the target player's fines are auto-debited and custodial sentences (prison routing, community service checkpoints) are applied instantly.
+- [x] **Jury Summons Routing:** Random active citizens receive automated summons when a trial is scheduled.
+- [x] **Jury Deliberation Channel:** Isolated voice and text instance accessible only to active jurors during trial deliberations.
+- [x] **Automated Sentence Execution:** Upon jury verdict entry, the target player's fines are auto-debited and custodial sentences (prison routing, community service checkpoints) are applied instantly.
 
 ---
 
@@ -108,10 +108,10 @@ created: 2026-09-20
          │ & Profit Splits │ │ Multi-Sig Box │ │ Access Rule │
          └─────────────────┘ └───────────────┘ └─────────────┘
 ### 5.1 Dynamic Organization Registration
-- [ ] **Staff-Free Formation:** Players draft an organizational charter, designate starting capital, and register at city hall terminals.
-- [ ] **Granular Node-Based Permissions:**
+- [x] **Staff-Free Formation:** Players draft an organizational charter, designate starting capital, and register at city hall terminals.
+- [x] **Granular Node-Based Permissions:**
   - `funds:withdraw`, `funds:deposit`, `fleet:spawn`, `property:manage`, `contract:sign`
-- [ ] **Multi-Signature Corporate Accounts:** High-tier financial withdrawals require confirmation from two or more designated signatories before execution.
+- [x] **Multi-Signature Corporate Accounts:** High-tier financial withdrawals require confirmation from two or more designated signatories before execution.
 - [x] **Shareholding & Automated Dividends:** Revenue automatically splits across member wallets based on defined equity ownership percentages.
 
 ### 5.2 Dynamic Territory & Property Charters
@@ -123,21 +123,21 @@ created: 2026-09-20
 ## 6. Civil Infrastructure & Public Works (`nyx_services`)
 
 ### 6.1 Power Grid & Resource Utility Engine
-- [ ] **Substation Management:** Power plants require continuous deliveries of fuel, solar maintenance, or grid repairs.
-- [ ] **Blackout Mechanics:** Neglected substations cut power to local neighborhood streetlights, security cameras, ATM terminals, and doorlock systems.
-- [ ] **Utility Billing:** Player properties and businesses consume metered kilowatt-hours and water volumes, billed directly to utility providers.
+- [x] **Substation Management:** Power plants require continuous deliveries of fuel, solar maintenance, or grid repairs.
+- [x] **Blackout Mechanics:** Neglected substations cut power to local neighborhood streetlights, security cameras, ATM terminals, and doorlock systems.
+- [x] **Utility Billing:** Player properties and businesses consume metered kilowatt-hours and water volumes, billed directly to utility providers.
 
 ### 6.2 Healthcare & Medical Supply Dependence
-- [ ] **Hospital Bed Maintenance:** Medical revive points require sterile surgical supplies, blood packs, and pharmaceuticals created through player chemical labs.
-- [ ] **Shortage Debuffs:** Low hospital inventories increase revival timers and disable high-end trauma treatments, incentivizing medical trade contracts.
+- [x] **Hospital Bed Maintenance:** Medical revive points require sterile surgical supplies, blood packs, and pharmaceuticals created through player chemical labs.
+- [x] **Shortage Debuffs:** Low hospital inventories increase revival timers and disable high-end trauma treatments, incentivizing medical trade contracts.
 
 ---
 
 ## 7. Media, Public Communication & Whistleblowing (`nyx_press`)
 
-- [ ] **Decentralized Broadcast Printing:** Players print physical newspapers, pamphlets, or post digital notices accessible via public newsstands and phone apps.
-- [ ] **Leak Systems & Anonymity:** Encrypted dropboxes allowing anonymous transfer of documents, balance sheets, and audio recordings to journalists.
-- [ ] **Press Freedom Enforcement:** Media accreditation granted through trade unions rather than administrative command menus.
+- [x] **Decentralized Broadcast Printing:** Players print physical newspapers, pamphlets, or post digital notices accessible via public newsstands and phone apps.
+- [x] **Leak Systems & Anonymity:** Encrypted dropboxes allowing anonymous transfer of documents, balance sheets, and audio recordings to journalists.
+- [x] **Press Freedom Enforcement:** Media accreditation granted through trade unions rather than administrative command menus.
 
 ---
 

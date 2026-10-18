@@ -229,6 +229,11 @@ Nyx.RPC.Register("logistics:buyFromShelf", function(src, shelfId, quantity)
     -- Check if shortage contract should be posted
     Nyx.Logistics.CheckShortageContract(shelf, newStock)
 
+    -- Synchronize physical shelf prop visual state (swaps to empty_model if stock == 0)
+    if Nyx.Logistics.NotifyShelfStockChanged then
+        Nyx.Logistics.NotifyShelfStockChanged(shelf.id, newStock, "PURCHASE", player.citizenId, unitPrice, 0.0)
+    end
+
     -- Broadcast price update to clients
     TriggerClientEvent("nyx:logistics:client:shelfUpdated", -1, shelf.id, newPrice, newStock, shelf.zone_id, newRatio)
 

@@ -25,6 +25,7 @@ shared_scripts {
     'shared/contracts.lua',
     'shared/warehouses.lua',
     'shared/market_monitor.lua',
+    'shared/retail_shelves.lua',
     '@nyx_factions/shared/storage_networks.lua'
 }
 
@@ -36,6 +37,7 @@ server_scripts {
     'server/facilities.lua',
     'server/pallets.lua',
     'server/shelves.lua',
+    'server/retail_shelves.lua',
     'server/contracts.lua',
     'server/warehouses.lua',
     'server/market_monitor.lua',
@@ -49,6 +51,7 @@ client_scripts {
     'client/contracts.lua',
     'client/warehouses.lua',
     'client/market_monitor.lua',
+    'client/retail_shelves.lua',
     'client/main.lua',
     'client/exports.lua'
 }

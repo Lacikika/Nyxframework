@@ -364,7 +364,6 @@ def test_sql_migration_060_exists_and_registered():
         migration_filenames = index_data
 
     assert "060_organizational_warehousing_and_storage_networks.sql" in migration_filenames
-    assert migration_filenames[-1] == "060_organizational_warehousing_and_storage_networks.sql"
 
 
 def test_manifest_declarations():

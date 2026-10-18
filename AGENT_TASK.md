@@ -123,8 +123,127 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Organizational Warehousing & Storage Networks (`nyx_factions`, `nyx_logistics` & `nyx_inventory`)**
   - **Implementation:** Decentralized warehousing infrastructure allowing player organizations to deploy, configure, and secure physical stashes, industrial workbenches, and pallet drop zones bound to customized role-based access control (RBAC) permissions within owned/leased facilities.
 
+- [x] **Feature: Point of Sale Physical Stocking, Empty Shelf Prop Despawning & In-World Retail Interactions (`nyx_logistics` & `nyx_inventory`)**
+  - **Implementation:** In-world physical retail shelves, dynamic empty shelf prop swapping/despawning when stock hits 0, manual player restocking mechanics with double-entry wholesale consignment payouts, and Third-Eye spatial interaction targets across canonical San Andreas stores.
+
+- [x] **Feature: Pharmaceutical Refining, Player Chemical Labs & Medical Bio-Synthesis (`nyx_services`, `nyx_logistics` & `nyx_inventory`)**
+  - **Implementation:** Chemical synthesis and autoclave workstations (`nyx_services_chemical_labs`), pure Lua 5.4 bio-chemical recipe compounding engine (sterile plasma, surgical packs, clinical disinfectant, linens, bandages, tourniquets, morphine), sterility degradation and contamination physics, substation electrical power grid interlocks, natural precursor harvest nodes in `nyx_logistics_nodes`, immutable regulatory audit ledger (`nyx_services_chemlab_audits`), and Third-Eye spatial interaction targets across canonical San Andreas laboratories.
+
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Pharmaceutical Refining, Player Chemical Labs & Medical Bio-Synthesis (`nyx_services`, `nyx_logistics` & `nyx_inventory`)**
+  - **Database Migration (`063_pharmaceutical_refining_and_player_chemical_labs.sql`)**:
+    - Created migration file and registered Step 63 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Mirrored migration to `FiveM/nyx_services/sql/migrations/063_pharmaceutical_refining_and_player_chemical_labs.sql`.
+    - Created `nyx_services_chemical_labs` table (`lab_id` PK, `lab_label`, `substation_id`, `coords` JSON vector3, `heading` DECIMAL 6,2, `power_draw_kw` DECIMAL 8,2, `sterility_level` DECIMAL 5,2, `autoclave_status` ENUM('idle', 'synthesizing', 'sterilizing', 'contaminated', 'offline_power'), `active_batch_recipe`, `active_batch_citizen_id`, `active_batch_start_time`, `active_batch_duration`, `active_batch_quantity`, `total_batches_produced`, `created_at`) with performance B-Tree indexes on `substation_id` and `autoclave_status`.
+    - Created `nyx_services_chemlab_audits` immutable regulatory & judicial ledger (`audit_id` PK, `audit_uuid` UNIQUE, `lab_id`, `citizen_id`, `action` ENUM('SYNTHESIS_STARTED', 'SYNTHESIS_COMPLETED', 'SYNTHESIS_ABORTED', 'STERILIZATION_CYCLE', 'CONTAMINATION_OCCURRED', 'POWER_LOST'), `recipe_key`, `inputs_consumed` JSON, `outputs_generated` JSON, `sterility_before`, `sterility_after`, `notes`, `created_at`) with indexes on `lab_id`, `citizen_id`, `created_at`.
+    - Seeded canonical chemical synthesis workstations: Humane Bio-Research Suite (`chemlab_humane_biotech`), Cypress Industrial Refinery Lab (`chemlab_cypress_refinery`), Pillbox Hill Clinical Pharmacy Lab (`chemlab_pillbox_pharmacy`), and Senora Desert Bio-Station (`chemlab_sandy_lab`).
+    - Seeded chemical precursor and botanical harvest nodes in `nyx_logistics_nodes`: `node_humane_botanicals` (`organic_compounds`), `node_el_burro_petrochem` (`chemical_precursors`), and `node_zancudo_brine` (`raw_saline_brine`).
+  - **Item Schema Registry Extensions (`FiveM/nyx_inventory/shared/items.lua`)**:
+    - Added definitions: `raw_saline_brine`, `saline_solution`, `organic_compounds`, `chemical_precursors`, `item_disinfectant`, `clean_linens`, and `bleach` with weight, stack limits, decay rates, and descriptions.
+    - Updated `CreateDefaultMetadata` to generate metadata tags (`sterile = true`, `osmolarity = 308`, `bloodType = "O-Universal"`, `concentration = "0.5% Chlorhexidine"`, `threadCount = 300`).
+  - **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_services/shared/chemical_labs.lua`)**:
+    - Defined 8 pharmaceutical compounding recipes: `saline_purification`, `synthetic_plasma_synthesis`, `surgical_pack_autoclave`, `disinfectant_compounding`, `hospital_linens_sanitization`, `sterile_pressure_bandage`, `tourniquet_assembly`, and `morphine_ampoule_synthesis`.
+    - Defined autoclave status lifecycle machine (`idle`, `synthesizing`, `sterilizing`, `contaminated`, `offline_power`).
+    - Implemented `EvaluateRecipeEligibility(lab, recipeKey, isPowered, playerItemCounts, batchQuantity)`: validates workstation idle state, regional substation power, sterility requirement thresholds, and inventory ingredient availability.
+    - Implemented `CalculateBatchYield(recipe, sterilityLevel, batchQuantity)`: models sterility-based product purity (`PURITY_OPTIMAL` with AR 99.8% grade, `PURITY_STANDARD` with USP grade, `PURITY_DEGRADED`), and bio-contamination spoliation below minimum thresholds.
+    - Implemented `CalculateSterilityDegradation(currentSterility, recipe, batchQuantity)`: models cumulative wear and contamination during synthesis runs.
+    - Implemented `EvaluateSterilizationCycle(lab, playerItemCounts)`: validates sanitization eligibility with `item_disinfectant` or `bleach`, restoring sterility to 100.0%.
+    - Implemented `IsPointNearLab(point, labCoords, maxDist)`: 3D Euclidean distance math.
+    - Implemented `FormatLabDisplay(lab)`: UI telemetry and status badge formatting.
+  - **Authoritative Server Subsystem & RPCs (`FiveM/nyx_services/server/chemlabs.lua`)**:
+    - Bootloader cache hydration (`Nyx.Services.ChemicalLabs`) from database on startup.
+    - Background 1000ms loop managing active synthesis batches, automatic yield distribution to online player inventories, sterility degradation, and power blackout interruptions.
+    - Implemented `StartChemicalSynthesis` with zero-trust distance checks (within 3.5m), substation power verification, inventory debits, and audit logging.
+    - Implemented `StartLabSterilization` with disinfectant consumption and 15-second autoclave cycle.
+    - Registered RPC endpoints: `services:getChemicalLabs`, `services:getChemicalLabDetails`, `services:startChemicalSynthesis`, and `services:startLabSterilization`.
+    - Exported public helpers in `server/exports.lua`: `GetChemicalLab`, `GetChemicalLabs`, `StartChemicalSynthesis`, `SterilizeChemicalLab`.
+  - **Client Subsystems & Spatial Interaction (`FiveM/nyx_services/client/chemlabs.lua`)**:
+    - Third-Eye spatial interaction targets (`nyx_interact`): "Gyógyszerszintézis Indítása (Bio-Chemical Synthesis)", "Autokláv Sterilizálása (Sterilize Lab)", and "Laboratóriumi Diagnosztika & Telemetria".
+    - Player commands: `/chemlabs` (telemetry of nearby labs), `/synthesize [recipe] [quantity]`, and `/sterilizelab`.
+    - Exported client helpers in `client/exports.lua`: `GetClosestChemicalLab` and `GetNearbyChemicalLabs`.
+    - Clean entity and interaction deregistration on resource stop (`onResourceStop`).
+  - **Resource Manifest & Logistics Cross-Compatibility**:
+    - Declared `shared/chemical_labs.lua`, `server/chemlabs.lua`, and `client/chemlabs.lua` in `FiveM/nyx_services/fxmanifest.lua`.
+    - Registered chemical recipes in `FiveM/nyx_logistics/shared/recipes.lua` and nodes in `FiveM/nyx_logistics/shared/nodes.lua`.
+  - **Verification & Test Coverage**:
+    - Added in-engine integration test Test 58 (`Nyx.Tests.TestPharmaceuticalRefiningAndPlayerChemicalLabs`) in `FiveM/nyx_core/server/tests.lua` (7 sub-tests) and wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_pharmaceutical_refining_and_player_chemical_labs.py` (9/9 tests passing).
+    - Full test suite: 542/542 tests passing; `scripts/validator.py` and `scripts/verify.ps1` clean across all 14 resources, 286 Lua files, and 63 migrations.
+- **[2026-10-18] Feature: Point of Sale Physical Stocking, Empty Shelf Prop Despawning & In-World Retail Interactions (`nyx_logistics` & `nyx_inventory`)**
+  - **Database Migration (`062_point_of_sale_physical_stocking_and_empty_shelf_displays.sql`)**:
+    - Created migration file and registered Step 62 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Mirrored migration to `FiveM/nyx_logistics/sql/migrations/062_point_of_sale_physical_stocking_and_empty_shelf_displays.sql`.
+    - Extended `nyx_logistics_shelves` with `coords` (JSON vector3), `heading` (DECIMAL 6,2), `shelf_category` ENUM('convenience', 'hardware', 'arms', 'pharmacy', 'electronics', 'general'), `shelf_label` (VARCHAR 64), `stocked_model` (VARCHAR 64), `empty_model` (VARCHAR 64), `display_mode` ENUM('prop_swap', 'sparse_stock', 'stocked_prop'), and `is_restockable` (TINYINT 1), with performance B-Tree indexes.
+    - Created `nyx_logistics_shelf_restock_audits` immutable audit ledger (`audit_id` PK, `audit_uuid` UNIQUE, `shelf_id`, `store_id`, `citizen_id`, `action` ENUM('RESTOCK_MANUAL', 'PURCHASE', 'STOCK_TRANSFER', 'SHELF_EMPTIED', 'SHELF_RESTOCKED'), `item_id`, `quantity`, `previous_stock`, `new_stock`, `unit_price`, `wholesale_payout`, `treasury_tx_uuid`, `notes`, `created_at`) with performance indexes.
+    - Seeded canonical retail store shelves across Los Santos & Blaine County (`shelf_vinewood_247_groceries`, `shelf_vinewood_247_beverages`, `shelf_ammunation_dt_ammo`, `shelf_sandy_hardware_parts`, `shelf_paleto_general_food`).
+  - **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_logistics/shared/retail_shelves.lua`)**:
+    - Defined statutory parameters: `WholesalePayoutMargin = 0.70`, `SparseCapacityThreshold = 0.50`, `StreamingRadius = 45.0m`, `MaxInteractionDistance = 2.5m`.
+    - Defined retail category taxonomy with localized labels, icons, and theme hex colors.
+    - Implemented `GetFullnessState(currentStock, targetCapacity)`: deterministic 3-state machine (`EMPTY`, `SPARSE`, `FULL`).
+    - Implemented `ResolveShelfPropModel(shelf, currentStock)`: dynamic prop resolution swapping to `empty_model` when stock reaches 0.
+    - Implemented `EvaluateRestock(shelf, playerItemCount, requestedQty)`: validates restock permissions, calculates available headroom, clamps quantities, and computes 70% wholesale consignment compensation.
+    - Implemented `IsPointNearShelf(point, shelfCoords, maxDist)`: 3D Euclidean interaction distance calculations.
+    - Implemented `FormatShelfDisplay(shelf, currentStock, currentPrice)`: presentation formatters with status badges (`TELJES KÉSZLET`, `FOGYÓBAN LÉVŐ KÉSZLET`, `TELJESEN KIÜRÜLT`).
+  - **Authoritative Server Subsystem & RPCs (`FiveM/nyx_logistics/server/retail_shelves.lua`)**:
+    - Bootloader cache hydration (`Nyx.Logistics.RetailShelves`) from database on startup.
+    - Implemented `NotifyShelfStockChanged`: synchronizes stock levels, checks model changes, logs audit records, and broadcasts `nyx:logistics:client:shelfVisualStateChanged` to all clients.
+    - Implemented `RestockShelf`: zero-trust validation, proximity checks (within 4.5m), Dijkstra dual-lock transfers (`char:{citId}:main` -> `shelf.inventory_id`), double-entry wholesale consignment payouts via `nyx_treasury`, and elastic price recalculation downwards.
+    - Registered RPCs: `logistics:getRetailShelves`, `logistics:getNearbyRetailShelves`, and `logistics:restockShelf`.
+    - Exported public helpers in `server/exports.lua`: `GetRetailShelf`, `GetRetailShelves`, `RestockRetailShelf`, `GetShelfVisualState`.
+    - Integrated hooks in `server/shelves.lua` (`buyFromShelf`) and `server/contracts.lua` (`deliverContract`).
+  - **Client Subsystems & Spatial Prop Streaming (`FiveM/nyx_logistics/client/retail_shelves.lua`)**:
+    - Dynamic entity streaming loop managing prop lifecycles within 45m of retail stores.
+    - Real-time prop model swapping: replaces stocked shelves with empty rack props when stock drops to 0, and restores stocked props when restocked.
+    - Third-Eye spatial interaction targets (`nyx_interact`): "Vásárlás a Polcról", "Polc Készletfeltöltése (Restock)", and "Polc Információ & Piaci Árindex".
+    - Registered player commands `/retailshelves` and `/restockshelf [shelfId] [quantity]`.
+    - Exported client helpers in `client/exports.lua`: `GetClosestRetailShelf`, `GetNearbyRetailShelves`, `GetRetailShelfVisualState`.
+    - Clean entity deletion on resource teardown (`onResourceStop`) preventing prop leaks.
+  - **Manifest Declarations**:
+    - Declared `shared/retail_shelves.lua`, `server/retail_shelves.lua`, and `client/retail_shelves.lua` in `FiveM/nyx_logistics/fxmanifest.lua`.
+  - **Verification & Test Coverage**:
+    - Added in-engine integration test Test 57 (`Nyx.Tests.TestPointOfSalePhysicalStockingAndEmptyShelfDisplays`) in `FiveM/nyx_core/server/tests.lua` (7 sub-tests) and wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_point_of_sale_physical_stocking_and_empty_shelf_displays.py` (9/9 tests passing).
+    - Full test suite: 533/533 tests passing; `scripts/validator.py` and `scripts/verify.ps1` clean across all 14 resources, 283 Lua files, and 62 migrations.
+- **[2026-10-18] Feature: Hospital Bed Maintenance, Clinical Recovery & Triage Engine (`nyx_services` & `nyx_inventory`)**
+  - **Database Migration (`061_hospital_bed_maintenance_and_clinical_recovery.sql`)**:
+    - Created migration file and registered Step 61 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Mirrored migration to `FiveM/nyx_services/sql/migrations/061_hospital_bed_maintenance_and_clinical_recovery.sql`.
+    - Created `nyx_services_hospital_beds` table (`bed_id` PK, `bed_uuid` UNIQUE, `hospital_id`, `bed_label`, `bed_type` ENUM('icu_trauma', 'general_ward', 'emergency_cot'), `coords` JSON, `occupied_by_citizen_id`, `is_occupied`, `bed_cleanliness` DECIMAL(5,2), `maintenance_status` ENUM('clean', 'occupied', 'soiled', 'sanitizing', 'offline_power'), `vital_monitor_active`, `iv_drip_active`, `current_infusion_item`, `admission_timestamp`, `last_sanitized_at`, `total_patients_treated`, `created_at`) with indexes on `hospital_id`, `maintenance_status`, and `is_occupied`.
+    - Created `nyx_services_hospital_bed_audits` immutable audit ledger (`audit_id` PK, `audit_uuid` UNIQUE, `bed_id`, `hospital_id`, `citizen_id`, `action` ENUM('ADMITTED', 'DISCHARGED', 'TREATMENT_APPLIED', 'CONSUMABLE_INFUSED', 'SOILED', 'SANITIZED', 'POWER_LOST', 'POWER_RESTORED'), `item_consumed`, `quantity`, `vital_telemetry` JSON, `notes`, `created_at`) with performance lookup indexes.
+    - Seeded canonical hospital beds across Pillbox Hill Medical Center, Sandy Shores Clinic, and Paleto Bay Emergency Care (`bed:pillbox:01` through `04`, `bed:sandy:01` through `02`, `bed:paleto:01` through `02`).
+  - **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_services/shared/hospital_beds.lua`)**:
+    - Defined bed classification taxonomy: `icu_trauma` (15 kW, 60 mL/s infusion, surgical capability, advanced vital monitor), `general_ward` (5 kW, 30 mL/s infusion, saline stabilization, vital monitor), `emergency_cot` (0 kW unpowered, 12 mL/s, basic resting).
+    - Defined maintenance states: `clean`, `occupied`, `soiled`, `sanitizing`, `offline_power`.
+    - Defined sanitization consumables (`item_disinfectant`, `clean_linens`, `bleach`) with duration seconds and cleanliness target levels.
+    - Implemented `CalculateBedInfusionRate(bedType, supplyStatus, isPowered)`: models electrical grid blackout degradation (25% battery backup multiplier for powered beds) and hospital supply shortage penalties (40% for critical shortage, 75% for degraded stock).
+    - Implemented `EvaluateBedEligibility(bed, citizenTraumaState, isPowered)`: enforces occupancy mutual exclusion, cleanliness threshold (>= 50%), and electrical power interlocks for ICU trauma beds.
+    - Implemented `CalculateSanitizationRequirement(bed, itemKey)`: validates cleaning consumable applicability, prevents redundant cleaning of sanitized beds, and calculates target cleanliness.
+    - Implemented `EvaluateVitalsTelemetry(citizenTraumaState, bed, isPowered)`: calculates realistic hemodynamic vitals (heart rate BPM, systolic/diastolic blood pressure, SpO2, and cardiac rhythm) mapping across shock classes (Class I stable, Class II tachycardia, Class III hypotension, Class IV ventricular tachycardia, and flatline), respecting monitor power availability.
+    - Implemented `FormatBedSummary(bed)`: UI formatting with color badges and localized status strings.
+  - **Authoritative Server Subsystems & RPCs (`FiveM/nyx_services/server/beds.lua`)**:
+    - Bootloader cache hydration (`Nyx.Services.HospitalBeds`) from database on startup.
+    - Implemented `AdmitPatientToBed` locking bed, setting patient occupancy, starting vitals telemetry, logging audit, and synchronizing state across clients.
+    - Implemented `DischargePatientFromBed` releasing patient, soiling bed down to 20% cleanliness, incrementing treated count, and updating clients.
+    - Implemented `SanitizeBed` deducting sanitizing consumables (`item_disinfectant`) from inventory, restoring bed to 100% clean, and logging audit.
+    - Implemented `AdministerBedTreatment` consuming medical consumables (`med_plasma`, `first_aid_pack`, `med_surgical_pack`) from finite hospital supply stash into patient on bed.
+    - Background 2-second hemodynamic recovery loop infusing blood volume, closing limb wounds, stabilizing fractures, reducing pain levels, clearing unconsciousness, and streaming vitals telemetry to occupied clients.
+    - Registered RPC endpoints: `services:getHospitalBeds`, `services:getBedDetails`, `services:admitPatientToBed`, `services:dischargePatientFromBed`, `services:sanitizeBed`, `services:administerBedTreatment`, `services:getBedTelemetry`.
+    - Exported public helpers in `server/exports.lua`: `GetHospitalBed`, `GetHospitalBeds`, `AdmitToHospitalBed`, `DischargeFromHospitalBed`, `SanitizeHospitalBed`, `AdministerHospitalBedTreatment`, `GetPlayerOccupiedBed`.
+  - **Client Subsystems & Spatial Interaction (`FiveM/nyx_services/client/beds.lua`)**:
+    - Dynamic Third-Eye spatial interaction targets (`nyx_interact`): "Fekvés a Kórházi Ágyba / Triage Felvétel", "Ágy Fertőtlenítése & Tiszta Ágynemű", and "Vitális Paraméterek & Telemetria".
+    - Kinematic bed positioning: teleporting ped to bed coords with heading alignment, entity freezing, and looping lying down animation (`anim@gangops@morgue@table@`, `body_search` / `amb@lo_res_idles@`).
+    - Handled discharge unfreezing and clearing ped tasks.
+    - Network listeners for live bed status updates and vitals telemetry ticks.
+    - Registered player commands: `/hospitalbeds` and `/dischargebed`.
+    - Exported client helpers in `client/exports.lua`: `GetCurrentHospitalBed`, `GetNearbyHospitalBeds`, `AdmitToNearbyHospitalBed`, `ExitCurrentHospitalBed`, `SanitizeHospitalBed`.
+  - **Manifest Declarations**:
+    - Declared `shared/hospital_beds.lua`, `server/beds.lua`, and `client/beds.lua` in `FiveM/nyx_services/fxmanifest.lua`.
+  - **Verification & Test Coverage**:
+    - Added in-engine integration test Test 56 (`Nyx.Tests.TestHospitalBedMaintenanceAndClinicalRecovery`) in `FiveM/nyx_core/server/tests.lua` (7 sub-tests) and wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_hospital_bed_maintenance_and_clinical_recovery.py` (8/8 tests passing).
+    - Full test suite: 524/524 tests passing; `scripts/validator.py` and `scripts/verify.ps1` clean across all 14 resources, 280 Lua files, and 61 migrations.
+
 - **[2026-10-18] Feature: Organizational Warehousing & Storage Networks (`nyx_factions`, `nyx_logistics` & `nyx_inventory`)**
   - **Database Migration (`060_organizational_warehousing_and_storage_networks.sql`)**:
     - Created migration file and registered Step 60 in `FiveM/nyx_core/sql/migrations/index.json`.

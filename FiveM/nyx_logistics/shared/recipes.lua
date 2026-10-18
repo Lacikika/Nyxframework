@@ -312,6 +312,69 @@ Nyx.Logistics.Recipes.Registry = {
                 }
             }
         }
+    },
+    ['saline_purification'] = {
+        key = 'saline_purification',
+        label = 'Isotonic Saline Solution Purification',
+        facilityType = 'chemical',
+        processingTime = 12,
+        powerRequirementKw = 8,
+        inputs = {
+            { item = 'raw_saline_brine', amount = 2 },
+            { item = 'drink_water', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'saline_solution',
+                amount = 2,
+                metadata = {
+                    sterile = true,
+                    osmolarity = 308
+                }
+            }
+        }
+    },
+    ['synthetic_plasma_synthesis'] = {
+        key = 'synthetic_plasma_synthesis',
+        label = 'Sterile Blood Plasma Bio-Synthesis',
+        facilityType = 'chemical',
+        processingTime = 25,
+        powerRequirementKw = 18,
+        inputs = {
+            { item = 'organic_compounds', amount = 2 },
+            { item = 'saline_solution', amount = 1 },
+            { item = 'plastic_polymer', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'med_plasma',
+                amount = 1,
+                metadata = {
+                    sterile = true,
+                    bloodType = 'O-Universal'
+                }
+            }
+        }
+    },
+    ['disinfectant_compounding'] = {
+        key = 'disinfectant_compounding',
+        label = 'Clinical Disinfectant Compounding',
+        facilityType = 'chemical',
+        processingTime = 15,
+        powerRequirementKw = 10,
+        inputs = {
+            { item = 'chemical_precursors', amount = 2 },
+            { item = 'drink_water', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'item_disinfectant',
+                amount = 2,
+                metadata = {
+                    sterility = 100.0
+                }
+            }
+        }
     }
 }
 
