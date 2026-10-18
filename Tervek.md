@@ -52,11 +52,11 @@ created: 2026-09-20
 ## 2. Dynamic Production & Supply Logistics (`nyx_logistics`)
 
 ### 2.1 Extraction to Shelf Lifecycle
-1. **Raw Resource Gathering:** Players harvest minerals, wood, oil, and agriculture via finite resource nodes with dynamic regeneration intervals.
-2. **Industrial Refining:** Dedicated refining plants convert raw materials into functional parts (e.g., sheet metal, copper wire, fabric, organic chemicals).
-3. **Player Manufacturing:** Assembly plants construct actual consumer items (repair kits, weapon components, medical band-aids, processed food) using strict recipe manifests.
-4. **Logistics & Hauling:** Finished freight pallets must be physically hauled via commercial flatbeds, vans, or container trailers to retail hubs.
-5. **Point of Sale Stocking:** Convenience stores, hardware shops, and arms dealerships function purely as stock containers. Zero stock = physical shelves display empty.
+- [x] **Raw Resource Gathering:** Players harvest minerals, wood, oil, and agriculture via finite resource nodes with dynamic regeneration intervals.
+- [x] **Industrial Refining:** Dedicated refining plants convert raw materials into functional parts (e.g., sheet metal, copper wire, fabric, organic chemicals).
+- [x] **Player Manufacturing:** Assembly plants construct actual consumer items (repair kits, weapon components, medical band-aids, processed food) using strict recipe manifests.
+- [x] **Logistics & Hauling:** Finished freight pallets must be physically hauled via commercial flatbeds, vans, or container trailers to retail hubs.
+- [x] **Point of Sale Stocking:** Convenience stores, hardware shops, and arms dealerships function purely as stock containers. Zero stock = physical shelves display empty.
 
 ### 2.2 Elastic Item Pricing
 - [x] Base prices dynamically calculate based on the stock-to-demand ratio within individual delivery zones:

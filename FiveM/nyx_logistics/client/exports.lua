@@ -48,4 +48,12 @@ exports("InspectPalletForensics", function(palletId)
     return exports['nyx_core']:TriggerRPCAwait("logistics:inspectPalletForensics", palletId)
 end)
 
+exports("GetClosestRefiningFacility", function()
+    return Nyx.Logistics.GetClosestRefiningFacility and Nyx.Logistics.GetClosestRefiningFacility()
+end)
+
+exports("GetNearbyRefiningFacilities", function(maxDist)
+    return Nyx.Logistics.GetNearbyRefiningFacilities and Nyx.Logistics.GetNearbyRefiningFacilities(maxDist)
+end)
+
 

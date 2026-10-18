@@ -129,8 +129,50 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Pharmaceutical Refining, Player Chemical Labs & Medical Bio-Synthesis (`nyx_services`, `nyx_logistics` & `nyx_inventory`)**
   - **Implementation:** Chemical synthesis and autoclave workstations (`nyx_services_chemical_labs`), pure Lua 5.4 bio-chemical recipe compounding engine (sterile plasma, surgical packs, clinical disinfectant, linens, bandages, tourniquets, morphine), sterility degradation and contamination physics, substation electrical power grid interlocks, natural precursor harvest nodes in `nyx_logistics_nodes`, immutable regulatory audit ledger (`nyx_services_chemlab_audits`), and Third-Eye spatial interaction targets across canonical San Andreas laboratories.
 
+- [x] **Feature: Industrial Refining Plants, Forestry Timber Harvesting & Functional Parts Manufacturing (`nyx_logistics`, `nyx_services` & `nyx_inventory`)**
+  - **Implementation:** Heavy industrial processing and refining plants (`fac_paleto_sawmill`, `fac_elysian_foundry`, `fac_davis_textile`), finite forestry timber and raw cotton harvest nodes (`node_paleto_forest_timber`, `node_chiliad_redwood`, `node_san_chianski_cotton`), pure Lua 5.4 industrial transformation blueprints (timber milling, structural sheet metal rolling, copper wire drawing, cotton textile carding, circuit substrate resin bonding, and weapon components machining), regional electrical power grid interlocks, immutable refining audit ledger (`nyx_logistics_refining_audits`), and Third-Eye spatial interaction targets across canonical industrial facilities.
+
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Industrial Refining Plants, Forestry Timber Harvesting & Functional Parts Manufacturing (`nyx_logistics`, `nyx_services` & `nyx_inventory`)**
+  - **Database Migration (`064_industrial_refining_and_functional_parts_manufacturing.sql`)**:
+    - Created migration file and registered Step 64 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Mirrored migration to `FiveM/nyx_logistics/sql/migrations/064_industrial_refining_and_functional_parts_manufacturing.sql`.
+    - Created `nyx_logistics_refining_audits` immutable regulatory & judicial audit ledger (`audit_id` PK, `audit_uuid` UNIQUE, `facility_id`, `citizen_id`, `action` ENUM('REFINING_STARTED', 'REFINING_COMPLETED', 'REFINING_HALTED_BLACKOUT', 'REFINING_RESUMED', 'PALLET_DISPATCHED'), `recipe_key`, `batch_count`, `inputs_consumed` JSON, `outputs_generated` JSON, `power_kwh_consumed` DECIMAL(10,4), `substation_id`, `notes`, `created_at`) with performance lookup indexes.
+    - Seeded forestry timber and agricultural natural resource harvest nodes in `nyx_logistics_nodes`: `node_paleto_forest_timber` (`raw_timber_logs`), `node_chiliad_redwood` (`raw_timber_logs`), and `node_san_chianski_cotton` (`raw_cotton`).
+    - Seeded heavy industrial processing facilities in `nyx_logistics_facilities`: Paleto Forest Sawmill (`fac_paleto_sawmill`), Elysian Island Metal Foundry & Rolling Mill (`fac_elysian_foundry`), and Davis Industrial Textile Mill (`fac_davis_textile`).
+    - Seeded industrial container stashes in `nyx_inventories`: `stash:sawmill_in`, `stash:sawmill_out`, `stash:foundry_in`, `stash:foundry_out`, `stash:textile_in`, and `stash:textile_out`.
+  - **Item Schema Registry Extensions (`FiveM/nyx_inventory/shared/items.lua`)**:
+    - Added definitions: `raw_timber_logs`, `raw_cotton`, `wood_cellulose`, `sheet_metal`, `copper_wire`, `circuit_substrate`, `electronic_circuit`, and `item_weapon_parts` with weights, stack limits, decay rates, and types.
+    - Updated `CreateDefaultMetadata` to generate metadata tags (`alloyGrade = "A36-Structural-Steel"`, `gauge = "12-AWG"`, `firmwareVersion = "v2.4-Civil"`, `tolerance = "0.005mm"`, `pulpPurity = 0.98`, `treeSpecies = "pacific_redwood"`).
+  - **Industrial Recipes & Nodes Extensions (`FiveM/nyx_logistics/shared/recipes.lua` & `shared/nodes.lua`)**:
+    - Added 8 industrial refining blueprints: `timber_sawmill_milling` (sawmill), `structural_sheet_rolling` (foundry), `copper_wire_drawing` (foundry), `textile_cotton_carding` (textile), `circuit_board_fabrication` (chemical), `electronics_assembly` (assembly), `precision_weapon_parts_machining` (assembly), and `wire_cutters_assembly` (assembly).
+    - Added forestry timber and cotton harvest nodes to static `Nyx.Logistics.Nodes.Registry`.
+  - **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_logistics/shared/refining.lua`)**:
+    - Defined facility type taxonomy (`sawmill`, `foundry`, `textile`, `refinery`, `assembly`, `chemical`, `smelter`, `penal_workshop`) with labels, icons, theme colors, and power consumption defaults.
+    - Implemented `ValidateRefiningInputs(recipe, availableItems, batchCount)`: validates recipe inputs against available inventory counts with batch headroom checks.
+    - Implemented `CalculateRefiningEnergyAndDuration(recipe, batchCount)`: non-linear multi-batch duration scaling and metered kWh calculations.
+    - Implemented `CalculateRefiningYield(recipe, batchCount, facilityEfficiency, isPowered)`: deterministic yield scaling with power interlocks and facility efficiency multipliers.
+    - Implemented `EvaluatePalletPackaging(recipe, batchCount, outputMode, itemWeights)`: evaluates heavy freight threshold (50kg) for automatic loading onto physical pallets.
+    - Implemented `IsPointNearFacility(point, facilityCoords, maxDist)`: 3D Euclidean distance calculations.
+    - Implemented `FormatFacilityTelemetry(facility, activeRecipe, isPowered, powerReason)`: status badges and presentation formatters.
+  - **Authoritative Server Subsystem & RPCs (`FiveM/nyx_logistics/server/refining.lua`)**:
+    - Implemented `LogRefiningAudit` for immutable regulatory record insertion.
+    - Implemented `StartRefiningBatch` with zero-trust distance validation (within 4.5m), trade union strike interlocks, connected substation power verification, inventory debits, and audit logging.
+    - Implemented `CancelRefiningBatch` allowing safe abort of active batches.
+    - Registered RPC endpoints: `logistics:getRefiningFacilities`, `logistics:getRefiningFacilityTelemetry`, `logistics:startRefiningBatch`, and `logistics:cancelRefiningBatch`.
+    - Exported public helpers in `server/exports.lua`: `GetRefiningFacility`, `GetRefiningFacilities`, `StartRefiningBatch`, `CancelRefiningBatch`, and `LogRefiningAudit`.
+  - **Client Subsystems & Spatial Interaction (`FiveM/nyx_logistics/client/refining.lua`)**:
+    - Third-Eye spatial interaction targets (`nyx_interact`): "Ipari Finomítás & Gyártás Indítása (Start Refining)", "Üzemi Telemetria & Áramellátás (Facility Telemetry)", and "Aktív Gyártási Ciklus Leállítása (Cancel Batch)".
+    - Player commands: `/refining` (telemetry report of nearby refining plants) and `/startrefining [facilityId] [recipeKey] [batchCount]`.
+    - Exported client helpers in `client/exports.lua`: `GetClosestRefiningFacility` and `GetNearbyRefiningFacilities`.
+    - Clean entity and interaction deregistration on resource stop (`onResourceStop`).
+  - **Resource Manifest Declarations (`FiveM/nyx_logistics/fxmanifest.lua`)**:
+    - Declared `shared/refining.lua`, `server/refining.lua`, and `client/refining.lua`.
+  - **Verification & Test Coverage**:
+    - Added in-engine integration test Test 59 (`Nyx.Tests.TestIndustrialRefiningAndFunctionalPartsManufacturing`) in `FiveM/nyx_core/server/tests.lua` (7 sub-tests) and wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_industrial_refining_and_functional_parts_manufacturing.py` (9/9 tests passing).
+    - Full test suite: 551/551 tests passing; `scripts/validator.py` and `scripts/verify.ps1` clean across all 14 resources, 289 Lua files, and 64 migrations.
 - **[2026-10-18] Feature: Pharmaceutical Refining, Player Chemical Labs & Medical Bio-Synthesis (`nyx_services`, `nyx_logistics` & `nyx_inventory`)**
   - **Database Migration (`063_pharmaceutical_refining_and_player_chemical_labs.sql`)**:
     - Created migration file and registered Step 63 in `FiveM/nyx_core/sql/migrations/index.json`.

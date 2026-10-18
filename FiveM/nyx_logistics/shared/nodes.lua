@@ -126,6 +126,45 @@ Nyx.Logistics.Nodes.Registry = {
             dict = 'amb@world_human_bum_wash@male@high@base',
             name = 'base'
         }
+    },
+    ['node_paleto_forest_timber'] = {
+        id = 'node_paleto_forest_timber',
+        label = 'Paleto Forest Redwood Timber Tract',
+        resource = 'raw_timber_logs',
+        maxReserve = 600,
+        regenRatePerHour = 60,
+        requiredTool = nil,
+        coords = vector3(-570.4, 5320.1, 70.2),
+        anim = {
+            dict = 'amb@world_human_hammering@male@base',
+            name = 'base'
+        }
+    },
+    ['node_chiliad_redwood'] = {
+        id = 'node_chiliad_redwood',
+        label = 'Mount Chiliad Ancient Pine Grove',
+        resource = 'raw_timber_logs',
+        maxReserve = 500,
+        regenRatePerHour = 50,
+        requiredTool = nil,
+        coords = vector3(-790.6, 5450.4, 34.5),
+        anim = {
+            dict = 'amb@world_human_hammering@male@base',
+            name = 'base'
+        }
+    },
+    ['node_san_chianski_cotton'] = {
+        id = 'node_san_chianski_cotton',
+        label = 'San Chianski Coastal Cotton Plantation',
+        resource = 'raw_cotton',
+        maxReserve = 700,
+        regenRatePerHour = 70,
+        requiredTool = nil,
+        coords = vector3(2580.4, 4690.2, 34.0),
+        anim = {
+            dict = 'amb@world_human_gardener_plant@male@base',
+            name = 'base'
+        }
     }
 }
 

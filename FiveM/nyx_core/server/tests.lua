@@ -12224,7 +12224,182 @@ function Nyx.Tests.TestPharmaceuticalRefiningAndPlayerChemicalLabs()
     return passes == total
 end
 
--- 45. Master Test Runner (Suite 1 - Suite 58)
+-- 44b. Suite 59: Industrial Refining Plants, Forestry Timber Harvesting & Functional Parts Manufacturing
+function Nyx.Tests.TestIndustrialRefiningAndFunctionalPartsManufacturing()
+    print("^3[Nyx:Test] Running Suite 59: Industrial Refining Plants, Forestry Timber Harvesting & Functional Parts Manufacturing...^7")
+    local passes = 0
+    local total = 7
+
+    local Refining = Nyx.Refining
+    if not Refining then
+        local chunk = nil
+        if LoadResourceFile then
+            chunk = LoadResourceFile("nyx_logistics", "shared/refining.lua")
+        end
+        if not chunk and io and io.open then
+            local f = io.open("FiveM/nyx_logistics/shared/refining.lua", "r")
+            if f then
+                chunk = f:read("*a")
+                f:close()
+            end
+        end
+        if chunk then
+            local fn = load(chunk, "nyx_logistics/shared/refining.lua")
+            if fn then fn() end
+        end
+        Refining = Nyx.Refining
+    end
+
+    if not Refining then
+        print("^1[Nyx:Test:FAIL] Could not load nyx_logistics/shared/refining.lua^7")
+        return false
+    end
+
+    -- Sub-test A: Facility Taxonomy & Supported Recipes Registry Integrity
+    local sawmillDef = Refining.GetFacilityDefinition('sawmill')
+    local foundryDef = Refining.GetFacilityDefinition('foundry')
+    local textileDef = Refining.GetFacilityDefinition('textile')
+    local assemblyDef = Refining.GetFacilityDefinition('assembly')
+
+    local testA_ok = (sawmillDef ~= nil and sawmillDef.defaultPowerKw == 15.0) and
+                     (foundryDef ~= nil and foundryDef.defaultPowerKw == 25.0) and
+                     (textileDef ~= nil and textileDef.defaultPowerKw == 12.0) and
+                     (assemblyDef ~= nil and assemblyDef.defaultPowerKw == 18.0)
+
+    if assertTest(testA_ok == true,
+        "Industrial Facility Taxonomy & Heavy Engineering Capabilities Integrity",
+        "Facility definition taxonomy failed for sawmill, foundry, textile, or assembly") then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Batch Input Validation & Headroom Clamping
+    local testRecipe = {
+        key = "structural_sheet_rolling",
+        inputs = {
+            { item = "refined_iron", amount = 3 }
+        },
+        outputs = {
+            { item = "sheet_metal", amount = 2 }
+        },
+        processingTime = 30,
+        powerRequirementKw = 25
+    }
+
+    local validInventory = { ['refined_iron'] = 10 }
+    local deficientInventory = { ['refined_iron'] = 5 }
+
+    local okSuff, _, _, _, haveSuff = Refining.ValidateRefiningInputs(testRecipe, validInventory, 2)
+    local okDef, errDef, missingDef, neededDef, haveDef = Refining.ValidateRefiningInputs(testRecipe, deficientInventory, 2)
+    local okNil, errNil = Refining.ValidateRefiningInputs(nil, validInventory, 1)
+
+    local testB_ok = (okSuff == true and haveSuff == 10) and
+                     (okDef == false and errDef == "INSUFFICIENT_INPUTS" and missingDef == "refined_iron" and neededDef == 6 and haveDef == 5) and
+                     (okNil == false and errNil == "INVALID_RECIPE")
+
+    if assertTest(testB_ok == true,
+        "Batch Input Inventory Validation & Supply Headroom Clamping",
+        string.format("Input validation failed: suff=%s, def=%s, errDef=%s, needed=%s, have=%s",
+            tostring(okSuff), tostring(okDef), tostring(errDef), tostring(neededDef), tostring(haveDef))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Power & Processing Duration Physics (Industrial Multi-Batch Scaling)
+    local dur1, kw1, kwh1 = Refining.CalculateRefiningEnergyAndDuration(testRecipe, 1)
+    local dur3, kw3, kwh3 = Refining.CalculateRefiningEnergyAndDuration(testRecipe, 3)
+
+    local expectedDur3 = math.floor(30 * (1.0 + 2 * 0.85))
+    local expectedKw3 = 25 * (1.0 + 2 * 0.20)
+
+    local testC_ok = (dur1 == 30 and kw1 == 25 and kwh1 > 0) and
+                     (dur3 == expectedDur3 and math.abs(kw3 - expectedKw3) < 0.01 and kwh3 > kwh1)
+
+    if assertTest(testC_ok == true,
+        "Power & Processing Duration Physics (Non-Linear Industrial Scaling Curves)",
+        string.format("Duration/power scaling failed: dur1=%d, dur3=%d (exp %d), kw3=%.1f (exp %.1f)",
+            dur1, dur3, expectedDur3, kw3, expectedKw3)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Refining Yield Calculation & Efficiency Multipliers
+    local yieldStd = Refining.CalculateRefiningYield(testRecipe, 3, 1.00, true)
+    local yieldBoosted = Refining.CalculateRefiningYield(testRecipe, 3, 1.25, true)
+    local yieldOffline = Refining.CalculateRefiningYield(testRecipe, 3, 1.00, false)
+
+    local testD_ok = (#yieldStd == 1 and yieldStd[1].amount == 6 and yieldStd[1].item == "sheet_metal") and
+                     (#yieldBoosted == 1 and yieldBoosted[1].amount == 7) and
+                     (#yieldOffline == 0)
+
+    if assertTest(testD_ok == true,
+        "Refining Yield Determinism, Grid Power Interlocks & Plant Efficiency Scaling",
+        string.format("Yield calculation failed: stdAmt=%d, boostedAmt=%d, offlineCount=%d",
+            yieldStd[1] and yieldStd[1].amount or 0, yieldBoosted[1] and yieldBoosted[1].amount or 0, #yieldOffline)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Heavy Freight Palletization Evaluation
+    local lightWeights = { ['sheet_metal'] = 3500 }
+    local shouldPallet1, weight1 = Refining.EvaluatePalletPackaging(testRecipe, 2, "inventory", lightWeights)
+    local shouldPalletHeavy, weightHeavy = Refining.EvaluatePalletPackaging(testRecipe, 8, "inventory", lightWeights)
+    local shouldPalletForced, _ = Refining.EvaluatePalletPackaging(testRecipe, 1, "pallet", lightWeights)
+
+    local testE_ok = (shouldPallet1 == false and weight1 == 14000) and
+                     (shouldPalletHeavy == true and weightHeavy == 56000) and
+                     (shouldPalletForced == true)
+
+    if assertTest(testE_ok == true,
+        "Automatic Freight Palletization Evaluation & Heavy Weight Thresholds",
+        string.format("Pallet check failed: p1=%s (wt=%d), pH=%s (wt=%d), pF=%s",
+            tostring(shouldPallet1), weight1, tostring(shouldPalletHeavy), weightHeavy, tostring(shouldPalletForced))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Spatial Raycasting & Proximity Interlocks
+    local plantCoords = { x = 1088.5, y = -2004.2, z = 31.5 }
+    local nearCoords = { x = 1089.0, y = -2005.0, z = 31.5 }
+    local farCoords = { x = 1120.0, y = -2050.0, z = 31.5 }
+
+    local isNear, distNear = Refining.IsPointNearFacility(nearCoords, plantCoords, 4.5)
+    local isFar, distFar = Refining.IsPointNearFacility(farCoords, plantCoords, 4.5)
+
+    local testF_ok = (isNear == true and distNear <= 4.5) and
+                     (isFar == false and distFar > 4.5)
+
+    if assertTest(testF_ok == true,
+        "Spatial Raycasting Proximity Verification & Euclidean Tolerances",
+        string.format("Proximity check failed: isNear=%s (dist=%.2f), isFar=%s (dist=%.2f)",
+            tostring(isNear), distNear, tostring(isFar), distFar)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Presentation Diagnostics & Status Telemetry Formatting
+    local mockPlant = {
+        id = "fac_elysian_foundry",
+        type = "foundry",
+        total_energy_consumed_kwh = 124.50,
+        power_consumption_kw = 25.0,
+        progress = 45.0,
+        is_active = true,
+        active_recipe = "structural_sheet_rolling",
+        output_mode = "pallet"
+    }
+
+    local telemActive = Refining.FormatFacilityTelemetry(mockPlant, testRecipe, true, nil)
+    local telemBlackout = Refining.FormatFacilityTelemetry(mockPlant, testRecipe, false, "SUBSTATION_DOWN")
+
+    local testG_ok = (telemActive.badgeClass == "badge-warning" and telemActive.isPowered == true and telemActive.energyFormatted == "124.50 kWh") and
+                     (telemBlackout.badgeClass == "badge-danger" and telemBlackout.isPowered == false)
+
+    if assertTest(testG_ok == true,
+        "Presentation Diagnostics & UI Status Telemetry Formatting Consistency",
+        string.format("Telemetry formatting failed: activeBadge=%s, blackoutBadge=%s",
+            telemActive.badgeClass, telemBlackout.badgeClass)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 45. Master Test Runner (Suite 1 - Suite 59)
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -12288,6 +12463,7 @@ function Nyx.Tests.RunAll()
     local t56 = Nyx.Tests.TestHospitalBedMaintenanceAndClinicalRecovery()
     local t57 = Nyx.Tests.TestPointOfSalePhysicalStockingAndEmptyShelfDisplays()
     local t58 = Nyx.Tests.TestPharmaceuticalRefiningAndPlayerChemicalLabs()
+    local t59 = Nyx.Tests.TestIndustrialRefiningAndFunctionalPartsManufacturing()
 
     print("^5--------------------------------------------------^7")
     local suites1to50Passed = false
@@ -12295,7 +12471,7 @@ function Nyx.Tests.RunAll()
         suites1to50Passed = true
     end
 
-    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 and t56 and t57 and t58 then
+    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 and t56 and t57 and t58 and t59 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

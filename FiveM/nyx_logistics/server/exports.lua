@@ -175,3 +175,24 @@ exports("GetShelfVisualState", function(shelfId)
     }
 end)
 
+-- Industrial Refining & Functional Parts Manufacturing
+exports("GetRefiningFacility", function(facilityId)
+    return Nyx.Logistics.GetRefiningFacility and Nyx.Logistics.GetRefiningFacility(facilityId)
+end)
+
+exports("GetRefiningFacilities", function()
+    return Nyx.Logistics.GetRefiningFacilities and Nyx.Logistics.GetRefiningFacilities()
+end)
+
+exports("StartRefiningBatch", function(src, facilityId, recipeKey, batchCount)
+    return Nyx.Logistics.StartRefiningBatch and Nyx.Logistics.StartRefiningBatch(src, facilityId, recipeKey, batchCount)
+end)
+
+exports("CancelRefiningBatch", function(src, facilityId)
+    return Nyx.Logistics.CancelRefiningBatch and Nyx.Logistics.CancelRefiningBatch(src, facilityId)
+end)
+
+exports("LogRefiningAudit", function(facilityId, citizenId, action, recipeKey, batchCount, inputs, outputs, powerKwh, substationId, notes)
+    return Nyx.Logistics.LogRefiningAudit and Nyx.Logistics.LogRefiningAudit(facilityId, citizenId, action, recipeKey, batchCount, inputs, outputs, powerKwh, substationId, notes)
+end)
+

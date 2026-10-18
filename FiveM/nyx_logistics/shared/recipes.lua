@@ -375,6 +375,175 @@ Nyx.Logistics.Recipes.Registry = {
                 }
             }
         }
+    },
+    ['timber_sawmill_milling'] = {
+        key = 'timber_sawmill_milling',
+        label = 'Heavy Redwood Timber Sawmill Milling',
+        facilityType = 'sawmill',
+        processingTime = 25,
+        powerRequirementKw = 15,
+        inputs = {
+            { item = 'raw_timber_logs', amount = 4 }
+        },
+        outputs = {
+            {
+                item = 'raw_timber',
+                amount = 2,
+                metadata = {
+                    durability = 100.0,
+                    milled = true
+                }
+            },
+            {
+                item = 'wood_cellulose',
+                amount = 2,
+                metadata = {
+                    pulpPurity = 0.98
+                }
+            }
+        }
+    },
+    ['structural_sheet_rolling'] = {
+        key = 'structural_sheet_rolling',
+        label = 'Structural Steel Sheet Rolling & Leveling',
+        facilityType = 'foundry',
+        processingTime = 30,
+        powerRequirementKw = 25,
+        inputs = {
+            { item = 'refined_iron', amount = 3 }
+        },
+        outputs = {
+            {
+                item = 'sheet_metal',
+                amount = 2,
+                metadata = {
+                    alloyGrade = 'A36-Structural-Steel',
+                    thicknessMm = 3.2
+                }
+            }
+        }
+    },
+    ['copper_wire_drawing'] = {
+        key = 'copper_wire_drawing',
+        label = 'Electrical Copper Wire Extrusion & Drawing',
+        facilityType = 'foundry',
+        processingTime = 20,
+        powerRequirementKw = 20,
+        inputs = {
+            { item = 'refined_copper', amount = 2 },
+            { item = 'plastic_polymer', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'copper_wire',
+                amount = 3,
+                metadata = {
+                    gauge = '12-AWG',
+                    conductivityRating = 0.99
+                }
+            }
+        }
+    },
+    ['textile_cotton_carding'] = {
+        key = 'textile_cotton_carding',
+        label = 'Cotton Carding & Industrial Textile Weaving',
+        facilityType = 'textile',
+        processingTime = 20,
+        powerRequirementKw = 12,
+        inputs = {
+            { item = 'raw_cotton', amount = 4 }
+        },
+        outputs = {
+            {
+                item = 'raw_fabric',
+                amount = 2,
+                metadata = {
+                    threadCount = 200,
+                    weave = 'twill'
+                }
+            }
+        }
+    },
+    ['circuit_board_fabrication'] = {
+        key = 'circuit_board_fabrication',
+        label = 'Phenolic Resin Circuit Board Substrate Bonding',
+        facilityType = 'chemical',
+        processingTime = 25,
+        powerRequirementKw = 15,
+        inputs = {
+            { item = 'plastic_polymer', amount = 2 },
+            { item = 'chemical_precursors', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'circuit_substrate',
+                amount = 2,
+                metadata = {
+                    dielectricStrength = '15kV/mm'
+                }
+            }
+        }
+    },
+    ['electronics_assembly'] = {
+        key = 'electronics_assembly',
+        label = 'Microcontroller Soldering & Electronic Assembly',
+        facilityType = 'assembly',
+        processingTime = 20,
+        powerRequirementKw = 10,
+        inputs = {
+            { item = 'copper_wire', amount = 2 },
+            { item = 'circuit_substrate', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'electronic_circuit',
+                amount = 2,
+                metadata = {
+                    firmwareVersion = 'v2.4-Civil'
+                }
+            }
+        }
+    },
+    ['precision_weapon_parts_machining'] = {
+        key = 'precision_weapon_parts_machining',
+        label = 'Precision Firearm Receiver & Barrel Machining',
+        facilityType = 'assembly',
+        processingTime = 30,
+        powerRequirementKw = 18,
+        inputs = {
+            { item = 'sheet_metal', amount = 2 },
+            { item = 'refined_iron', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'item_weapon_parts',
+                amount = 1,
+                metadata = {
+                    tolerance = '0.005mm'
+                }
+            }
+        }
+    },
+    ['wire_cutters_assembly'] = {
+        key = 'wire_cutters_assembly',
+        label = 'Insulated Wire Cutters Forging & Assembly',
+        facilityType = 'assembly',
+        processingTime = 15,
+        powerRequirementKw = 8,
+        inputs = {
+            { item = 'refined_iron', amount = 1 },
+            { item = 'plastic_polymer', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'wire_cutters',
+                amount = 1,
+                metadata = {
+                    durability = 100.0,
+                    insulated = true
+                }
+            }
+        }
     }
 }
 

@@ -378,6 +378,78 @@ Nyx.Items.Registry = {
         type = 'material',
         description = 'Heavy-grade milled timber planks and lumber studs for civic and industrial assembly.'
     },
+    ['raw_timber_logs'] = {
+        name = 'raw_timber_logs',
+        label = 'Felled Timber Raw Logs',
+        weight = 5000,
+        stackable = true,
+        maxStack = 10,
+        type = 'material',
+        description = 'Heavy unhewn pine and redwood logs harvested from regional forestry tracts, ready for sawmill processing.'
+    },
+    ['raw_cotton'] = {
+        name = 'raw_cotton',
+        label = 'Raw Harvested Cotton Bolls',
+        weight = 400,
+        stackable = true,
+        maxStack = 50,
+        type = 'material',
+        description = 'Uncarded raw agricultural cotton bolls harvested from coastal plantations for textile spinning.'
+    },
+    ['wood_cellulose'] = {
+        name = 'wood_cellulose',
+        label = 'Purified Wood Pulp Cellulose',
+        weight = 800,
+        stackable = true,
+        maxStack = 40,
+        type = 'material',
+        description = 'Processed wood fibers and chemical cellulose pulp used in paper printing, cardboard packaging, and composite materials.'
+    },
+    ['sheet_metal'] = {
+        name = 'sheet_metal',
+        label = 'Rolled Structural Sheet Metal',
+        weight = 3500,
+        stackable = true,
+        maxStack = 20,
+        type = 'material',
+        description = 'High-strength cold-rolled structural steel sheet plate for precision metal stamping, tool fabrication, and vehicle chassis repairs.'
+    },
+    ['copper_wire'] = {
+        name = 'copper_wire',
+        label = 'Industrial Copper Wire Spool',
+        weight = 1200,
+        stackable = true,
+        maxStack = 25,
+        type = 'material',
+        description = 'Continuous spool of insulated high-conductivity electrical copper wiring for circuitry, motors, and grid repairs.'
+    },
+    ['circuit_substrate'] = {
+        name = 'circuit_substrate',
+        label = 'Phenolic Circuit Board Substrate',
+        weight = 300,
+        stackable = true,
+        maxStack = 50,
+        type = 'material',
+        description = 'Resin-bonded flame-retardant fiberglass substrate ready for conductive etching and electronic soldering.'
+    },
+    ['electronic_circuit'] = {
+        name = 'electronic_circuit',
+        label = 'Microcontroller Logic Circuit Board',
+        weight = 500,
+        stackable = true,
+        maxStack = 30,
+        type = 'material',
+        description = 'Assembled solid-state microcontroller and printed logic circuit board for telemetry systems, radios, and diagnostics.'
+    },
+    ['item_weapon_parts'] = {
+        name = 'item_weapon_parts',
+        label = 'Precision Firearm Mechanical Parts',
+        weight = 1500,
+        stackable = true,
+        maxStack = 10,
+        type = 'material',
+        description = 'Milled steel slide, trigger assembly, and precision recoil springs for assembly into functional ballistic firearms.'
+    },
     ['raw_saline_brine'] = {
         name = 'raw_saline_brine',
         label = 'Raw Saline Mineral Brine',
@@ -972,6 +1044,31 @@ function Nyx.Items.CreateDefaultMetadata(name, extra)
             meta.carrierCitizenId = (type(extra) == "table" and extra.carrierCitizenId) or "CIT-AGENT"
             meta.amount = (type(extra) == "table" and extra.amount) or 10000.00
             meta.issuedAt = os.time()
+        elseif item.name == 'sheet_metal' then
+            meta.alloyGrade = (type(extra) == "table" and extra.alloyGrade) or "A36-Structural-Steel"
+            meta.thicknessMm = (type(extra) == "table" and extra.thicknessMm) or 3.2
+            meta.rolledAt = os.time()
+        elseif item.name == 'copper_wire' then
+            meta.gauge = (type(extra) == "table" and extra.gauge) or "12-AWG"
+            meta.conductivityRating = 0.99
+            meta.drawnAt = os.time()
+        elseif item.name == 'circuit_substrate' then
+            meta.dielectricStrength = "15kV/mm"
+            meta.bondedAt = os.time()
+        elseif item.name == 'electronic_circuit' then
+            meta.firmwareVersion = "v2.4-Civil"
+            meta.assembledAt = os.time()
+            meta.circuitUuid = (type(extra) == "table" and extra.circuitUuid) or string.format("PCB-%06d", math.random(100000, 999999))
+        elseif item.name == 'item_weapon_parts' then
+            meta.tolerance = "0.005mm"
+            meta.machinedAt = os.time()
+            meta.machinedFacility = (type(extra) == "table" and extra.machinedFacility) or "fac_davis_assembly"
+        elseif item.name == 'raw_timber_logs' then
+            meta.treeSpecies = (type(extra) == "table" and extra.treeSpecies) or "pacific_redwood"
+            meta.felledAt = os.time()
+        elseif item.name == 'wood_cellulose' then
+            meta.pulpPurity = 0.98
+            meta.milledAt = os.time()
         end
     end
 
