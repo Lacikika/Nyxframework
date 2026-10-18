@@ -90,6 +90,13 @@ CreateThread(function()
                             action = function()
                                 Nyx.Properties.ShowStewardshipOverview()
                             end
+                        },
+                        {
+                            label = "Ingatlan Portál & Árverések",
+                            icon = "fa-solid fa-building-columns",
+                            action = function()
+                                Nyx.Properties.OpenPortal({ propertyId = prop.id })
+                            end
                         }
                     },
                     distance = 2.0

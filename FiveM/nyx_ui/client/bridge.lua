@@ -113,6 +113,16 @@ function Nyx.UI.SanitizePayload(data)
     if data.actions and type(data.actions) == "table" then sanitized.actions = data.actions end
     if data.billPayload and type(data.billPayload) == "table" then sanitized.billPayload = data.billPayload end
     if data.description and type(data.description) == "string" then sanitized.description = string.sub(data.description, 1, 1024) end
+    -- Real Estate & Property Portal parameters
+    if data.auctionId and (type(data.auctionId) == "string" or type(data.auctionId) == "number") then sanitized.auctionId = tonumber(data.auctionId) or tostring(data.auctionId) end
+    if data.propertyId and (type(data.propertyId) == "string" or type(data.propertyId) == "number") then sanitized.propertyId = tonumber(data.propertyId) or tostring(data.propertyId) end
+    if data.bidAmount and type(data.bidAmount) == "number" then sanitized.bidAmount = data.bidAmount end
+    if data.delegateCitizenId and type(data.delegateCitizenId) == "string" then sanitized.delegateCitizenId = string.sub(data.delegateCitizenId, 1, 16) end
+    if data.scope and type(data.scope) == "string" then sanitized.scope = string.sub(data.scope, 1, 32) end
+    if data.notes and type(data.notes) == "string" then sanitized.notes = string.sub(data.notes, 1, 255) end
+    if data.statusFilter and type(data.statusFilter) == "string" then sanitized.statusFilter = string.sub(data.statusFilter, 1, 32) end
+    if data.typeFilter and type(data.typeFilter) == "string" then sanitized.typeFilter = string.sub(data.typeFilter, 1, 32) end
+    if data.searchQuery and type(data.searchQuery) == "string" then sanitized.searchQuery = string.sub(data.searchQuery, 1, 128) end
     if data.payload and type(data.payload) == "table" then
         sanitized.payload = Nyx.UI.SanitizePayload(data.payload)
     end
@@ -623,6 +633,110 @@ Nyx.UI.SafeNUICallback("parliament:getAmendmentAudit", function(data, cb)
     end
     cb({})
 end)
+
+-- Property Blind-Auction & Stewardship Portal Callbacks
+Nyx.UI.SafeNUICallback("closePropertyPortal", function(_, cb)
+    Nyx.UI.SetFocus(false, false)
+    cb({ success = true })
+end)
+
+Nyx.UI.SafeNUICallback("property:getOverview", function(_, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("properties:getRealEstatePortalOverview")
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("property:getActiveAuctions", function(_, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("properties:getActiveAuctions")
+        return cb(res or { success = false, auctions = {} })
+    end
+    cb({ success = false, auctions = {} })
+end)
+
+Nyx.UI.SafeNUICallback("property:placeBid", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("properties:placeSealedBid", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("property:getAuctionBids", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("properties:getAuctionBidsHistory", data and data.auctionId)
+        return cb(res or {})
+    end
+    cb({})
+end)
+
+Nyx.UI.SafeNUICallback("property:payArrears", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("properties:payDelinquentTaxes", data and data.propertyId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("property:repairCondition", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("properties:repairCondition", data and data.propertyId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("property:getTaxAssessment", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("properties:getTaxAssessment", data and data.propertyId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("property:registerDelegate", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("properties:registerStewardDelegate", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("property:revokeDelegate", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("properties:revokeStewardDelegate", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("property:assignSteward", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("properties:assignPropertySteward", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("property:getMyStewardship", function(_, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("properties:getMyStewardship")
+        return cb(res or {})
+    end
+    cb({})
+end)
+
+Nyx.UI.SafeNUICallback("property:getInactivityAuditLogs", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local limit = data and data.limit or 20
+        local res = exports['nyx_core']:TriggerRPCAwait("properties:getInactivityAuditLogs", limit)
+        return cb(res or {})
+    end
+    cb({})
+end)
+
 
 
 -- 5. Intercept Universal Notification Triggers across All Framework Modules

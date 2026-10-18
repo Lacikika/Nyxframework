@@ -662,6 +662,209 @@ function handleDevMockNui(action, data) {
             { audit_id: 2, session_id: 103, law_id: 'TX-401', field: 'rate', old_value: '0.07', new_value: '0.08', enacted_by_session_title: 'Költségvetési Stabilitási Törvény', enacted_at: '2026-10-12 18:00' }
         ];
     }
+    // Property Blind-Auction & Stewardship Portal Mock Handlers
+    if (action === 'closePropertyPortal') {
+        return { success: true };
+    }
+    if (action === 'property:getOverview') {
+        return {
+            success: true,
+            citizenId: 'NYX-1001',
+            citizenName: 'Alexander Vance',
+            citizenBalance: 85400.00,
+            auctions: [
+                {
+                    auctionId: 1,
+                    propertyId: 101,
+                    propertyLabel: 'Integrity Way Apt 101',
+                    propertyCode: 'apt_integrity_101',
+                    propertyType: 'residential',
+                    zoneId: 'zone_ls_metro',
+                    landAreaSqm: 120.00,
+                    valuationPrice: 150000.00,
+                    minimumBid: 75000.00,
+                    totalBidsPlaced: 3,
+                    isBlind: true,
+                    endsAt: new Date(Date.now() + 86400000 * 1.5).toISOString(),
+                    status: 'active',
+                    hasPlacedBid: true,
+                    mySealedBid: 82000.00,
+                    isLeading: false
+                },
+                {
+                    auctionId: 2,
+                    propertyId: 103,
+                    propertyLabel: 'Elysian Island Warehouse #4',
+                    propertyCode: 'wh_elysian_04',
+                    propertyType: 'industrial',
+                    zoneId: 'zone_port_industrial',
+                    landAreaSqm: 1250.00,
+                    valuationPrice: 450000.00,
+                    minimumBid: 225000.00,
+                    totalBidsPlaced: 1,
+                    isBlind: true,
+                    endsAt: new Date(Date.now() + 86400000 * 2.8).toISOString(),
+                    status: 'active',
+                    hasPlacedBid: false,
+                    mySealedBid: 0.00,
+                    isLeading: false
+                }
+            ],
+            ownedProperties: [
+                {
+                    id: 201,
+                    code: 'store_vinewood_24',
+                    label: 'Vinewood 24/7 Storefront',
+                    type: 'commercial',
+                    price: 280000.00,
+                    landAreaSqm: 320.00,
+                    maintenanceCondition: 78.50,
+                    repairCost: 3440.00,
+                    repairPointsNeeded: 21.5,
+                    delinquencyTier: 1,
+                    delinquentAmount: 2450.00,
+                    consecutiveMissedCycles: 1,
+                    zoneId: 'zone_ls_metro',
+                    reclaimedForAuction: false,
+                    stewardDelegateCitizenId: 'NYX-9941',
+                    inactivityStatus: 'delegated',
+                    isLocked: false,
+                    assessment: {
+                        price: 280000.00,
+                        baseMillageRate: 0.0150,
+                        effectiveMillageRate: 0.0225,
+                        holdingMultiplier: 1.50,
+                        propertiesOwned: 2,
+                        landAreaSqm: 320.00,
+                        millageTax: 2100.00,
+                        maintenanceTax: 350.00,
+                        penalty: 367.50,
+                        totalTaxDue: 2817.50
+                    },
+                    badge: {
+                        tier: 1,
+                        badgeClass: 'badge-warning',
+                        statusLabel: '1. FOKÚ FIGYELMEZTETÉS',
+                        description: 'Késedelmes adófizetés. Kérjük rendezze tartozását.'
+                    }
+                },
+                {
+                    id: 202,
+                    code: 'apt_delperro_302',
+                    label: 'Del Perro Heights Luxury Apt',
+                    type: 'residential',
+                    price: 320000.00,
+                    landAreaSqm: 180.00,
+                    maintenanceCondition: 100.00,
+                    repairCost: 0.00,
+                    repairPointsNeeded: 0.0,
+                    delinquencyTier: 0,
+                    delinquentAmount: 0.00,
+                    consecutiveMissedCycles: 0,
+                    zoneId: 'zone_ls_metro',
+                    reclaimedForAuction: false,
+                    stewardDelegateCitizenId: null,
+                    inactivityStatus: 'active',
+                    isLocked: true,
+                    assessment: {
+                        price: 320000.00,
+                        baseMillageRate: 0.0150,
+                        effectiveMillageRate: 0.0225,
+                        holdingMultiplier: 1.50,
+                        propertiesOwned: 2,
+                        landAreaSqm: 180.00,
+                        millageTax: 2400.00,
+                        maintenanceTax: 200.00,
+                        penalty: 0.00,
+                        totalTaxDue: 2600.00
+                    },
+                    badge: {
+                        tier: 0,
+                        badgeClass: 'badge-success',
+                        statusLabel: 'RENDEZETT',
+                        description: 'Nincs hátralék, az ingatlan jogi státusza tiszta.'
+                    }
+                }
+            ],
+            stewardship: {
+                delegates: [
+                    {
+                        delegate_id: 1,
+                        owner_citizen_id: 'NYX-1001',
+                        delegate_citizen_id: 'NYX-9941',
+                        scope: 'all',
+                        first_name: 'Marcus',
+                        last_name: 'Holloway',
+                        is_active: 1,
+                        authorized_at: '2026-10-15 14:00',
+                        notes: 'Vezető jogi megbízott'
+                    }
+                ],
+                managedProperties: [
+                    {
+                        property_id: 301,
+                        property_code: 'wh_cypress_12',
+                        label: 'Cypress Flats Storage Depot',
+                        type: 'industrial',
+                        price: 190000.00,
+                        owner_citizen_id: 'NYX-4011',
+                        inactivity_status: 'delegated'
+                    }
+                ],
+                ownedProperties: []
+            },
+            reclamationLogs: [
+                {
+                    log_id: 101,
+                    asset_type: 'property',
+                    asset_id: 'wh_elysian_04',
+                    previous_owner_citizen_id: 'NYX-0042',
+                    delegate_citizen_id: null,
+                    action: 'forfeited_to_auction',
+                    auction_id: 2,
+                    liquidated_funds: 0.00,
+                    notes: '72 órás türelmi idő lejárt, nyilvános vakárverésre bocsátva.',
+                    timestamp: Math.floor(Date.now() / 1000) - 7200
+                },
+                {
+                    log_id: 98,
+                    asset_type: 'property',
+                    asset_id: 'store_vinewood_24',
+                    previous_owner_citizen_id: 'NYX-1001',
+                    delegate_citizen_id: 'NYX-9941',
+                    action: 'warning_cleared',
+                    auction_id: null,
+                    liquidated_funds: 0.00,
+                    notes: 'Gondnoki belépés hitelesítve, zárlati figyelmeztetés törölve.',
+                    timestamp: Math.floor(Date.now() / 1000) - 43200
+                }
+            ]
+        };
+    }
+    if (action === 'property:placeBid') {
+        showNotification({ type: 'success', title: 'ZÁRT LICIT LETÉTBE HELYEZVE', message: `$${data.bidAmount || 0} összegű titkos licit rögzítve az árverésre (#${data.auctionId}).` });
+        return { success: true, totalBidsPlaced: 4 };
+    }
+    if (action === 'property:payArrears') {
+        showNotification({ type: 'success', title: 'ADÓHÁTRALÉK RENDEZVE', message: 'Az ingatlan adótartozása sikeresen befizetve a városi kincstárba!' });
+        return { success: true };
+    }
+    if (action === 'property:repairCondition') {
+        showNotification({ type: 'success', title: 'SZERKEZETI FELÚJÍTÁS', message: 'Karbantartási díj átutalva, az ingatlan szerkezeti állapota 100%-ra visszaállítva.' });
+        return { success: true };
+    }
+    if (action === 'property:registerDelegate') {
+        showNotification({ type: 'success', title: 'MEGBÍZÁS RÖGZÍTVE', message: `Állampolgári gondnoki megbízás rögzítve: ${data.delegateCitizenId}` });
+        return { success: true };
+    }
+    if (action === 'property:revokeDelegate') {
+        showNotification({ type: 'info', title: 'MEGBÍZÁS VISSZAVONVA', message: `Gondnoki meghatalmazás visszavonva (${data.delegateCitizenId}).` });
+        return { success: true };
+    }
+    if (action === 'property:assignSteward') {
+        showNotification({ type: 'success', title: 'GONDNOK KIJELÖLVE', message: 'Ingatlan gondnoki kijelölése sikeresen frissítve.' });
+        return { success: true };
+    }
     return { success: true, devMode: true };
 }
 
@@ -754,6 +957,26 @@ const NyxState = {
         petitions: [],
         officials: [],
         citizenVotes: {}
+    },
+    property: {
+        isOpen: false,
+        activeTab: 'auctions',
+        citizenId: null,
+        citizenName: 'Állampolgár',
+        citizenBalance: 0,
+        auctions: [],
+        ownedProperties: [],
+        stewardship: {
+            delegates: [],
+            managedProperties: [],
+            ownedProperties: []
+        },
+        reclamationLogs: [],
+        selectedAuction: null,
+        selectedProperty: null,
+        searchQuery: '',
+        typeFilter: 'all',
+        statusFilter: 'all'
     },
     activeDialog: null
 };
@@ -2667,6 +2890,13 @@ async function openSubpoenaDisclosure(citizenId) {
             <h5><i class="fa-solid fa-chart-pie"></i> Vállalati Tulajdonrészek & Részvények</h5>
             ${sharesHtml || '<div class="subp-empty">Nincs társasági tulajdonrész.</div>'}
         </div>
+        <div class="subp-section">
+            <h5><i class="fa-solid fa-receipt"></i> Főkönyvi Tranzakciók</h5>
+            ${txHtml || '<div class="subp-empty">Nincsenek rögzített tranzakciók.</div>'}
+        </div>
+    `;
+}
+
 // 12D. Parliamentary Ranked-Choice Voting & Legislation Terminal
 function openParliamentUI(payload) {
     NyxState.parliament.isOpen = true;
@@ -3447,6 +3677,597 @@ async function submitParliamentRecall() {
     });
 }
 
+// 12E. Real Estate Blind-Auction & Stewardship Portal Controller
+function openPropertyPortal(payload) {
+    NyxState.property.isOpen = true;
+    const overlay = document.getElementById('property-portal-overlay');
+    if (overlay) overlay.classList.remove('hidden');
+
+    if (payload && payload.activeTab) {
+        NyxState.property.activeTab = payload.activeTab;
+    }
+
+    setPropertyTab(NyxState.property.activeTab || 'auctions');
+
+    if (payload && payload.data) {
+        applyPropertyOverviewData(payload.data);
+    } else {
+        refreshPropertyPortalOverview();
+    }
+}
+
+function closePropertyPortal() {
+    NyxState.property.isOpen = false;
+    const overlay = document.getElementById('property-portal-overlay');
+    if (overlay) overlay.classList.add('hidden');
+
+    closeAuctionBidModal();
+    closeAssignStewardModal();
+
+    postNui('closePropertyPortal', {});
+}
+
+function setPropertyTab(tabName) {
+    NyxState.property.activeTab = tabName;
+
+    // Update Tab Buttons
+    document.querySelectorAll('#property-portal-overlay .tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+    });
+
+    // Update Tab Panes
+    const auctionsPane = document.getElementById('prop-tab-auctions');
+    const taxPane = document.getElementById('prop-tab-taxation');
+    const stewardPane = document.getElementById('prop-tab-stewardship');
+
+    if (auctionsPane) auctionsPane.classList.toggle('hidden', tabName !== 'auctions');
+    if (taxPane) taxPane.classList.toggle('hidden', tabName !== 'taxation');
+    if (stewardPane) stewardPane.classList.toggle('hidden', tabName !== 'stewardship');
+
+    playWebBeep(640, 'sine', 0.04);
+
+    if (tabName === 'auctions') {
+        renderPropertyAuctions();
+    } else if (tabName === 'taxation') {
+        renderOwnedProperties();
+    } else if (tabName === 'stewardship') {
+        renderPropertyStewardship();
+    }
+}
+
+async function refreshPropertyPortalOverview() {
+    const res = await postNui('property:getOverview', {});
+    if (res && res.success) {
+        applyPropertyOverviewData(res);
+    }
+}
+
+function applyPropertyOverviewData(data) {
+    NyxState.property.citizenId = data.citizenId || null;
+    NyxState.property.citizenName = data.citizenName || 'Állampolgár';
+    NyxState.property.citizenBalance = Number(data.citizenBalance) || 0;
+    NyxState.property.auctions = data.auctions || [];
+    NyxState.property.ownedProperties = data.ownedProperties || [];
+    NyxState.property.stewardship = data.stewardship || { delegates: [], managedProperties: [], ownedProperties: [] };
+    NyxState.property.reclamationLogs = data.reclamationLogs || [];
+
+    // Header badge updates
+    const nameEl = document.getElementById('prop-citizen-name');
+    if (nameEl) nameEl.textContent = NyxState.property.citizenName;
+
+    const balEl = document.getElementById('prop-citizen-balance');
+    if (balEl) balEl.textContent = formatCurrency(NyxState.property.citizenBalance);
+
+    // Refresh active tab view
+    if (NyxState.property.activeTab === 'auctions') {
+        renderPropertyAuctions();
+    } else if (NyxState.property.activeTab === 'taxation') {
+        renderOwnedProperties();
+    } else if (NyxState.property.activeTab === 'stewardship') {
+        renderPropertyStewardship();
+    }
+}
+
+function renderPropertyAuctions() {
+    const grid = document.getElementById('prop-auctions-grid');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+    const query = (NyxState.property.searchQuery || '').toLowerCase();
+    const typeFilter = NyxState.property.typeFilter || 'all';
+
+    const filtered = (NyxState.property.auctions || []).filter(a => {
+        const matchesQuery = !query || 
+            (a.propertyLabel && a.propertyLabel.toLowerCase().includes(query)) ||
+            (a.propertyCode && a.propertyCode.toLowerCase().includes(query)) ||
+            (a.zoneId && a.zoneId.toLowerCase().includes(query));
+        const matchesType = typeFilter === 'all' || (a.propertyType && a.propertyType.toLowerCase() === typeFilter);
+        return matchesQuery && matchesType;
+    });
+
+    if (filtered.length === 0) {
+        grid.innerHTML = `<div class="table-empty-notice"><i class="fa-solid fa-gavel"></i> Jelenleg nincs aktív önkormányzati ingatlanárverés a megadott szűrési feltételekkel.</div>`;
+        return;
+    }
+
+    filtered.forEach(a => {
+        const card = document.createElement('div');
+        card.className = `auction-item-card ${a.hasPlacedBid ? 'has-bid' : ''}`;
+
+        const endsAtMs = new Date(a.endsAt).getTime();
+        const nowMs = Date.now();
+        const diffSec = Math.max(0, Math.floor((endsAtMs - nowMs) / 1000));
+        const hours = Math.floor(diffSec / 3600);
+        const mins = Math.floor((diffSec % 3600) / 60);
+        const timeStr = diffSec <= 0 ? 'LEJÁRT' : `${hours}ó ${mins}p`;
+
+        card.innerHTML = `
+            <div class="auction-card-header">
+                <div class="auction-title-block">
+                    <span class="auction-prop-label">${escapeHtml(a.propertyLabel || 'Ingatlan')}</span>
+                    <span class="auction-prop-sub"><i class="fa-solid fa-map-pin"></i> ${escapeHtml(a.zoneId || 'LS Metro')} &bull; <code>${escapeHtml(a.propertyCode || '')}</code></span>
+                </div>
+                <span class="badge ${a.hasPlacedBid ? 'badge-success' : 'badge-primary'}">${a.hasPlacedBid ? 'Licitáltál' : 'Vakárverés'}</span>
+            </div>
+
+            <div class="auction-specs-grid">
+                <div class="spec-cell">
+                    <span class="spec-cell-label">Becsült Érték</span>
+                    <span class="spec-cell-val">${formatCurrency(a.valuationPrice || 0)}</span>
+                </div>
+                <div class="spec-cell">
+                    <span class="spec-cell-label">Kikiáltási Ár</span>
+                    <span class="spec-cell-val text-cyan">${formatCurrency(a.minimumBid || 0)}</span>
+                </div>
+                <div class="spec-cell">
+                    <span class="spec-cell-label">Telekterület</span>
+                    <span class="spec-cell-val">${Math.floor(a.landAreaSqm || 150)} m²</span>
+                </div>
+                <div class="spec-cell">
+                    <span class="spec-cell-label">Titkos Licitek</span>
+                    <span class="spec-cell-val">${a.totalBidsPlaced || 0} letét</span>
+                </div>
+            </div>
+
+            <div class="auction-sealed-status-row">
+                <span><i class="fa-solid fa-user-shield"></i> Saját titkos letét:</span>
+                <strong class="${a.hasPlacedBid ? 'text-success' : 'text-muted'}">${a.hasPlacedBid ? formatCurrency(a.mySealedBid || 0) : 'Nincs licit'}</strong>
+            </div>
+
+            <div class="auction-timer-row">
+                <span><i class="fa-solid fa-clock"></i> Hátralévő idő:</span>
+                <span class="auction-timer-val">${timeStr}</span>
+            </div>
+
+            <button class="btn btn-primary btn-block prop-place-bid-btn" data-auction-id="${a.auctionId}">
+                <i class="fa-solid fa-coins"></i> ${a.hasPlacedBid ? 'Licit Emelése' : 'Zárt Licit Letétbe Helyezése'}
+            </button>
+        `;
+
+        const bidBtn = card.querySelector('.prop-place-bid-btn');
+        if (bidBtn) {
+            bidBtn.addEventListener('click', () => openAuctionBidModal(a));
+        }
+
+        grid.appendChild(card);
+    });
+}
+
+function renderOwnedProperties() {
+    const list = document.getElementById('prop-owned-list');
+    if (!list) return;
+
+    list.innerHTML = '';
+    const owned = NyxState.property.ownedProperties || [];
+
+    // Update KPI Ribbon
+    const ownedCountEl = document.getElementById('prop-kpi-owned-count');
+    if (ownedCountEl) ownedCountEl.textContent = owned.length;
+
+    let totalArrears = 0;
+    let holdingMult = 1.0;
+    if (owned.length > 1) {
+        holdingMult = Math.pow(1.5, owned.length - 1);
+    }
+    owned.forEach(p => {
+        totalArrears += (Number(p.delinquentAmount) || 0);
+    });
+
+    const holdingEl = document.getElementById('prop-kpi-holding-mult');
+    if (holdingEl) holdingEl.textContent = holdingMult.toFixed(2) + 'x';
+
+    const arrearsEl = document.getElementById('prop-kpi-total-arrears');
+    if (arrearsEl) arrearsEl.textContent = formatCurrency(totalArrears);
+
+    const query = (NyxState.property.searchQuery || '').toLowerCase();
+    const statusFilter = NyxState.property.statusFilter || 'all';
+
+    const filtered = owned.filter(p => {
+        const matchesQuery = !query || 
+            (p.label && p.label.toLowerCase().includes(query)) ||
+            (p.code && p.code.toLowerCase().includes(query)) ||
+            (p.zoneId && p.zoneId.toLowerCase().includes(query));
+        
+        let matchesStatus = true;
+        if (statusFilter === 'pristine') {
+            matchesStatus = (Number(p.maintenanceCondition || 100) >= 95 && Number(p.delinquencyTier || 0) === 0);
+        } else if (statusFilter === 'delinquent') {
+            matchesStatus = (Number(p.delinquencyTier || 0) > 0 || Number(p.delinquentAmount || 0) > 0);
+        } else if (statusFilter === 'auctioned') {
+            matchesStatus = (p.reclaimedForAuction === true);
+        }
+
+        return matchesQuery && matchesStatus;
+    });
+
+    if (filtered.length === 0) {
+        list.innerHTML = `<div class="table-empty-notice"><i class="fa-solid fa-house-chimney"></i> Nincs a szűrésnek megfelelő saját ingatlan a nyilvántartásban.</div>`;
+        return;
+    }
+
+    filtered.forEach(p => {
+        const card = document.createElement('div');
+        const tier = Number(p.delinquencyTier) || 0;
+        const arrears = Number(p.delinquentAmount) || 0;
+        const cond = Math.min(100, Math.max(0, Number(p.maintenanceCondition) || 100));
+
+        let tierClass = 'delinquent-clean';
+        if (tier >= 3) tierClass = 'delinquent-danger';
+        else if (tier > 0) tierClass = 'delinquent-warning';
+
+        card.className = `owned-prop-card ${tierClass}`;
+
+        let condFillClass = 'good';
+        if (cond < 50) condFillClass = 'bad';
+        else if (cond < 80) condFillClass = 'medium';
+
+        card.innerHTML = `
+            <div class="owned-prop-info">
+                <span class="owned-prop-label">${escapeHtml(p.label || 'Ingatlan')}</span>
+                <span class="owned-prop-sub"><code>${escapeHtml(p.code || '')}</code> &bull; ${escapeHtml(p.zoneId || '')} &bull; ${Math.floor(p.landAreaSqm || 150)} m²</span>
+            </div>
+
+            <div class="condition-progress-block">
+                <div class="spec-cell-label">Szerkezet: ${cond.toFixed(1)}%</div>
+                <div class="condition-track">
+                    <div class="condition-fill ${condFillClass}" style="width: ${cond}%;"></div>
+                </div>
+            </div>
+
+            <div>
+                <span class="badge ${p.badge ? p.badge.badgeClass : (tier > 0 ? 'badge-danger' : 'badge-success')}">
+                    ${p.badge ? p.badge.statusLabel : (tier > 0 ? `Fokozat ${tier}` : 'Rendezett')}
+                </span>
+                ${arrears > 0 ? `<div class="text-danger" style="font-size: 11px; margin-top: 3px;">Hátralék: ${formatCurrency(arrears)}</div>` : ''}
+            </div>
+
+            <div>
+                <span class="spec-cell-label">Gondnok</span>
+                <div style="font-size: 12px; font-weight: 600; color: var(--color-text-primary);">
+                    ${p.stewardDelegateCitizenId ? `<i class="fa-solid fa-user-shield text-cyan"></i> ${escapeHtml(p.stewardDelegateCitizenId)}` : '<span class="text-muted">Nincs kijelölve</span>'}
+                </div>
+            </div>
+
+            <div class="owned-actions-group">
+                ${arrears > 0 ? `<button class="btn btn-danger btn-sm prop-pay-arrears-btn" data-id="${p.id}"><i class="fa-solid fa-receipt"></i> Befizetés</button>` : ''}
+                ${cond < 100 ? `<button class="btn btn-warning btn-sm prop-repair-btn" data-id="${p.id}"><i class="fa-solid fa-hammer"></i> Felújítás</button>` : ''}
+                <button class="btn btn-secondary btn-sm prop-assign-btn" data-id="${p.id}"><i class="fa-solid fa-user-gear"></i> Gondnok</button>
+            </div>
+        `;
+
+        const payBtn = card.querySelector('.prop-pay-arrears-btn');
+        if (payBtn) payBtn.addEventListener('click', () => handlePayArrears(p.id));
+
+        const repairBtn = card.querySelector('.prop-repair-btn');
+        if (repairBtn) repairBtn.addEventListener('click', () => handleRepairCondition(p.id));
+
+        const assignBtn = card.querySelector('.prop-assign-btn');
+        if (assignBtn) assignBtn.addEventListener('click', () => openAssignStewardModal(p));
+
+        list.appendChild(card);
+    });
+}
+
+function renderPropertyStewardship() {
+    const delegatesList = document.getElementById('prop-delegates-list');
+    const managedList = document.getElementById('prop-managed-properties-list');
+    const logsList = document.getElementById('prop-reclamation-logs-list');
+
+    const stewardship = NyxState.property.stewardship || { delegates: [], managedProperties: [] };
+    const delegates = stewardship.delegates || [];
+    const managed = stewardship.managedProperties || [];
+    const logs = NyxState.property.reclamationLogs || [];
+
+    // Delegates badge
+    const delBadge = document.getElementById('prop-delegates-count-badge');
+    if (delBadge) delBadge.textContent = `${delegates.length} megbízott`;
+
+    const manBadge = document.getElementById('prop-managed-count-badge');
+    if (manBadge) manBadge.textContent = `${managed.length} ingatlan`;
+
+    if (delegatesList) {
+        delegatesList.innerHTML = '';
+        if (delegates.length === 0) {
+            delegatesList.innerHTML = `<div class="table-empty-notice"><i class="fa-solid fa-users"></i> Nincs kijelölt megbízottad.</div>`;
+        } else {
+            delegates.forEach(d => {
+                const item = document.createElement('div');
+                item.className = 'delegate-card-item';
+                item.innerHTML = `
+                    <div>
+                        <div style="font-weight: 700; color: var(--color-text-primary);"><i class="fa-solid fa-user-shield text-cyan"></i> ${escapeHtml(d.delegate_citizen_id)} (${escapeHtml((d.first_name || '') + ' ' + (d.last_name || ''))})</div>
+                        <div style="font-size: 11px; color: var(--color-text-secondary);">Hatókör: <code>${escapeHtml(d.scope || 'all')}</code> &bull; ${escapeHtml(d.notes || 'Meghatalmazva')}</div>
+                    </div>
+                    <button class="btn btn-danger btn-sm prop-revoke-delegate-btn" data-citid="${d.delegate_citizen_id}"><i class="fa-solid fa-user-xmark"></i> Visszavonás</button>
+                `;
+                const revBtn = item.querySelector('.prop-revoke-delegate-btn');
+                if (revBtn) revBtn.addEventListener('click', () => handleRevokeDelegate(d.delegate_citizen_id));
+                delegatesList.appendChild(item);
+            });
+        }
+    }
+
+    if (managedList) {
+        managedList.innerHTML = '';
+        if (managed.length === 0) {
+            managedList.innerHTML = `<div class="table-empty-notice"><i class="fa-solid fa-shield-halved"></i> Jelenleg nem vagy kijelölt gondnok más állampolgár ingatlanán.</div>`;
+        } else {
+            managed.forEach(m => {
+                const item = document.createElement('div');
+                item.className = 'managed-card-item';
+                item.innerHTML = `
+                    <div>
+                        <div style="font-weight: 700; color: var(--color-text-primary);"><i class="fa-solid fa-building text-success"></i> ${escapeHtml(m.label || m.property_code)}</div>
+                        <div style="font-size: 11px; color: var(--color-text-secondary);">Tulajdonos: <code>${escapeHtml(m.owner_citizen_id || 'Ismeretlen')}</code> &bull; Státusz: <span class="badge badge-success">${escapeHtml(m.inactivity_status || 'delegated')}</span></div>
+                    </div>
+                    <span class="badge badge-outline"><i class="fa-solid fa-shield"></i> Védett</span>
+                `;
+                managedList.appendChild(item);
+            });
+        }
+    }
+
+    if (logsList) {
+        logsList.innerHTML = '';
+        if (logs.length === 0) {
+            logsList.innerHTML = `<div class="table-empty-notice"><i class="fa-solid fa-clock-rotate-left"></i> Nincs rögzített inaktivitási bejegyzés.</div>`;
+        } else {
+            logs.forEach(l => {
+                const item = document.createElement('div');
+                let actClass = '';
+                if (l.action === 'forfeited_to_auction') actClass = 'forfeited';
+                else if (l.action === 'warning_cleared') actClass = 'cleared';
+                item.className = `reclamation-log-item ${actClass}`;
+                item.innerHTML = `
+                    <div>
+                        <strong style="color: var(--color-text-primary); text-transform: uppercase;">${escapeHtml(l.action || '')}</strong>
+                        <div style="color: var(--color-text-secondary); font-size: 11px;">Eszköz: <code>${escapeHtml(l.asset_id || '')}</code> (${escapeHtml(l.asset_type || '')}) &bull; ${escapeHtml(l.notes || '')}</div>
+                    </div>
+                    <span class="badge badge-outline">${l.timestamp ? new Date(l.timestamp * 1000).toLocaleDateString() : 'Nemrég'}</span>
+                `;
+                logsList.appendChild(item);
+            });
+        }
+    }
+}
+
+// Modal: Place Sealed Blind Auction Bid
+function openAuctionBidModal(auction) {
+    NyxState.property.selectedAuction = auction;
+    const modal = document.getElementById('property-submodal-bid');
+    if (!modal) return;
+
+    const titleEl = document.getElementById('prop-bid-target-title');
+    if (titleEl) titleEl.textContent = `${auction.propertyLabel} (${auction.propertyCode})`;
+
+    const floorEl = document.getElementById('prop-bid-min-floor');
+    if (floorEl) floorEl.textContent = formatCurrency(auction.minimumBid || 0);
+
+    const mineEl = document.getElementById('prop-bid-current-mine');
+    if (mineEl) mineEl.textContent = auction.hasPlacedBid ? formatCurrency(auction.mySealedBid || 0) : '$0.00';
+
+    const availEl = document.getElementById('prop-bid-bank-avail');
+    if (availEl) availEl.textContent = formatCurrency(NyxState.property.citizenBalance || 0);
+
+    const inputEl = document.getElementById('property-bid-input');
+    if (inputEl) {
+        inputEl.value = Math.max(Number(auction.minimumBid) || 0, Number(auction.mySealedBid) || 0) + 500;
+    }
+
+    const hintEl = document.getElementById('prop-bid-error-hint');
+    if (hintEl) hintEl.classList.add('hidden');
+
+    modal.classList.remove('hidden');
+    playWebBeep(720, 'sine', 0.05);
+}
+
+function closeAuctionBidModal() {
+    NyxState.property.selectedAuction = null;
+    const modal = document.getElementById('property-submodal-bid');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function submitAuctionBid() {
+    const auction = NyxState.property.selectedAuction;
+    if (!auction) return;
+
+    const inputEl = document.getElementById('property-bid-input');
+    const bidAmount = Number(inputEl ? inputEl.value : 0);
+
+    if (bidAmount < (Number(auction.minimumBid) || 0)) {
+        const hintEl = document.getElementById('prop-bid-error-hint');
+        if (hintEl) {
+            hintEl.textContent = `A licitnek el kell érnie a kikiáltási árat (${formatCurrency(auction.minimumBid)})!`;
+            hintEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    const submitBtn = document.getElementById('property-bid-submit-btn');
+    lockButtonAction(submitBtn, async () => {
+        const res = await postNui('property:placeBid', {
+            auctionId: auction.auctionId,
+            bidAmount: bidAmount
+        });
+
+        if (res && res.success) {
+            playWebBeep(980, 'sine', 0.1);
+            showNotification({ type: 'success', title: 'ZÁRT LICIT ELFOGADVA', message: `Sikeresen elhelyezted a(z) ${formatCurrency(bidAmount)} összegű zárt letétet!` });
+            closeAuctionBidModal();
+            refreshPropertyPortalOverview();
+        } else {
+            showNotification({ type: 'error', title: 'LICIT SIKERTELEN', message: res?.error || 'Nem sikerült letétbe helyezni a licitet.' });
+        }
+    });
+}
+
+// Modal: Assign Property Steward
+function openAssignStewardModal(prop) {
+    NyxState.property.selectedProperty = prop;
+    const modal = document.getElementById('property-submodal-assign');
+    if (!modal) return;
+
+    const labelEl = document.getElementById('prop-assign-prop-label');
+    if (labelEl) labelEl.value = `${prop.label} (${prop.code})`;
+
+    const selectEl = document.getElementById('property-assign-delegate-select');
+    if (selectEl) {
+        selectEl.innerHTML = '<option value="">-- Nincs gondnok (Kijelölés törlése) --</option>';
+        const delegates = (NyxState.property.stewardship && NyxState.property.stewardship.delegates) || [];
+        delegates.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.delegate_citizen_id;
+            opt.textContent = `${d.delegate_citizen_id} - ${d.first_name || ''} ${d.last_name || ''} (${d.scope || 'all'})`;
+            if (prop.stewardDelegateCitizenId === d.delegate_citizen_id) {
+                opt.selected = true;
+            }
+            selectEl.appendChild(opt);
+        });
+    }
+
+    modal.classList.remove('hidden');
+    playWebBeep(720, 'sine', 0.05);
+}
+
+function closeAssignStewardModal() {
+    NyxState.property.selectedProperty = null;
+    const modal = document.getElementById('property-submodal-assign');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function submitAssignSteward() {
+    const prop = NyxState.property.selectedProperty;
+    if (!prop) return;
+
+    const selectEl = document.getElementById('property-assign-delegate-select');
+    const delegateId = selectEl ? selectEl.value : null;
+
+    const submitBtn = document.getElementById('property-assign-submit-btn');
+    lockButtonAction(submitBtn, async () => {
+        const res = await postNui('property:assignSteward', {
+            propertyId: prop.id,
+            delegateCitizenId: delegateId || null
+        });
+
+        if (res && res.success) {
+            playWebBeep(880, 'sine', 0.08);
+            showNotification({ type: 'success', title: 'GONDNOK FRISSÍTVE', message: 'Az ingatlan gondnoki megbízása rögzítésre került.' });
+            closeAssignStewardModal();
+            refreshPropertyPortalOverview();
+        } else {
+            showNotification({ type: 'error', title: 'SIKERTELEN KIJELÖLÉS', message: res?.error || 'Nem sikerült kijelölni a gondnokot.' });
+        }
+    });
+}
+
+async function handlePayArrears(propertyId) {
+    openDialog({
+        title: 'Adóhátralék Rendezése',
+        message: 'Biztosan befizeted az esedékes ingatlanadó hátralékot a városi kincstárnak?',
+        onConfirm: async () => {
+            const res = await postNui('property:payArrears', { propertyId: propertyId });
+            if (res && res.success) {
+                playWebBeep(980, 'sine', 0.1);
+                showNotification({ type: 'success', title: 'HÁTRALÉK RENDEZVE', message: 'Az adóhátralék sikeresen kiegyenlítve!' });
+                refreshPropertyPortalOverview();
+            } else {
+                showNotification({ type: 'error', title: 'BEFIZETÉS SIKERTELEN', message: res?.error || 'Nincs fedezet vagy hiba történt.' });
+            }
+        }
+    });
+}
+
+async function handleRepairCondition(propertyId) {
+    openDialog({
+        title: 'Szerkezeti Felújítás',
+        message: 'Megrendeled az ingatlan azonnali szerkezeti felújítását (100% állapot) a Közművektől?',
+        onConfirm: async () => {
+            const res = await postNui('property:repairCondition', { propertyId: propertyId });
+            if (res && res.success) {
+                playWebBeep(980, 'sine', 0.1);
+                showNotification({ type: 'success', title: 'FELÚJÍTÁS SIKERES', message: 'Az ingatlan szerkezeti állapota 100%-ra visszaállítva!' });
+                refreshPropertyPortalOverview();
+            } else {
+                showNotification({ type: 'error', title: 'FELÚJÍTÁS SIKERTELEN', message: res?.error || 'Nincs fedezet vagy nem vagy tulajdonos.' });
+            }
+        }
+    });
+}
+
+async function handleAppointDelegate() {
+    const citIdInput = document.getElementById('prop-input-delegate-citid');
+    const scopeSelect = document.getElementById('prop-select-delegate-scope');
+    const notesInput = document.getElementById('prop-input-delegate-notes');
+
+    const delegateCitizenId = citIdInput ? citIdInput.value.trim() : '';
+    const scope = scopeSelect ? scopeSelect.value : 'all';
+    const notes = notesInput ? notesInput.value.trim() : '';
+
+    if (!delegateCitizenId || delegateCitizenId.length < 3) {
+        showNotification({ type: 'warning', title: 'ÉRVÉNYTELEN AZONOSÍTÓ', message: 'Kérlek adj meg egy érvényes Citizen ID-t!' });
+        return;
+    }
+
+    const btn = document.getElementById('prop-btn-appoint-delegate');
+    lockButtonAction(btn, async () => {
+        const res = await postNui('property:registerDelegate', {
+            delegateCitizenId: delegateCitizenId,
+            scope: scope,
+            notes: notes
+        });
+
+        if (res && res.success) {
+            playWebBeep(920, 'sine', 0.1);
+            showNotification({ type: 'success', title: 'MEGHATALMAZÁS RÖGZÍTVE', message: `Gondnoki megbízás bejegyezve (${delegateCitizenId}).` });
+            if (citIdInput) citIdInput.value = '';
+            if (notesInput) notesInput.value = '';
+            refreshPropertyPortalOverview();
+        } else {
+            showNotification({ type: 'error', title: 'MEGBÍZÁS SIKERTELEN', message: res?.error || 'Nem sikerült bejegyezni a megbízást.' });
+        }
+    });
+}
+
+async function handleRevokeDelegate(delegateCitizenId) {
+    openDialog({
+        title: 'Meghatalmazás Visszavonása',
+        message: `Biztosan visszavonod a(z) ${delegateCitizenId} polgár gondnoki meghatalmazását?`,
+        onConfirm: async () => {
+            const res = await postNui('property:revokeDelegate', {
+                delegateCitizenId: delegateCitizenId
+            });
+            if (res && res.success) {
+                playWebBeep(880, 'sine', 0.08);
+                showNotification({ type: 'info', title: 'MEGHATALMAZÁS VISSZAVONVA', message: 'A gondnoki megbízás sikeresen törölve.' });
+                refreshPropertyPortalOverview();
+            } else {
+                showNotification({ type: 'error', title: 'HIBA', message: res?.error || 'Nem sikerült visszavonni.' });
+            }
+        }
+    });
+}
+
+
 // 13. Global NUI Envelope Dispatcher
 window.addEventListener('message', (event) => {
     const packet = event.data;
@@ -3534,6 +4355,13 @@ window.addEventListener('message', (event) => {
         openParliamentUI(packet.payload);
     } else if (action === 'PARLIAMENT_UI_CLOSE') {
         closeParliamentUI();
+    }
+
+    // Real Estate Blind-Auction & Stewardship Portal
+    else if (action === 'PROPERTY_PORTAL_OPEN') {
+        openPropertyPortal(packet.payload);
+    } else if (action === 'PROPERTY_PORTAL_CLOSE') {
+        closePropertyPortal();
     }
 });
 
@@ -3977,6 +4805,30 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('parliament-select-bill-field')?.addEventListener('change', updateParliamentBillBoundsHint);
     document.getElementById('parliament-submit-bill-btn')?.addEventListener('click', submitParliamentBill);
 
+    // Real Estate Blind-Auction & Stewardship Portal Listeners
+    document.getElementById('property-portal-close-btn')?.addEventListener('click', closePropertyPortal);
+
+    document.querySelectorAll('#property-portal-overlay .tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.getAttribute('data-tab');
+            if (tab) setPropertyTab(tab);
+        });
+    });
+
+    document.getElementById('prop-auctions-search')?.addEventListener('input', renderPropertyAuctions);
+    document.getElementById('prop-auctions-type-filter')?.addEventListener('change', renderPropertyAuctions);
+    document.getElementById('prop-owned-search')?.addEventListener('input', renderOwnedProperties);
+    document.getElementById('prop-owned-status-filter')?.addEventListener('change', renderOwnedProperties);
+
+    document.getElementById('property-submodal-bid-close')?.addEventListener('click', closeAuctionBidModal);
+    document.getElementById('property-bid-cancel-btn')?.addEventListener('click', closeAuctionBidModal);
+    document.getElementById('property-bid-submit-btn')?.addEventListener('click', submitAuctionBid);
+
+    document.getElementById('property-submodal-assign-close')?.addEventListener('click', closeAssignStewardModal);
+    document.getElementById('property-assign-cancel-btn')?.addEventListener('click', closeAssignStewardModal);
+    document.getElementById('property-assign-submit-btn')?.addEventListener('click', submitAssignSteward);
+    document.getElementById('prop-btn-appoint-delegate')?.addEventListener('click', () => openAssignStewardModal(null));
+
     // Dialog Confirm & Cancel
     document.getElementById('dialog-confirm-btn')?.addEventListener('click', () => closeDialog(true));
     document.getElementById('dialog-cancel-btn')?.addEventListener('click', () => closeDialog(false));
@@ -4026,6 +4878,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const propBidSubmodal = document.getElementById('property-submodal-bid');
+            if (propBidSubmodal && !propBidSubmodal.classList.contains('hidden')) {
+                closeAuctionBidModal();
+                return;
+            }
+
+            const propAssignSubmodal = document.getElementById('property-submodal-assign');
+            if (propAssignSubmodal && !propAssignSubmodal.classList.contains('hidden')) {
+                closeAssignStewardModal();
+                return;
+            }
+
             const dialogOverlay = document.getElementById('dialog-overlay');
             if (dialogOverlay && !dialogOverlay.classList.contains('hidden')) {
                 closeDialog(false);
@@ -4056,6 +4920,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (NyxState.parliament.isOpen) {
                 closeParliamentUI();
+                return;
+            }
+            if (NyxState.property.isOpen) {
+                closePropertyPortal();
                 return;
             }
             if (NyxState.mdt.isOpen) {
@@ -4223,6 +5091,14 @@ function initBrowserDevMode() {
             closeParliamentUI();
         } else {
             openParliamentUI({ activeTab: 'ballot' });
+        }
+    });
+
+    document.getElementById('dev-btn-property')?.addEventListener('click', () => {
+        if (NyxState.property.isOpen) {
+            closePropertyPortal();
+        } else {
+            openPropertyPortal({ activeTab: 'auctions' });
         }
     });
 

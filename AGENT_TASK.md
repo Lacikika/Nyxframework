@@ -51,7 +51,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Parliamentary Ranked-Choice Voting & Legislation UI (`nyx_ui` & `nyx_parliament`)**
   - **Implementation:** Interactive Instant-Runoff Voting (IRV) ballot interface, candidate endorsement registration portal, and live penal code amendment reader.
 
-- [ ] **Feature: Property Blind-Auction & Stewardship Portal (`nyx_ui` & `nyx_properties`)**
+- [x] **Feature: Property Blind-Auction & Stewardship Portal (`nyx_ui` & `nyx_properties`)**
   - **Implementation:** Real estate web application supporting blind-auction foreclosure bidding, tax delinquency settlements, and proxy stewardship assignments.
 
 - [ ] **Feature: 3D Warehouse Matrix & Elastic Market Monitor (`nyx_ui` & `nyx_logistics`)**
@@ -107,6 +107,42 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Property Blind-Auction & Stewardship Portal (`nyx_ui` & `nyx_properties`)**
+  - **Database Migration (`037_property_blind_auction_and_stewardship_portal.sql`, `index.json`)**:
+    - Created `nyx_property_auction_bids` immutable sealed bid ledger (`bid_id`, `auction_id`, `bidder_citizen_id`, `bid_amount`, `is_refunded`, `is_sealed`, `placed_at`, `refunded_at`, `treasury_tx_uuid`).
+    - Extended `nyx_property_auctions` with `is_blind` (TINYINT default 1) and `total_bids_placed` (INT UNSIGNED default 0).
+    - Extended `nyx_stewardship_delegates` with `revocation_reason` (VARCHAR(255)).
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 37) and mirrored to `FiveM/nyx_properties/sql/migrations/`.
+  - **Shared Pure Lua 5.4 Logic Engine (`nyx_properties/shared/portal_ui.lua`, `fxmanifest.lua`)**:
+    - Implemented `Nyx.PropertyPortalUI.FormatCurrency` for standard US dollar representation with thousand separators.
+    - Implemented `Nyx.PropertyPortalUI.ValidateBidPayload` enforcing positive numeric amounts, 2-decimal rounding, minimum floor checking, and bank balance sufficiency.
+    - Implemented `Nyx.PropertyPortalUI.MaskBlindAuction` enforcing bid confidentiality (hiding `highest_bid` and `highest_bidder` from competing viewers, exposing sealed bids only to leading bidder).
+    - Implemented `Nyx.PropertyPortalUI.ValidateDelegationPayload` enforcing self-delegation guard (`delegateCitizenId ~= ownerCitizenId`), valid scope whitelist (`maintenance`, `sublease`, `full`), and notes sanitization.
+    - Implemented `Nyx.PropertyPortalUI.ValidateStewardAssignmentPayload` for municipal administrative stewardship enforcement with tax settlement caps.
+    - Implemented `Nyx.PropertyPortalUI.FilterPropertiesCatalog` multi-dimensional search across titles, addresses, property IDs, property types, and delinquency statuses.
+    - Implemented `Nyx.PropertyPortalUI.FormatDelinquencyBadge` providing 4-tier taxonomy (`NAPRAKÉSZ`, `FIGYELMEZTETÉS`, `ADÓZÁLOG`, `LEFOGLALVA`).
+    - Implemented `Nyx.PropertyPortalUI.CalculateRemainingTime` providing countdown formatting and expiration detection.
+    - Registered `shared/portal_ui.lua` in `FiveM/nyx_properties/fxmanifest.lua`.
+  - **Server-Side RPC Enhancements & Auction Bid Ledger (`nyx_properties/server/`)**:
+    - Updated `PlaceAuctionBid` in `auction.lua` to validate bids, insert immutable bid records, update `total_bids_placed`, and automatically refund outbid sealed bids with closed-loop balance restoration.
+    - Added `GetRealEstatePortalOverview` in `auction.lua` aggregating masked blind auctions, owned properties with tax assessments and delinquency badges, proxy stewardship delegates and managed assets, and recent municipal reclamation audit logs.
+    - Added `GetAuctionBidsHistory` in `auction.lua` returning caller-sanitized auction bid ledgers.
+    - Registered RPC endpoints: `properties:getRealEstatePortalOverview`, `properties:getPortalOverview`, `properties:placeSealedBid`, `properties:getAuctionBidsHistory`.
+    - Exported `GetRealEstatePortalOverview` and `GetAuctionBidsHistory` in `exports.lua`.
+  - **Client-Side Dispatch & UI Bridge (`nyx_properties/client/`, `nyx_ui/client/`)**:
+    - Created `nyx_properties/client/portal_ui.lua` with `OpenPortal(options)`, `ClosePortal()`, chat commands `/realestate`, `/auctions`, `/myproperties`, `/stewardship`, and exports. Registered in `fxmanifest.lua`.
+    - Updated `nyx_properties/client/interact.lua` adding entrance target option `Ingatlan Portál & Árverések`.
+    - Updated `nyx_ui/client/bridge.lua` whitelisting property parameters (`auctionId`, `propertyId`, `bidAmount`, `delegateCitizenId`, `scope`, `notes`, `statusFilter`, `typeFilter`, `searchQuery`) in `SanitizePayload`, and registering 13 safe NUI callbacks (`closePropertyPortal`, `property:getOverview`, `property:getActiveAuctions`, `property:placeBid`, `property:getAuctionBids`, `property:payArrears`, `property:repairCondition`, `property:getTaxAssessment`, `property:registerDelegate`, `property:revokeDelegate`, `property:assignSteward`, `property:getMyStewardship`, `property:getInactivityAuditLogs`).
+    - Updated `nyx_ui/client/exports.lua` exporting `OpenPropertyPortal`, `ClosePropertyPortal`, and mapping aliases in `OpenView`.
+  - **Web Single-Frame CEF SPA (`nyx_ui/web/`)**:
+    - *HTML (`index.html`)*: Section 8E `#property-portal-overlay` modal featuring 3 tabs (Önkormányzati Vakárverések, Saját Ingatlanok & Adózás, Gondnokság & Megbízások), submodals (`#property-submodal-bid`, `#property-submodal-assign`), and `#dev-btn-property` in toolbar.
+    - *CSS (`css/app.css`)*: Section 19 CEF-compliant styling strictly adhering to render budget (high-opacity dark surfaces `rgba(12, 15, 22, 0.96)`, zero GPU shaders, zero `backdrop-filter`, zero `blur()`, touch targets $\ge 40$px, WCAG AA+ contrast).
+    - *JavaScript (`js/app.js`)*: Added `NyxState.property` reactive state, message listeners (`PROPERTY_PORTAL_OPEN`/`CLOSE`), tab switching, sealed-bid auction card rendering with confidentiality badges, sealed-bid submission dialog with auto-refund warning, owned properties rendering with structural condition bars and tax delinquency ribbons, tax arrears settlement, structural repairs, proxy stewardship delegate appointment and revocation, managed properties list, municipal reclamation audit logs, hierarchical submodal escape handling, and browser dev mode mock telemetry.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestPropertyBlindAuctionAndStewardshipUI()` (Test 32) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_property_auction_stewardship_ui.py` covering sealed-bid validation, blind-auction data confidentiality, proxy stewardship delegation validation, property catalog filtering, delinquency badge taxonomy, countdown timers, currency formatting, migration 037 schema, web HTML structure, CEF CSS budget, JS state handlers, and bridge registration (11/11 passing).
+    - Full pytest suite: 277/277 tests passing (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 212 Lua files, 37 migrations, 100% clean verification.
 - **[2026-10-18] Feature: Parliamentary Ranked-Choice Voting & Legislation UI (`nyx_ui` & `nyx_parliament`)**
   - **Database Migration (`036_parliament_voting_ui_and_legislation_audit.sql`, `index.json`)**:
     - Created `nyx_parliament_amendment_audit` immutable audit ledger (`audit_id`, `session_id`, `law_id`, `field`, `old_value`, `new_value`, `enacted_by_session_title`, `enacted_at`).

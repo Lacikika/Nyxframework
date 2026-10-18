@@ -18,7 +18,8 @@ version '1.1.0'
 shared_scripts {
     'config.lua',
     'shared/taxation.lua',
-    'shared/inactivity.lua'
+    'shared/inactivity.lua',
+    'shared/portal_ui.lua'
 }
 
 server_scripts {
@@ -38,6 +39,7 @@ client_scripts {
     'client/taxation.lua',
     'client/inactivity.lua',
     'client/interact.lua',
+    'client/portal_ui.lua',
     'client/exports.lua'
 }
 

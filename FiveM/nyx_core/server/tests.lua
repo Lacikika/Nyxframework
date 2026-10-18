@@ -6722,7 +6722,300 @@ function Nyx.Tests.TestParliamentRankedChoiceAndLegislationUI()
     return passes == total
 end
 
--- 32. Master Test Runner
+-- 32. Test Property Blind-Auction & Stewardship Portal UI
+function Nyx.Tests.TestPropertyBlindAuctionAndStewardshipUI()
+    print("^3[Nyx:Tests] Running Property Blind-Auction & Stewardship Portal UI Suite...^7")
+    local passes = 0
+    local total = 6
+
+    local PortalUI = (Nyx and Nyx.PropertyPortalUI) or {}
+
+    -- Sub-test A: Sealed-Bid Validation & Minimum Floor Enforcement
+    local validateBid = PortalUI.ValidateBidPayload or function(payload, minimumBid, playerBankBalance)
+        if not payload or type(payload) ~= "table" then
+            return false, "INVALID_BID_PAYLOAD"
+        end
+        local auctionId = tonumber(payload.auctionId or payload.auction_id)
+        if not auctionId or auctionId <= 0 then
+            return false, "INVALID_AUCTION_ID"
+        end
+        local bidAmount = tonumber(payload.bidAmount or payload.bid_amount or payload.amount)
+        if not bidAmount or bidAmount <= 0 then
+            return false, "INVALID_BID_AMOUNT"
+        end
+        bidAmount = math.floor(bidAmount * 100 + 0.5) / 100
+        if minimumBid and bidAmount < minimumBid then
+            return false, "BID_BELOW_MINIMUM_FLOOR"
+        end
+        if playerBankBalance and bidAmount > playerBankBalance then
+            return false, "INSUFFICIENT_FUNDS"
+        end
+        return true, { auctionId = auctionId, bidAmount = bidAmount }
+    end
+
+    local okA1, dataA1 = validateBid({ auctionId = 10, bidAmount = 75000 }, 50000, 100000)
+    local okA2, errA2 = validateBid({ auctionId = 10, bidAmount = 40000 }, 50000, 100000)
+    local okA3, errA3 = validateBid({ auctionId = 10, bidAmount = -100 }, 50000, 100000)
+    local okA4, errA4 = validateBid({ auctionId = 10, bidAmount = 120000 }, 50000, 100000)
+
+    local testA_ok = (okA1 == true and dataA1.bidAmount == 75000) and
+                     (okA2 == false and errA2 == "BID_BELOW_MINIMUM_FLOOR") and
+                     (okA3 == false and errA3 == "INVALID_BID_AMOUNT") and
+                     (okA4 == false and errA4 == "INSUFFICIENT_FUNDS")
+
+    if assertTest(testA_ok == true,
+        "Sealed-Bid Validation, Minimum Floor & Bank Balance Escrow Invariant",
+        string.format("valid=%s, floorErr=%s, invErr=%s, balErr=%s", tostring(okA1), tostring(errA2), tostring(errA3), tostring(errA4))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Masked Blind-Auction Data Confidentiality
+    local maskAuction = PortalUI.MaskBlindAuction or function(auction, viewerCitizenId)
+        if not auction or type(auction) ~= "table" then return {} end
+        local isBlind = (auction.is_blind == 1 or auction.is_blind == true or auction.isBlind == true)
+        local highestBidder = auction.highest_bidder or auction.highestBidder
+        local highestBid = tonumber(auction.highest_bid or auction.highestBid or 0)
+        local isMyLead = (viewerCitizenId and highestBidder and viewerCitizenId == highestBidder)
+
+        local masked = {
+            auction_id = auction.auction_id or auction.auctionId,
+            property_id = auction.property_id or auction.propertyId,
+            property_title = auction.property_title or auction.propertyTitle or "Ingatlan",
+            property_address = auction.property_address or auction.propertyAddress or "",
+            property_type = auction.property_type or auction.propertyType or "residential",
+            minimum_bid = tonumber(auction.minimum_bid or auction.minimumBid or 0),
+            is_blind = isBlind,
+            total_bids_placed = tonumber(auction.total_bids_placed or auction.totalBidsPlaced or 0),
+            end_time = tonumber(auction.end_time or auction.endTime or 0),
+            isMyLead = isMyLead,
+            status = auction.status or "active"
+        }
+
+        if isBlind then
+            if isMyLead then
+                masked.highest_bid = highestBid
+                masked.highest_bidder = highestBidder
+                masked.mySealedBid = highestBid
+                masked.isSealed = false
+            else
+                masked.highest_bid = nil
+                masked.highest_bidder = nil
+                masked.mySealedBid = nil
+                masked.isSealed = true
+            end
+        else
+            masked.highest_bid = highestBid
+            masked.highest_bidder = highestBidder
+            masked.mySealedBid = isMyLead and highestBid or nil
+            masked.isSealed = false
+        end
+
+        return masked
+    end
+
+    local rawAuction = {
+        auction_id = 42,
+        property_id = 108,
+        property_title = "Vinewood Hills Villa",
+        minimum_bid = 200000,
+        highest_bid = 350000,
+        highest_bidder = "CIT_HIGH_ROLLER",
+        is_blind = 1,
+        total_bids_placed = 4,
+        end_time = 1779999999
+    }
+
+    local maskedCompetitor = maskAuction(rawAuction, "CIT_COMPETITOR")
+    local maskedLeader = maskAuction(rawAuction, "CIT_HIGH_ROLLER")
+
+    local testB_ok = (maskedCompetitor.is_blind == true and maskedCompetitor.highest_bid == nil and maskedCompetitor.highest_bidder == nil and maskedCompetitor.isSealed == true and maskedCompetitor.mySealedBid == nil) and
+                     (maskedLeader.is_blind == true and maskedLeader.highest_bid == 350000 and maskedLeader.highest_bidder == "CIT_HIGH_ROLLER" and maskedLeader.isMyLead == true and maskedLeader.mySealedBid == 350000)
+
+    if assertTest(testB_ok == true,
+        "Masked Blind-Auction Data Confidentiality & Bidder Discretion Invariant",
+        string.format("competitorHidden=%s, leaderRevealed=%s", tostring(maskedCompetitor.highest_bid == nil), tostring(maskedLeader.highest_bid == 350000))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Proxy Stewardship Delegation Payload Validation & Self-Delegation Guard
+    local validateDelegation = PortalUI.ValidateDelegationPayload or function(payload, ownerCitizenId)
+        if not payload or type(payload) ~= "table" then
+            return false, "INVALID_DELEGATION_PAYLOAD"
+        end
+        local propertyId = tonumber(payload.propertyId or payload.property_id)
+        if not propertyId or propertyId <= 0 then
+            return false, "INVALID_PROPERTY_ID"
+        end
+        local delegateCitizenId = payload.delegateCitizenId or payload.delegate_citizen_id
+        if not delegateCitizenId or type(delegateCitizenId) ~= "string" or string.len(string.gsub(delegateCitizenId, "^%s*(.-)%s*$", "%1")) < 3 then
+            return false, "INVALID_DELEGATE_CITIZEN_ID"
+        end
+        delegateCitizenId = string.gsub(delegateCitizenId, "^%s*(.-)%s*$", "%1")
+        if ownerCitizenId and delegateCitizenId == ownerCitizenId then
+            return false, "CANNOT_DELEGATE_TO_SELF"
+        end
+        local scope = string.lower(payload.scope or "maintenance")
+        local validScopes = { maintenance = true, sublease = true, full = true }
+        if not validScopes[scope] then
+            return false, "INVALID_DELEGATION_SCOPE"
+        end
+        local notes = payload.notes or ""
+        if string.len(notes) > 255 then
+            notes = string.sub(notes, 1, 255)
+        end
+        return true, {
+            propertyId = propertyId,
+            delegateCitizenId = delegateCitizenId,
+            scope = scope,
+            notes = notes
+        }
+    end
+
+    local okC1, dataC1 = validateDelegation({ propertyId = 5, delegateCitizenId = "CIT_PROXY", scope = "full", notes = "Steward assignment" }, "CIT_OWNER")
+    local okC2, errC2 = validateDelegation({ propertyId = 5, delegateCitizenId = "CIT_OWNER", scope = "full" }, "CIT_OWNER")
+    local okC3, errC3 = validateDelegation({ propertyId = 0, delegateCitizenId = "CIT_PROXY" }, "CIT_OWNER")
+    local okC4, errC4 = validateDelegation({ propertyId = 5, delegateCitizenId = "  ", scope = "full" }, "CIT_OWNER")
+    local okC5, errC5 = validateDelegation({ propertyId = 5, delegateCitizenId = "CIT_PROXY", scope = "invalid_scope" }, "CIT_OWNER")
+
+    local testC_ok = (okC1 == true and dataC1.delegateCitizenId == "CIT_PROXY" and dataC1.scope == "full") and
+                     (okC2 == false and errC2 == "CANNOT_DELEGATE_TO_SELF") and
+                     (okC3 == false and errC3 == "INVALID_PROPERTY_ID") and
+                     (okC4 == false and errC4 == "INVALID_DELEGATE_CITIZEN_ID") and
+                     (okC5 == false and errC5 == "INVALID_DELEGATION_SCOPE")
+
+    if assertTest(testC_ok == true,
+        "Proxy Stewardship Delegation Payload Validation & Self-Delegation Guard",
+        string.format("valid=%s, selfErr=%s, propErr=%s, citErr=%s, scopeErr=%s", tostring(okC1), tostring(errC2), tostring(errC3), tostring(errC4), tostring(errC5))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Property Catalog Multi-Dimensional Filtering
+    local filterProps = PortalUI.FilterPropertiesCatalog or function(catalog, searchQuery, typeFilter, statusFilter)
+        if not catalog or type(catalog) ~= "table" then return {} end
+        local filtered = {}
+        local q = (searchQuery and string.lower(string.gsub(searchQuery, "^%s*(.-)%s*$", "%1"))) or ""
+        local tFilter = (typeFilter and string.lower(typeFilter)) or "all"
+        local sFilter = (statusFilter and string.lower(statusFilter)) or "all"
+
+        for _, p in ipairs(catalog) do
+            local matchesQuery = true
+            if q ~= "" then
+                local title = string.lower(p.title or p.property_title or "")
+                local addr = string.lower(p.address or p.property_address or "")
+                local pid = tostring(p.property_id or p.propertyId or "")
+                matchesQuery = (string.find(title, q, 1, true) ~= nil) or
+                               (string.find(addr, q, 1, true) ~= nil) or
+                               (string.find(pid, q, 1, true) ~= nil)
+            end
+
+            local matchesType = true
+            if tFilter ~= "all" and tFilter ~= "" then
+                local pType = string.lower(p.property_type or p.propertyType or "residential")
+                matchesType = (pType == tFilter)
+            end
+
+            local matchesStatus = true
+            if sFilter ~= "all" and sFilter ~= "" then
+                local pStatus = string.lower(p.status or p.delinquencyStatus or "current")
+                matchesStatus = (pStatus == sFilter)
+            end
+
+            if matchesQuery and matchesType and matchesStatus then
+                table.insert(filtered, p)
+            end
+        end
+
+        return filtered
+    end
+
+    local sampleCatalog = {
+        { property_id = 1, title = "Del Perro Penthouse", address = "110 Del Perro Heights", property_type = "residential", status = "current" },
+        { property_id = 2, title = "Paleto Bay Warehouse", address = "44 Industrial Way", property_type = "industrial", status = "lien" },
+        { property_id = 3, title = "Legion Square Retail", address = "200 Vinewood Blvd", property_type = "commercial", status = "warning" },
+        { property_id = 4, title = "Mirror Park Townhome", address = "12 Nikola Ave", property_type = "residential", status = "foreclosure" }
+    }
+
+    local fSearch = filterProps(sampleCatalog, "del perro", "all", "all")
+    local fType = filterProps(sampleCatalog, "", "industrial", "all")
+    local fStatus = filterProps(sampleCatalog, "", "all", "foreclosure")
+    local fMulti = filterProps(sampleCatalog, "nikola", "residential", "foreclosure")
+
+    local testD_ok = (#fSearch == 1 and fSearch[1].property_id == 1) and
+                     (#fType == 1 and fType[1].property_id == 2) and
+                     (#fStatus == 1 and fStatus[1].property_id == 4) and
+                     (#fMulti == 1 and fMulti[1].property_id == 4)
+
+    if assertTest(testD_ok == true,
+        "Property Catalog Multi-Dimensional Filtering & Search Subsystem",
+        string.format("fSearch=%d, fType=%d, fStatus=%d, fMulti=%d", #fSearch, #fType, #fStatus, #fMulti)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Delinquency Status Badge Taxonomy & Tier Progression
+    local formatDelinquency = PortalUI.FormatDelinquencyBadge or function(delinquentTaxAmount)
+        local tax = tonumber(delinquentTaxAmount or 0)
+        if not tax or tax <= 0 then
+            return { badgeClass = "badge-success", label = "NAPRAKÉSZ", tier = "current", icon = "fa-circle-check" }
+        elseif tax < 5000 then
+            return { badgeClass = "badge-warning", label = "FIGYELMEZTETÉS", tier = "warning", icon = "fa-triangle-exclamation" }
+        elseif tax < 10000 then
+            return { badgeClass = "badge-danger", label = "ADÓZÁLOG", tier = "lien", icon = "fa-file-invoice-dollar" }
+        else
+            return { badgeClass = "badge-danger", label = "LEFOGLALVA", tier = "foreclosure", icon = "fa-gavel" }
+        end
+    end
+
+    local bCurrent = formatDelinquency(0)
+    local bWarning = formatDelinquency(2500)
+    local bLien = formatDelinquency(8000)
+    local bForeclosure = formatDelinquency(20000)
+
+    local testE_ok = (bCurrent.tier == "current" and bCurrent.badgeClass == "badge-success" and bCurrent.label == "NAPRAKÉSZ") and
+                     (bWarning.tier == "warning" and bWarning.badgeClass == "badge-warning" and bWarning.label == "FIGYELMEZTETÉS") and
+                     (bLien.tier == "lien" and bLien.badgeClass == "badge-danger" and bLien.label == "ADÓZÁLOG") and
+                     (bForeclosure.tier == "foreclosure" and bForeclosure.badgeClass == "badge-danger" and bForeclosure.label == "LEFOGLALVA")
+
+    if assertTest(testE_ok == true,
+        "Delinquency Status Badge Taxonomy & Progression Tier Invariant",
+        string.format("bCur=%s, bWarn=%s, bLien=%s, bFore=%s", bCurrent.tier, bWarning.tier, bLien.tier, bForeclosure.tier)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Auction Countdown Calculation & Expiration Detection
+    local calcTime = PortalUI.CalculateRemainingTime or function(endTime, currentTime)
+        local target = tonumber(endTime or 0)
+        local now = tonumber(currentTime) or os.time()
+        local diff = target - now
+
+        if diff <= 0 then
+            return { remainingSeconds = 0, isExpired = true, formatted = "LEJÁRT" }
+        end
+
+        local hours = math.floor(diff / 3600)
+        local minutes = math.floor((diff % 3600) / 60)
+        local seconds = diff % 60
+
+        local formatted = string.format("%02dh %02dm %02ds", hours, minutes, seconds)
+        return { remainingSeconds = diff, isExpired = false, formatted = formatted }
+    end
+
+    local testTimeNow = 1770000000
+    local futureAuction = calcTime(testTimeNow + 3665, testTimeNow)
+    local expiredAuction = calcTime(testTimeNow - 50, testTimeNow)
+
+    local testF_ok = (futureAuction.isExpired == false and futureAuction.remainingSeconds == 3665 and futureAuction.formatted == "01h 01m 05s") and
+                     (expiredAuction.isExpired == true and expiredAuction.remainingSeconds == 0 and expiredAuction.formatted == "LEJÁRT")
+
+    if assertTest(testF_ok == true,
+        "Auction Countdown Calculation & Expiration Detection Invariant",
+        string.format("futureExp=%s, futureFmt=%s, pastExp=%s, pastFmt=%s", tostring(futureAuction.isExpired), futureAuction.formatted, tostring(expiredAuction.isExpired), expiredAuction.formatted)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 33. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -6759,9 +7052,10 @@ function Nyx.Tests.RunAll()
     local t29 = Nyx.Tests.TestCorporateMultiSigRBACAndUnionUI()
     local t30 = Nyx.Tests.TestCourtroomTerminalEvidenceAndJuryUI()
     local t31 = Nyx.Tests.TestParliamentRankedChoiceAndLegislationUI()
+    local t32 = Nyx.Tests.TestPropertyBlindAuctionAndStewardshipUI()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

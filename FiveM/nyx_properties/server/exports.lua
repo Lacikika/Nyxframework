@@ -110,3 +110,18 @@ exports('SweepPropertyInactivity', function()
     end
     return nil
 end)
+
+exports('GetRealEstatePortalOverview', function(citizenId)
+    if Nyx.Properties.GetRealEstatePortalOverview then
+        return Nyx.Properties.GetRealEstatePortalOverview(citizenId)
+    end
+    return nil
+end)
+
+exports('GetAuctionBidsHistory', function(auctionId, citizenId)
+    if Nyx.Properties.GetAuctionBidsHistory then
+        return Nyx.Properties.GetAuctionBidsHistory(auctionId, citizenId)
+    end
+    return {}
+end)
+

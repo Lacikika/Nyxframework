@@ -23,6 +23,7 @@
             <button id="dev-btn-faction"><i class="fa-solid fa-building-user"></i> Corp/Union</button>
             <button id="dev-btn-court"><i class="fa-solid fa-scale-balanced"></i> Court</button>
             <button id="dev-btn-parliament"><i class="fa-solid fa-landmark"></i> Parliament</button>
+            <button id="dev-btn-property"><i class="fa-solid fa-building-columns"></i> Real Estate</button>
             <button id="dev-btn-freight"><i class="fa-solid fa-truck"></i> Freight</button>
             <button id="dev-btn-interact"><i class="fa-solid fa-crosshairs"></i> Target</button>
             <button id="dev-btn-place"><i class="fa-solid fa-arrows-up-down-left-right"></i> Place</button>
@@ -1426,6 +1427,232 @@
                 <div class="modal-footer">
                     <button id="parliament-recall-cancel-btn" class="btn btn-secondary">Mégse</button>
                     <button id="parliament-recall-submit-btn" class="btn btn-danger"><i class="fa-solid fa-user-xmark"></i> Petíció Hivatalos Indítása</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================
+             8E. REAL ESTATE BLIND-AUCTION & STEWARDSHIP PORTAL OVERLAY
+             ================================================================ -->
+        <div id="property-portal-overlay" class="modal-backdrop hidden">
+            <div class="modal-dialog property-portal-dialog">
+                <!-- Master Header -->
+                <div class="modal-header">
+                    <div class="header-titles">
+                        <h3><i class="fa-solid fa-building-columns icon-accent cyan"></i> Ingatlan Árverés & Gondnoksági Portál</h3>
+                        <span class="header-subtitle">Önkormányzati vakárverések, telekadó-hátralék rendezés és felhatalmazott ingatlangondnokság</span>
+                    </div>
+                    <div class="header-meta">
+                        <span id="prop-citizen-badge" class="badge badge-primary"><i class="fa-solid fa-user"></i> <span id="prop-citizen-name">Állampolgár</span></span>
+                        <span id="prop-balance-badge" class="badge badge-success"><i class="fa-solid fa-building-columns"></i> <span id="prop-citizen-balance">$0.00</span></span>
+                        <button id="property-portal-close-btn" class="icon-btn" title="Bezárás (ESC)"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                </div>
+
+                <!-- Master Navigation Tabs -->
+                <div class="modal-tabs">
+                    <button class="tab-btn active" data-tab="auctions" id="prop-tab-btn-auctions">
+                        <i class="fa-solid fa-gavel"></i> Önkormányzati Vakárverések
+                    </button>
+                    <button class="tab-btn" data-tab="taxation" id="prop-tab-btn-taxation">
+                        <i class="fa-solid fa-file-invoice-dollar"></i> Saját Ingatlanok & Adózás
+                    </button>
+                    <button class="tab-btn" data-tab="stewardship" id="prop-tab-btn-stewardship">
+                        <i class="fa-solid fa-user-shield"></i> Gondnokság & Megbízások
+                    </button>
+                </div>
+
+                <!-- Master Body Container -->
+                <div class="modal-body property-portal-body">
+                    <!-- Tab 1: Foreclosure Blind Auctions -->
+                    <div id="prop-tab-auctions" class="prop-tab-pane">
+                        <div class="tab-action-bar">
+                            <div class="action-bar-info">
+                                <h4 class="section-title">Aktív Városi Ingatlanárverések (Sealed-Bid Auctions)</h4>
+                                <span class="sub-text">Adó- és inaktivitási zárlat alá vont ingatlanok. A licitek a lezárásig titkosak; a legmagasabb letét nyer.</span>
+                            </div>
+                            <div class="action-bar-filters">
+                                <input type="text" id="prop-auctions-search" placeholder="Keresés ingatlan, zóna vagy kód alapján..." class="modal-input search-input">
+                                <select id="prop-auctions-type-filter" class="modal-select filter-select">
+                                    <option value="all">Minden Típus</option>
+                                    <option value="residential">Lakóingatlan</option>
+                                    <option value="commercial">Kereskedelmi</option>
+                                    <option value="industrial">Ipari / Raktár</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Auctions Grid -->
+                        <div id="prop-auctions-grid" class="auctions-cards-grid">
+                            <!-- Dynamic auction cards -->
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Owned Properties & Tax Delinquency -->
+                    <div id="prop-tab-taxation" class="prop-tab-pane hidden">
+                        <!-- KPI Metric Ribbon -->
+                        <div class="prop-kpi-ribbon">
+                            <div class="kpi-card card-surface">
+                                <span class="kpi-label"><i class="fa-solid fa-house-chimney"></i> Birtokolt Ingatlanok</span>
+                                <span id="prop-kpi-owned-count" class="kpi-value">0</span>
+                                <span class="kpi-sub">Nyilvántartott tulajdoni lap</span>
+                            </div>
+                            <div class="kpi-card card-surface">
+                                <span class="kpi-label"><i class="fa-solid fa-layer-group"></i> Halmozási Szorzó</span>
+                                <span id="prop-kpi-holding-mult" class="kpi-value">1.00x</span>
+                                <span class="kpi-sub">Progresszív telekadó ráta</span>
+                            </div>
+                            <div class="kpi-card card-surface">
+                                <span class="kpi-label"><i class="fa-solid fa-triangle-exclamation"></i> Teljes Adóhátralék</span>
+                                <span id="prop-kpi-total-arrears" class="kpi-value text-danger">$0.00</span>
+                                <span class="kpi-sub">Esedékes tartozás</span>
+                            </div>
+                        </div>
+
+                        <div class="tab-action-bar">
+                            <div class="action-bar-info">
+                                <h4 class="section-title">Saját Ingatlanállomány Telemetria & Állapot</h4>
+                                <span class="sub-text">Szerkezeti felújítások indítása, progresszív telekadók és zárolási szankciók kezelése.</span>
+                            </div>
+                            <div class="action-bar-filters">
+                                <input type="text" id="prop-owned-search" placeholder="Keresés saját ingatlanok között..." class="modal-input search-input">
+                                <select id="prop-owned-status-filter" class="modal-select filter-select">
+                                    <option value="all">Minden Állapot</option>
+                                    <option value="pristine">Kiváló Állapotú</option>
+                                    <option value="delinquent">Adóhátralékos</option>
+                                    <option value="auctioned">Árverés Alatt</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="prop-owned-list" class="owned-properties-list">
+                            <!-- Dynamic property cards -->
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Proxy Stewardship & Delegation -->
+                    <div id="prop-tab-stewardship" class="prop-tab-pane hidden">
+                        <div class="stewardship-dashboard-layout">
+                            <!-- Left: Appoint Delegate & Active Proxies -->
+                            <div class="stewardship-col-left">
+                                <div class="card-surface steward-form-card">
+                                    <h4 class="card-title"><i class="fa-solid fa-user-plus"></i> Új Gondnoki Meghatalmazás Kiadása</h4>
+                                    <span class="card-subtitle">Jelölj ki megbízottat, aki távolléted alatt megvédi ingatlanaidat az inaktivitási árveréstől.</span>
+
+                                    <div class="steward-form">
+                                        <div class="form-group">
+                                            <label>Megbízott Citizen ID</label>
+                                            <input type="text" id="prop-input-delegate-citid" placeholder="Pl. NYX8834" class="modal-input" maxlength="16">
+                                        </div>
+                                        <div class="form-row-2">
+                                            <div class="form-group">
+                                                <label>Meghatalmazás Hatóköre</label>
+                                                <select id="prop-select-delegate-scope" class="modal-select">
+                                                    <option value="all">Minden Vagyonrész (Ingatlan + Vállalat)</option>
+                                                    <option value="properties">Kizárólag Ingatlanok (Properties)</option>
+                                                    <option value="factions">Kizárólag Szervezetek (Factions)</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Gondnoki Megjegyzés</label>
+                                                <input type="text" id="prop-input-delegate-notes" placeholder="Pl. Családi vagyonkezelő megbízás" class="modal-input" maxlength="255">
+                                            </div>
+                                        </div>
+                                        <button id="prop-btn-appoint-delegate" class="btn btn-primary btn-block"><i class="fa-solid fa-signature"></i> Meghatalmazás Rögzítése</button>
+                                    </div>
+                                </div>
+
+                                <div class="card-surface delegates-list-card">
+                                    <div class="card-header-row">
+                                        <h4 class="card-title"><i class="fa-solid fa-users-gear"></i> Kijelölt Állampolgári Megbízottak</h4>
+                                        <span id="prop-delegates-count-badge" class="badge badge-primary">0 megbízott</span>
+                                    </div>
+                                    <div id="prop-delegates-list" class="delegates-grid">
+                                        <!-- Dynamic delegate cards with revoke button -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right: Managed Properties & Audit Logs -->
+                            <div class="stewardship-col-right">
+                                <div class="card-surface managed-props-card">
+                                    <div class="card-header-row">
+                                        <h4 class="card-title"><i class="fa-solid fa-shield-halved"></i> Általam Gondnokolt Ingatlanok</h4>
+                                        <span id="prop-managed-count-badge" class="badge badge-success">0 ingatlan</span>
+                                    </div>
+                                    <span class="card-subtitle">Ingatlanok, ahol hivatalos proxy védelmet biztosítasz az inaktivitási árverésekkel szemben.</span>
+                                    <div id="prop-managed-properties-list" class="managed-grid">
+                                        <!-- Dynamic managed cards -->
+                                    </div>
+                                </div>
+
+                                <div class="card-surface audit-logs-card">
+                                    <h4 class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> Inaktivitási & Visszavételi Főkönyv</h4>
+                                    <span class="card-subtitle">Önkormányzati figyelmeztetések, visszavonások és árverési kobzások naplója.</span>
+                                    <div id="prop-reclamation-logs-list" class="reclamation-logs-list">
+                                        <!-- Dynamic audit log items -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submodal: Place Sealed Blind Auction Bid Dialog -->
+        <div id="property-submodal-bid" class="modal-backdrop hidden">
+            <div class="modal-dialog submodal-dialog">
+                <div class="modal-header">
+                    <h4><i class="fa-solid fa-gavel icon-accent cyan"></i> Zárt Licit Leadása (Blind Auction Bid)</h4>
+                    <button id="property-submodal-bid-close" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <p class="submodal-instruction">A vakárverésen a licited zárt letétbe kerül. Ha valaki túllicitál, az összeg azonnal visszatérül a bankszámládra. A licitek a lezárásig titkosak.</p>
+                    <div class="bid-property-summary card-surface">
+                        <span id="prop-bid-target-title" class="summary-title">Ingatlan megnevezése</span>
+                        <div class="summary-details">
+                            <span>Kikiáltási ár: <strong id="prop-bid-min-floor">$0.00</strong></span>
+                            <span>Jelenlegi licited: <strong id="prop-bid-current-mine">$0.00</strong></span>
+                            <span>Elérhető egyenleg: <strong id="prop-bid-bank-avail">$0.00</strong></span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Licit Összege ($ USD, 2 tizedesjegyig)</label>
+                        <input type="number" step="100" id="property-bid-input" placeholder="Pl. 25000.00" class="modal-input">
+                        <span id="prop-bid-error-hint" class="sub-text text-danger hidden">A licitnek meg kell haladnia a kikiáltási árat!</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="property-bid-cancel-btn" class="btn btn-secondary">Mégse</button>
+                    <button id="property-bid-submit-btn" class="btn btn-primary"><i class="fa-solid fa-coins"></i> Licit Letétbe Helyezése</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submodal: Assign Property Steward Dialog -->
+        <div id="property-submodal-assign" class="modal-backdrop hidden">
+            <div class="modal-dialog submodal-dialog">
+                <div class="modal-header">
+                    <h4><i class="fa-solid fa-user-shield icon-accent cyan"></i> Ingatlan Gondnok Kijelölése</h4>
+                    <button id="property-submodal-assign-close" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <p class="submodal-instruction">Válassz egyet a hivatalosan felhatalmazott megbízottaid közül, vagy töröld a gondnoki kijelölést az adott ingatlanról.</p>
+                    <div class="form-group">
+                        <label>Ingatlan</label>
+                        <input type="text" id="prop-assign-prop-label" class="modal-input" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Kijelölt Megbízott</label>
+                        <select id="property-assign-delegate-select" class="modal-select">
+                            <!-- Dynamic delegates options or 'None' -->
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="property-assign-cancel-btn" class="btn btn-secondary">Mégse</button>
+                    <button id="property-assign-submit-btn" class="btn btn-primary"><i class="fa-solid fa-check"></i> Kijelölés Mentése</button>
                 </div>
             </div>
         </div>
