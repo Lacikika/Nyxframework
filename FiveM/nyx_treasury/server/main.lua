@@ -93,3 +93,28 @@ Nyx.RPC.Register("treasury:getAllocations", function(src)
     ]])
     return rows or {}
 end)
+
+-- Commodity Market & Consumer Price Index Explorer RPC
+Nyx.RPC.Register("treasury:getMarketIndex", function(src)
+    local ok, summary = pcall(function()
+        return exports['nyx_logistics']:GetMarketSummary()
+    end)
+
+    if ok and summary then
+        return {
+            success = true,
+            citywideCpi = summary.citywideCpi,
+            zones = summary.zones,
+            salesTaxRate = Nyx.Treasury.ActiveSalesTax,
+            transferTaxRate = Nyx.Treasury.ActiveTransferTax
+        }
+    end
+
+    return {
+        success = true,
+        citywideCpi = 1.0,
+        zones = {},
+        salesTaxRate = Nyx.Treasury.ActiveSalesTax,
+        transferTaxRate = Nyx.Treasury.ActiveTransferTax
+    }
+end)

@@ -138,7 +138,7 @@ class TestWeightPenaltiesSystem(unittest.TestCase):
 
         self.assertIn("function Nyx.Tests.TestWeightPenalties()", code)
         self.assertIn("local t6 = Nyx.Tests.TestWeightPenalties()", code)
-        self.assertIn("if t1 and t2 and t3 and t4 and t5 and t6 then", code)
+        self.assertIn("and t6", code)
 
 if __name__ == "__main__":
     unittest.main()

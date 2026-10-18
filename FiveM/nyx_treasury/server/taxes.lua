@@ -38,22 +38,57 @@ function Nyx.Treasury.SetTaxRate(taxType, newRate, ratifiedBy)
     return true
 end
 
--- Calculate net and tax amounts
-function Nyx.Treasury.CalculateTaxSplit(grossAmount, rate)
+-- Calculate net and tax amounts (with optional localized zone surcharge)
+function Nyx.Treasury.CalculateTaxSplit(grossAmount, rate, zoneId)
     grossAmount = math.floor((tonumber(grossAmount) or 0) * 100) / 100
     local r = rate or Nyx.Treasury.ActiveSalesTax
-    local taxAmount = math.floor((grossAmount * r) * 100) / 100
+
+    -- Check if localized zone tax surcharge applies
+    local zoneSurcharge = 0.0
+    if zoneId then
+        local ok, zone = pcall(function()
+            return exports['nyx_logistics']:GetZone(zoneId)
+        end)
+        if ok and zone and zone.taxSurcharge then
+            zoneSurcharge = tonumber(zone.taxSurcharge) or 0.0
+        elseif Config.ZoneTaxSurcharges and Config.ZoneTaxSurcharges[zoneId] then
+            zoneSurcharge = tonumber(Config.ZoneTaxSurcharges[zoneId]) or 0.0
+        end
+    end
+
+    local maxRate = Config.MaxTaxRate or 0.15
+    local effectiveRate = math.min(maxRate, math.max(0.0, r + zoneSurcharge))
+
+    local taxAmount = math.floor((grossAmount * effectiveRate) * 100) / 100
     local netAmount = grossAmount - taxAmount
-    return netAmount, taxAmount, r
+    return netAmount, taxAmount, effectiveRate, zoneSurcharge
+end
+
+-- Retrieve combined statutory and localized zone tax rate
+function Nyx.Treasury.GetZoneTaxRate(zoneId)
+    local baseRate = Nyx.Treasury.ActiveSalesTax or 0.08
+    local zoneSurcharge = 0.0
+    if zoneId then
+        local ok, zone = pcall(function()
+            return exports['nyx_logistics']:GetZone(zoneId)
+        end)
+        if ok and zone and zone.taxSurcharge then
+            zoneSurcharge = tonumber(zone.taxSurcharge) or 0.0
+        elseif Config.ZoneTaxSurcharges and Config.ZoneTaxSurcharges[zoneId] then
+            zoneSurcharge = tonumber(Config.ZoneTaxSurcharges[zoneId]) or 0.0
+        end
+    end
+    local maxRate = Config.MaxTaxRate or 0.15
+    return math.min(maxRate, baseRate + zoneSurcharge)
 end
 
 -- Point-of-Sale (POS) Transaction Interceptor
 -- Atomic Split: Buyer pays Gross -> Seller receives Net -> Municipal Tax Pool receives Tax
-function Nyx.Treasury.ProcessPOSTransaction(buyerAcc, sellerAcc, grossAmount, memo)
+function Nyx.Treasury.ProcessPOSTransaction(buyerAcc, sellerAcc, grossAmount, memo, zoneId)
     grossAmount = math.floor((tonumber(grossAmount) or 0) * 100) / 100
     if grossAmount <= 0 then return false, "INVALID_GROSS_AMOUNT" end
 
-    local netAmount, taxAmount, appliedRate = Nyx.Treasury.CalculateTaxSplit(grossAmount, Nyx.Treasury.ActiveSalesTax)
+    local netAmount, taxAmount, appliedRate, zoneSurcharge = Nyx.Treasury.CalculateTaxSplit(grossAmount, Nyx.Treasury.ActiveSalesTax, zoneId)
     local taxAcc = Config.Accounts.Tax or "gov:city:tax"
 
     Nyx.Treasury.EnsureAccount(buyerAcc, buyerAcc, "department", 0.00)
@@ -117,7 +152,10 @@ function Nyx.Treasury.ProcessPOSTransaction(buyerAcc, sellerAcc, grossAmount, me
                 0.00,
                 "pos_tax",
                 "TAX_INTERCEPTOR",
-                string.format("Sales tax (%.1f%%) on POS TX #%s", appliedRate * 100, txNetUuid:sub(1, 8))
+                string.format("Sales tax (%.1f%%%s) on POS TX #%s",
+                    appliedRate * 100,
+                    (zoneSurcharge > 0 and string.format(", incl. %.2f%% zone surcharge", zoneSurcharge * 100) or ""),
+                    txNetUuid:sub(1, 8))
             }
         }
     end
@@ -140,6 +178,8 @@ function Nyx.Treasury.ProcessPOSTransaction(buyerAcc, sellerAcc, grossAmount, me
         net = netAmount,
         tax = taxAmount,
         rate = appliedRate,
+        zoneSurcharge = zoneSurcharge,
+        zoneId = zoneId,
         txUuid = txNetUuid
     }
 end

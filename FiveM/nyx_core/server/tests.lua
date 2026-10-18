@@ -384,7 +384,118 @@ function Nyx.Tests.TestWeightPenalties()
     return passes == total
 end
 
--- 7. Master Test Runner
+-- 7. Test Localized Stock-to-Demand Elastic Pricing & Treasury Zone Taxes
+function Nyx.Tests.TestElasticItemPricingAndZoneDemand()
+    print("^3[Nyx:Tests] Running Localized Elastic Pricing & Zone Demand Suite...^7")
+    local passes = 0
+    local total = 6
+
+    local basePrice = 100.00
+    local targetCap = 100
+
+    -- Test A: Localized Delivery Zone Demand Scaling (Metro vs Rural Paleto)
+    -- Metro multiplier = 1.35 -> Deff = 135
+    -- Rural multiplier = 0.75 -> Deff = 75
+    local alpha = 1.25
+    local function calcZonePrice(stock, demandMult, velRatio)
+        local effD = targetCap * demandMult * (1.0 + (velRatio or 0.0))
+        local raw = 1.0 + (alpha * ((effD - stock) / effD))
+        local mult = math.max(0.50, math.min(2.25, raw))
+        return math.floor((basePrice * mult) * 100) / 100, effD, math.floor((stock / effD) * 10000) / 10000
+    end
+
+    local pMetro, effMetro, rMetro = calcZonePrice(100, 1.35, 0.0) -- Stock=100, Deff=135
+    local pPaleto, effPaleto, rPaleto = calcZonePrice(100, 0.75, 0.0) -- Stock=100, Deff=75
+
+    -- In Metro: (135 - 100) / 135 = 0.259259 -> mult = 1.32407 -> price = 132.40
+    -- In Paleto: (75 - 100) / 75 = -0.333333 -> mult = 0.583333 -> price = 58.33
+    if assertTest(pMetro == 132.40 and pPaleto == 58.33 and effMetro == 135.0 and effPaleto == 75.0,
+        "Localized Zone Demand Scaling Invariant",
+        string.format("Zone price deviation: Metro=%.2f (eff=%.1f), Paleto=%.2f (eff=%.1f)", pMetro, effMetro, pPaleto, effPaleto)) then
+        passes = passes + 1
+    end
+
+    -- Test B: Rolling Sales Velocity & Exponential Half-Life Decay
+    local function calcDecayed(v0, dt, halfLife)
+        return math.floor((v0 * math.pow(0.5, dt / halfLife)) * 100) / 100
+    end
+
+    local vStart = 20.0
+    local vHalf = calcDecayed(vStart, 1800, 1800) -- After 1 half-life (1800s) -> 10.0
+    local vQuarter = calcDecayed(vStart, 3600, 1800) -- After 2 half-lives (3600s) -> 5.0
+
+    if assertTest(vHalf == 10.0 and vQuarter == 5.0,
+        "Demand Velocity Exponential Half-Life Decay Invariant",
+        string.format("Decayed velocity error: 1800s=%.2f, 3600s=%.2f", vHalf, vQuarter)) then
+        passes = passes + 1
+    end
+
+    -- Test C: Velocity Price Spiking Under Rapid Consumer Purchasing
+    -- Baseline Metro at Stock=50 without velocity:
+    local pNormal, _, _ = calcZonePrice(50, 1.35, 0.0)
+    -- Metro with sudden velocity spike (+30% demand boost):
+    local pSpiked, effSpiked, _ = calcZonePrice(50, 1.35, 0.30)
+
+    if assertTest(pSpiked > pNormal and effSpiked > effMetro,
+        "Velocity Demand Surge Price Expansion Invariant",
+        string.format("Spiked price %.2f failed to exceed normal price %.2f", pSpiked, pNormal)) then
+        passes = passes + 1
+    end
+
+    -- Test D: Strict Mathematical Clamping at Boundary Limits
+    local pSevereShortage, _, rShort = calcZonePrice(0, 1.35, 0.50) -- Stock = 0
+    local pSevereSurplus, _, rSurp = calcZonePrice(500, 0.75, 0.0)  -- Massive Surplus
+
+    if assertTest(pSevereShortage == 225.00 and pSevereSurplus == 50.00 and rShort == 0.0 and rSurp > 1.0,
+        "Elastic Price Surplus Floor & Shortage Ceiling Invariants",
+        string.format("Boundary clamping failure: Ceiling=%.2f (expect 225.00), Floor=%.2f (expect 50.00)", pSevereShortage, pSevereSurplus)) then
+        passes = passes + 1
+    end
+
+    -- Test E: Treasury Localized Point-of-Sale Tax Surcharge Interception
+    local function calcTaxSplit(gross, baseRate, zoneSurcharge)
+        local effRate = math.min(0.15, baseRate + (zoneSurcharge or 0.0))
+        local tax = math.floor((gross * effRate) * 100) / 100
+        local net = gross - tax
+        return net, tax, effRate
+    end
+
+    local grossSale = 1000.00
+    local baseTaxRate = 0.08
+    local metroSurcharge = 0.0150 -- +1.5% in LS Metro
+    local ruralSurcharge = 0.0000 -- 0.0% in Sandy Shores
+
+    local netMetro, taxMetro, rateMetro = calcTaxSplit(grossSale, baseTaxRate, metroSurcharge)
+    local netRural, taxRural, rateRural = calcTaxSplit(grossSale, baseTaxRate, ruralSurcharge)
+
+    if assertTest(taxMetro == 95.00 and netMetro == 905.00 and rateMetro == 0.095 and
+                  taxRural == 80.00 and netRural == 920.00 and rateRural == 0.080,
+        "Treasury Localized Zone Sales Tax Surcharge Invariant",
+        string.format("Tax split mismatch: MetroTax=%.2f, RuralTax=%.2f", taxMetro, taxRural)) then
+        passes = passes + 1
+    end
+
+    -- Test F: Dynamic Shortage Freight Bounty Scaling per Regional Deficit
+    local baseBountyMult = 0.35
+    local function calcBounty(deficitRatio, zoneDemandMult)
+        local scaleBonus = math.min(1.50, deficitRatio * zoneDemandMult)
+        local mult = math.min(2.25, baseBountyMult * (1.0 + scaleBonus))
+        return math.floor((basePrice * mult) * 100) / 100, mult
+    end
+
+    local normalBounty, bNormMult = calcBounty(0.10, 1.00) -- Light deficit (10% capacity missing)
+    local criticalBounty, bCritMult = calcBounty(0.95, 1.35) -- Severe deficit (95% missing in High-Demand Metro)
+
+    if assertTest(criticalBounty > normalBounty and bCritMult > bNormMult,
+        "Dynamic Shortage Freight Bounty Regional Scaling Invariant",
+        string.format("Freight bounty did not scale under deficit: Critical=%.2f (mult=%.4f), Normal=%.2f", criticalBounty, bCritMult, normalBounty)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 8. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -396,9 +507,10 @@ function Nyx.Tests.RunAll()
     local t4 = Nyx.Tests.TestFreightBoardEscrowAndElasticity()
     local t5 = Nyx.Tests.TestVehicleMileageAndWear()
     local t6 = Nyx.Tests.TestWeightPenalties()
+    local t7 = Nyx.Tests.TestElasticItemPricingAndZoneDemand()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

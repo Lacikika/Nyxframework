@@ -25,3 +25,16 @@ Config.PalletMaxSlots = 20           -- Heavy slot capacity
 -- Automated Shortage Contracts
 Config.ShortageContractThreshold = 0.10  -- Generate freight contract when stock <= 10% of target capacity
 Config.DefaultFreightPayoutMultiplier = 0.35 -- Payout per delivered unit = 35% of item base price
+
+-- Localized Economic Delivery Zones & Dynamic Demand Modeling
+Config.DeliveryZones = {
+    DefaultZoneId = "zone_ls_metro",
+    VelocityHalfLifeSeconds = 1800,      -- 30 minutes half-life decay for rolling purchase velocity
+    VelocityImpactFactor = 0.25,        -- Velocity weighting on effective demand multiplier
+    MaxVelocityMultiplier = 2.0,        -- Maximum velocity scaling multiplier
+    ShortageBountyScaling = true,       -- Enable dynamic freight payout scaling based on zone deficit
+    MaxShortageBountyMultiplier = 2.25, -- Maximum freight bounty multiplier during critical shortages
+    PriceHistoryLogLimit = 200,         -- Maximum history entries cached in memory
+    EquilibriumRatio = 1.0              -- S / D = 1.0 represents standard market equilibrium
+}
+

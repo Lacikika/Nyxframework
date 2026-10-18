@@ -11,5 +11,6 @@
   "010_logistics_freight_board.sql",
   "011_properties_schema.sql",
   "012_mdt_dispatch.sql",
-  "013_vehicles_wear_mileage.sql"
+  "013_vehicles_wear_mileage.sql",
+  "014_logistics_elastic_pricing_zones.sql"
 ]

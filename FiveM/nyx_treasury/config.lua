@@ -22,6 +22,14 @@ Config.TransferTaxRate = 0.02    -- 2% wire transfer tax
 Config.MaxTaxRate = 0.15         -- 15% constitutional tax rate ceiling
 Config.TaxSweepInterval = 1800   -- 30 minutes per automated revenue redistribution sweep
 
+-- Localized Economic Zone Tax Surcharges (Added to base sales tax, subject to MaxTaxRate)
+Config.ZoneTaxSurcharges = {
+    ['zone_ls_metro'] = 0.0150,        -- +1.5% municipal surcharge in dense urban core
+    ['zone_sandy_shores'] = 0.0000,    -- 0.0% in Blaine County rural zone
+    ['zone_paleto_bay'] = 0.0000,      -- 0.0% in Paleto Bay
+    ['zone_port_industrial'] = 0.0050  -- +0.5% in Port industrial basin
+}
+
 -- Public Service Payroll Configuration
 Config.PayrollInterval = 900     -- 15 minutes between public duty paycheck cycles
 

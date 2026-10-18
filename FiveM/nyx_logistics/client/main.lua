@@ -8,23 +8,30 @@ Nyx = Nyx or {}
 Nyx.Logistics = Nyx.Logistics or {}
 
 -- Real-time Shelf Price & Stock Update Listener
-RegisterNetEvent("nyx:logistics:client:shelfUpdated", function(shelfId, newPrice, newStock)
+RegisterNetEvent("nyx:logistics:client:shelfUpdated", function(shelfId, newPrice, newStock, zoneId, stockToDemandRatio)
     if Config.Debug then
-        print(string.format("^4[Nyx:Logistics:Client] Shelf '%s' recalibrated: $%.2f (Stock: %d)^7", shelfId, newPrice, newStock))
+        print(string.format("^4[Nyx:Logistics:Client] Shelf '%s' [%s] recalibrated: $%.2f (Stock: %d, S/D Ratio: %s)^7",
+            shelfId, zoneId or "metro", newPrice, newStock, tostring(stockToDemandRatio or "1.0")))
     end
 
     SendNUIMessage({
         action = "SHELF_UPDATED",
         shelfId = shelfId,
         price = newPrice,
-        stock = newStock
+        stock = newStock,
+        zoneId = zoneId,
+        stockToDemandRatio = stockToDemandRatio
     })
 end)
 
 -- Shortage Freight Contract Available Notification
-RegisterNetEvent("nyx:logistics:client:newContractAvailable", function(shelfId, quantity, payoutPerUnit)
+RegisterNetEvent("nyx:logistics:client:newContractAvailable", function(payload)
+    local title = type(payload) == "table" and payload.title or "Sürgősségi Fuvarozás"
+    local totalPayout = type(payload) == "table" and payload.totalPayout or 0.00
+    local qty = type(payload) == "table" and payload.quantity or 0
+
     TriggerEvent("nyx:core:client:notify",
-        string.format("New Hauling Contract Available! Stock: %dx items ($%.2f/unit payout)", quantity, payoutPerUnit),
+        string.format("%s: %dx rakomány ($%.2f összdíj)", title, qty, totalPayout),
         "info"
     )
 end)

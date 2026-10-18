@@ -75,41 +75,57 @@ function Nyx.Logistics.CheckShortageContract(shelf, currentStock)
 
         if existing == 0 then
             local needed = shelf.target_capacity - currentStock
-            local payoutPerUnit = math.floor((shelf.base_price * (Config.DefaultFreightPayoutMultiplier or 0.35)) * 100) / 100
+            local zone = Nyx.Logistics.GetZone and Nyx.Logistics.GetZone(shelf.zone_id)
+            local zoneDemandMult = zone and zone.baseDemandMultiplier or 1.00
+            local baseMultiplier = Config.DefaultFreightPayoutMultiplier or 0.35
+
+            -- Dynamic freight payout scaling based on localized zone deficit
+            local dynamicMultiplier = baseMultiplier
+            if Config.DeliveryZones and Config.DeliveryZones.ShortageBountyScaling then
+                local deficitRatio = math.max(0.0, (shelf.target_capacity - currentStock) / shelf.target_capacity)
+                local scaleBonus = math.min(1.50, deficitRatio * zoneDemandMult)
+                dynamicMultiplier = math.min(
+                    Config.DeliveryZones.MaxShortageBountyMultiplier or 2.25,
+                    baseMultiplier * (1.0 + scaleBonus)
+                )
+            end
+
+            local payoutPerUnit = math.floor((shelf.base_price * dynamicMultiplier) * 100) / 100
             local totalPayout = math.floor((payoutPerUnit * needed) * 100) / 100
-            local escrowBond = math.floor((totalPayout * (Nyx.Logistics.FreightConfig.EscrowBondPercent or 0.15)) * 100) / 100
+            local escrowBond = math.floor((totalPayout * (Nyx.Logistics.FreightConfig and Nyx.Logistics.FreightConfig.EscrowBondPercent or 0.15)) * 100) / 100
             local contractUuid = Nyx.RPC.GenerateNonce()
 
             local srcCoords = { x = 152.4, y = -3205.2, z = 5.9 }
-            local dstCoords = shelf.coords or { x = -48.2, y = -1757.4, z = 29.4 }
+            local dstCoords = shelf.coords or (zone and zone.coords and { x = zone.coords.x, y = zone.coords.y, z = zone.coords.z }) or { x = -48.2, y = -1757.4, z = 29.4 }
 
             local contractId = MySQL.insert.await([[
                 INSERT INTO `nyx_logistics_freight_contracts`
                 (`contract_uuid`, `contract_type`, `issuer_type`, `issuer_id`, `title`, 
-                 `source_inventory_id`, `dest_inventory_id`, `source_coords`, `dest_coords`, 
+                 `source_inventory_id`, `dest_inventory_id`, `source_coords`, `dest_coords`, `zone_id`,
                  `item_id`, `quantity`, `payout_per_unit`, `total_payout`, `escrow_deposit`, `status`, `deadline_seconds`)
-                VALUES (?, 'shortage_auto', 'municipal_store', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available', ?)
+                VALUES (?, 'shortage_auto', 'municipal_store', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available', ?)
             ]], {
                 contractUuid,
                 shelf.store_id or "gov_civic_market",
-                string.format("Sürgősségi Készletfeltöltés: %s", shelf.item_id),
+                string.format("Sürgősségi Készletfeltöltés: %s [%s]", shelf.item_id, zone and zone.name or "Metro"),
                 "stash:hub_central",
                 shelf.inventory_id,
                 json.encode(srcCoords),
                 json.encode(dstCoords),
+                shelf.zone_id or "zone_ls_metro",
                 shelf.item_id,
                 needed,
                 payoutPerUnit,
                 totalPayout,
                 escrowBond,
-                Nyx.Logistics.FreightConfig.DefaultDeadlineSeconds or 1800
+                Nyx.Logistics.FreightConfig and Nyx.Logistics.FreightConfig.DefaultDeadlineSeconds or 1800
             })
 
             if contractId then
                 MySQL.prepare([[
                     INSERT INTO `nyx_logistics_freight_audit`
                     (`contract_id`, `action`, `amount`, `debit_account`, `credit_account`, `notes`)
-                    VALUES (?, 'CONTRACT_CREATED', ?, ?, ?, 'Automated shelf deficit contract generated')
+                    VALUES (?, 'CONTRACT_CREATED', ?, ?, ?, 'Automated shelf deficit contract generated with dynamic zone scaling')
                 ]], {
                     contractId,
                     totalPayout,
@@ -118,16 +134,17 @@ function Nyx.Logistics.CheckShortageContract(shelf, currentStock)
                 })
 
                 if Config.Debug then
-                    print(string.format("^3[Nyx:Logistics] Shortage contract #%d posted: %dx %s ($%.2f total, $%.2f escrow)^7",
-                        contractId, needed, shelf.item_id, totalPayout, escrowBond))
+                    print(string.format("^3[Nyx:Logistics] Shortage contract #%d posted (%s): %dx %s ($%.2f total, $%.2f escrow)^7",
+                        contractId, shelf.zone_id or "metro", needed, shelf.item_id, totalPayout, escrowBond))
                 end
 
                 TriggerClientEvent("nyx:logistics:client:newContractAvailable", -1, {
                     contractId = contractId,
-                    title = string.format("Sürgősségi Szállítás: %s", shelf.item_id),
+                    title = string.format("Sürgősségi Szállítás: %s [%s]", shelf.item_id, zone and zone.name or "Metro"),
                     quantity = needed,
                     totalPayout = totalPayout,
-                    escrowDeposit = escrowBond
+                    escrowDeposit = escrowBond,
+                    zoneId = shelf.zone_id or "zone_ls_metro"
                 })
             end
         end
@@ -490,13 +507,24 @@ Nyx.RPC.Register("logistics:deliverContract", function(src, payload)
     })
 
     -- Recalibrate shelf price downwards
-    local shelf = Nyx.Logistics.Shelves and Nyx.Logistics.Shelves[destInvId]
-    if shelf then
-        local newStock = exports['nyx_inventory']:GetItemCount(destInvId, shelf.item_id)
-        local newPrice = Nyx.Logistics.CalculateShelfPrice(shelf.base_price, shelf.target_capacity, newStock)
-        shelf.current_price = newPrice
+    local targetShelf = nil
+    if Nyx.Logistics.Shelves then
+        for _, s in pairs(Nyx.Logistics.Shelves) do
+            if s.inventory_id == destInvId or s.id == destInvId then
+                targetShelf = s
+                break
+            end
+        end
+    end
+
+    if targetShelf then
+        local newStock = exports['nyx_inventory']:GetItemCount(destInvId, targetShelf.item_id)
+        local newPrice, newMult, newRatio = Nyx.Logistics.CalculateShelfPrice(
+            targetShelf.base_price, targetShelf.target_capacity, newStock, targetShelf.zone_id, targetShelf.item_id, targetShelf
+        )
+        targetShelf.current_price = newPrice
         MySQL.prepare("UPDATE `nyx_logistics_shelves` SET `current_price` = ? WHERE `inventory_id` = ?", { newPrice, destInvId })
-        TriggerClientEvent("nyx:logistics:client:shelfUpdated", -1, shelf.id or destInvId, newPrice, newStock)
+        TriggerClientEvent("nyx:logistics:client:shelfUpdated", -1, targetShelf.id or destInvId, newPrice, newStock, targetShelf.zone_id, newRatio)
     end
 
     return {

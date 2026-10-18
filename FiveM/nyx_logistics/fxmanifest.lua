@@ -16,6 +16,7 @@ dependencies {
 
 shared_scripts {
     'config.lua',
+    'shared/zones.lua',
     'shared/nodes.lua',
     'shared/recipes.lua',
     'shared/contracts.lua'
@@ -24,6 +25,7 @@ shared_scripts {
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/main.lua',
+    'server/zones.lua',
     'server/nodes.lua',
     'server/facilities.lua',
     'server/shelves.lua',
@@ -32,6 +34,7 @@ server_scripts {
 }
 
 client_scripts {
+    'client/zones.lua',
     'client/harvesting.lua',
     'client/pallets.lua',
     'client/contracts.lua',
