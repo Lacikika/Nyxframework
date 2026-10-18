@@ -30,20 +30,43 @@ Config.Jury = {
     }
 }
 
--- Judicial Warrants Configuration
+-- Judicial Warrants & Subpoenas Configuration
 Config.Warrants = {
     DefaultExpirationHours = 72, -- 3 days baseline duration
     MaxExpirationHours = 336,    -- 14 days maximum
     AllowedTypes = {
         ['arrest'] = true,
         ['search_property'] = true,
-        ['search_vehicle'] = true
+        ['search_vehicle'] = true,
+        ['subpoena'] = true,
+        ['wiretap'] = true
+    },
+    SubpoenaScopes = {
+        ['all'] = true,
+        ['financial'] = true,
+        ['property'] = true,
+        ['telecom'] = true
+    },
+    Tracking = {
+        IntervalSeconds = 20,           -- Live cellular triangulation ping sweep interval
+        DefaultAccuracyRadius = 35.0,  -- Meters of uncertainty radius
+        BlipDurationMs = 25000,        -- Client blip lifetime
+        SoundAlert = true
     },
     AuthorizedPermissions = {
         ['judge'] = true,
         ['doj_lead'] = true,
+        ['chief_magistrate'] = true,
         ['admin'] = true,
         ['root'] = true
+    },
+    AuthorizedPetitioners = {
+        ['police'] = true,
+        ['sheriff'] = true,
+        ['state_police'] = true,
+        ['doj'] = true,
+        ['judge'] = true,
+        ['admin'] = true
     }
 }
 

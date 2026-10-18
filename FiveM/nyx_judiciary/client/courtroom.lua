@@ -330,3 +330,194 @@ CreateThread(function()
         Wait(sleep)
     end
 end)
+
+-- ----------------------------------------------------------------------------
+-- 6. Judicial Warrant & Subpoena Registry Commands & Third-Eye Hooks
+-- ----------------------------------------------------------------------------
+
+-- Register Third-Eye Target at Courthouse Clerk / Judge Chambers
+CreateThread(function()
+    while not exports['nyx_interact'] do
+        Wait(300)
+    end
+
+    local registryCoords = vector3(-540.8, -198.2, 38.2)
+    exports['nyx_interact']:AddTargetCoords("court_warrant_registry", registryCoords, 2.0, {
+        options = {
+            {
+                icon = "fa-solid fa-file-contract",
+                label = "Warrant & Subpoena Petition Registry",
+                event = "nyx:judiciary:client:openWarrantRegistry",
+                canInteract = function(entity, dist)
+                    return dist <= 2.0
+                end
+            }
+        },
+        distance = 2.0
+    })
+end)
+
+RegisterNetEvent("nyx:judiciary:client:openWarrantRegistry", function()
+    if exports['nyx_core'] and exports['nyx_core'].TriggerServerRPC then
+        exports['nyx_core']:TriggerServerRPC("judiciary:getPendingPetitions", function(res)
+            if res and res.success and res.petitions then
+                local count = #res.petitions
+                if exports['nyx_ui'] then
+                    exports['nyx_ui']:Notify({
+                        type = "info",
+                        title = "BÍRÓI PARANCS REGISZTER",
+                        message = string.format("Függőben lévő kérvények: %d db. Használd a /reviewpetition parancsot az elbíráláshoz.", count)
+                    })
+                end
+            else
+                if exports['nyx_ui'] then
+                    exports['nyx_ui']:Notify({
+                        type = "error",
+                        title = "HOZZÁFÉRÉS ELUTASÍTVA",
+                        message = res and res.error or "Nincs jogosultságod a bírói kérvények megtekintésére."
+                    })
+                end
+            end
+        end)
+    end
+end)
+
+-- Command: /petitionwarrant <targetCitId> <type> <hours> <probable cause narrative>
+RegisterCommand("petitionwarrant", function(source, args)
+    if #args < 4 then
+        if exports['nyx_ui'] then
+            exports['nyx_ui']:Notify({
+                type = "error",
+                title = "HIÁNYZÓ ADATOK",
+                message = "Használat: /petitionwarrant [citizenId] [arrest|search_property|search_vehicle|subpoena|wiretap] [hours] [indoklás...]"
+            })
+        end
+        return
+    end
+
+    local targetCitId = args[1]
+    local warrantType = args[2]:lower()
+    local hours = tonumber(args[3]) or 72
+    local causeWords = {}
+    for i = 4, #args do
+        table.insert(causeWords, args[i])
+    end
+    local causeSummary = table.concat(causeWords, " ")
+
+    if exports['nyx_core'] and exports['nyx_core'].TriggerServerRPC then
+        exports['nyx_core']:TriggerServerRPC("judiciary:petitionWarrant", {
+            targetCitizenId = targetCitId,
+            warrantType = warrantType,
+            requestedDurationHours = hours,
+            probableCauseSummary = causeSummary
+        }, function(res)
+            if res and res.success then
+                if exports['nyx_ui'] then
+                    exports['nyx_ui']:Notify({
+                        type = "success",
+                        title = "KÉRVÉNY BENYÚJTVA",
+                        message = string.format("Kérvény azonosító: %s. A bírói tanács értesítve lett.", res.petition.petitionId)
+                    })
+                end
+            else
+                if exports['nyx_ui'] then
+                    exports['nyx_ui']:Notify({
+                        type = "error",
+                        title = "KÉRVÉNY ELUTASÍTVA",
+                        message = res and res.error or "Hiba történt a kérvény benyújtásakor."
+                    })
+                end
+            end
+        end)
+    end
+end, false)
+
+-- Command: /reviewpetition <petitionId> <approve|reject> [notes]
+RegisterCommand("reviewpetition", function(source, args)
+    if #args < 2 then
+        if exports['nyx_ui'] then
+            exports['nyx_ui']:Notify({
+                type = "error",
+                title = "HIÁNYZÓ ADATOK",
+                message = "Használat: /reviewpetition [petitionId] [approve | reject] [indoklás...]"
+            })
+        end
+        return
+    end
+
+    local petitionId = args[1]
+    local decision = (args[2]:lower() == "approve" or args[2]:lower() == "approved") and "approved" or "rejected"
+    local noteWords = {}
+    for i = 3, #args do
+        table.insert(noteWords, args[i])
+    end
+    local notes = #noteWords > 0 and table.concat(noteWords, " ") or nil
+
+    if exports['nyx_core'] and exports['nyx_core'].TriggerServerRPC then
+        exports['nyx_core']:TriggerServerRPC("judiciary:reviewPetition", {
+            petitionId = petitionId,
+            decision = decision,
+            reviewNotes = notes
+        }, function(res)
+            if res and res.success then
+                if exports['nyx_ui'] then
+                    exports['nyx_ui']:Notify({
+                        type = "success",
+                        title = "BÍRÓI DÖNTÉS RÖGZÍTVE",
+                        message = string.format("Kérvény %s elbírálva: %s", petitionId, string.upper(decision))
+                    })
+                end
+            else
+                if exports['nyx_ui'] then
+                    exports['nyx_ui']:Notify({
+                        type = "error",
+                        title = "HIBA AZ ELBÍRÁLÁSKOR",
+                        message = res and res.error or "Nem sikerült elbírálni a kérvényt."
+                    })
+                end
+            end
+        end)
+    end
+end, false)
+
+-- Command: /subpoenarecords <targetCitizenId>
+RegisterCommand("subpoenarecords", function(source, args)
+    if #args < 1 then
+        if exports['nyx_ui'] then
+            exports['nyx_ui']:Notify({
+                type = "error",
+                title = "HIÁNYZÓ ADAT",
+                message = "Használat: /subpoenarecords [citizenId]"
+            })
+        end
+        return
+    end
+
+    local targetCitId = args[1]
+    if exports['nyx_core'] and exports['nyx_core'].TriggerServerRPC then
+        exports['nyx_core']:TriggerServerRPC("judiciary:getSubpoenaRecords", targetCitId, function(res)
+            if res and res.success and res.records then
+                local rec = res.records
+                if exports['nyx_ui'] then
+                    exports['nyx_ui']:Notify({
+                        type = "success",
+                        title = "IDÉZÉS HITELT ÉRDEMLŐ",
+                        message = string.format("Bank: $%.2f | Tranzakciók: %d db | Ingatlanok: %d db | Részvények: %d db",
+                            rec.accountBalance and rec.accountBalance.bank or 0.0,
+                            rec.transactions and #rec.transactions or 0,
+                            rec.properties and #rec.properties or 0,
+                            rec.corporateShares and #rec.corporateShares or 0)
+                    })
+                end
+            else
+                if exports['nyx_ui'] then
+                    exports['nyx_ui']:Notify({
+                        type = "error",
+                        title = "HOZZÁFÉRÉS MEGTAGADVA",
+                        message = res and res.error or "Nincs aktív jóváhagyott idézési parancs ehhez a személyhez."
+                    })
+                end
+            end
+        end)
+    end
+end, false)

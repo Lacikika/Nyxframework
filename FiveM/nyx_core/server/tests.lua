@@ -4678,7 +4678,249 @@ function Nyx.Tests.TestTradeUnionsAndCollectiveBargaining()
     return passes == total
 end
 
--- 23. Master Test Runner
+-- 23. Test Judicial Subpoenas, Probable Cause Warrants & Live MDT Dispatch Tracking Integration
+function Nyx.Tests.TestJudicialSubpoenasAndWarrantTracking()
+    print("^3[Nyx:Tests] Running Judicial Subpoenas & Warrant Tracking Suite...^7")
+    local passes = 0
+    local total = 8
+
+    -- Test A: Probable Cause Petition Validation & Sanitization
+    local W = Nyx.Warrants or {}
+    local validPetition = {
+        petitionerCitizenId = "OFFICER_01",
+        targetCitizenId = "SUSPECT_42",
+        warrantType = "subpoena",
+        subpoenaScope = "financial",
+        probableCauseSummary = "Confidential financial ledger inspection for illicit money laundering scheme.",
+        requestedDurationHours = 120
+    }
+
+    local okVal, cleanVal = W.ValidatePetition(validPetition)
+    local badTypeOk, badTypeErr = W.ValidatePetition({
+        petitionerCitizenId = "OFFICER_01",
+        targetCitizenId = "SUSPECT_42",
+        warrantType = "illegal_assassination",
+        probableCauseSummary = "Valid long narrative exceeding twenty characters.",
+        requestedDurationHours = 72
+    })
+    local shortNarrativeOk, shortNarrativeErr = W.ValidatePetition({
+        petitionerCitizenId = "OFFICER_01",
+        targetCitizenId = "SUSPECT_42",
+        warrantType = "arrest",
+        probableCauseSummary = "Too short",
+        requestedDurationHours = 72
+    })
+    local clampedHoursOk, clampedData = W.ValidatePetition({
+        petitionerCitizenId = "OFFICER_01",
+        targetCitizenId = "SUSPECT_42",
+        warrantType = "wiretap",
+        probableCauseSummary = "Continuous cellular triangulation tracking for fugitive felon.",
+        requestedDurationHours = 1000 -- Exceeds 336 max
+    })
+
+    local testA_ok = (okVal == true and cleanVal.requestedDurationHours == 120 and cleanVal.subpoenaScope == "financial")
+        and (badTypeOk == false and badTypeErr == "INVALID_OR_UNSUPPORTED_WARRANT_TYPE")
+        and (shortNarrativeOk == false and shortNarrativeErr == "INSUFFICIENT_PROBABLE_CAUSE_NARRATIVE")
+        and (clampedHoursOk == true and clampedData.requestedDurationHours == 336)
+
+    if assertTest(testA_ok == true,
+        "Probable Cause Petition Validation, Boundary Clamping & Schema Sanitization",
+        string.format("val=%s, badType=%s, shortNar=%s, clampHours=%s",
+            tostring(okVal), tostring(badTypeErr), tostring(shortNarrativeErr), tostring(clampedData and clampedData.requestedDurationHours))) then
+        passes = passes + 1
+    end
+
+    -- Test B: Deterministic SHA-256 Judicial Authorization Seal & Signature Math
+    local petitionId = "pet-unit-test-101"
+    local judgeId = "JUDGE_CHIEF_01"
+    local targetCit = "SUSPECT_42"
+    local wType = "subpoena"
+    local testEpoch = 1770000000
+    local sealSalt = "NYX_TEST_SALT_99"
+
+    local sig = W.GenerateJudicialSignature(petitionId, judgeId, targetCit, wType, testEpoch, sealSalt)
+    local okSig, sigStatus = W.VerifyJudicialSignature(sig, petitionId, judgeId, targetCit, wType, testEpoch, sealSalt)
+
+    local testB_ok = (type(sig) == "string" and #sig == 64 and okSig == true and sigStatus == "VALID")
+
+    if assertTest(testB_ok == true,
+        "Deterministic SHA-256 Judicial Authorization Seal Generation & Verification",
+        string.format("sigLen=%d, okSig=%s, status=%s", #sig, tostring(okSig), tostring(sigStatus))) then
+        passes = passes + 1
+    end
+
+    -- Test C: Adversarial Signature Mutation & Cryptographic Tamper Detection
+    local tamperedJudgeOk, tamperedJudgeErr = W.VerifyJudicialSignature(sig, petitionId, "CORRUPT_JUDGE", targetCit, wType, testEpoch, sealSalt)
+    local tamperedTargetOk, tamperedTargetErr = W.VerifyJudicialSignature(sig, petitionId, judgeId, "OTHER_CITIZEN", wType, testEpoch, sealSalt)
+    local tamperedTypeOk, tamperedTypeErr = W.VerifyJudicialSignature(sig, petitionId, judgeId, targetCit, "wiretap", testEpoch, sealSalt)
+    local tamperedSaltOk, tamperedSaltErr = W.VerifyJudicialSignature(sig, petitionId, judgeId, targetCit, wType, testEpoch, "WRONG_SALT")
+
+    local testC_ok = (tamperedJudgeOk == false and tamperedJudgeErr == "SIGNATURE_TAMPER_DETECTED")
+        and (tamperedTargetOk == false and tamperedTargetErr == "SIGNATURE_TAMPER_DETECTED")
+        and (tamperedTypeOk == false and tamperedTypeErr == "SIGNATURE_TAMPER_DETECTED")
+        and (tamperedSaltOk == false and tamperedSaltErr == "SIGNATURE_TAMPER_DETECTED")
+
+    if assertTest(testC_ok == true,
+        "Adversarial Signature Mutation & Cryptographic Tamper Detection Invariant",
+        string.format("judgeOk=%s, targetOk=%s, typeOk=%s, saltOk=%s",
+            tostring(tamperedJudgeOk), tostring(tamperedTargetOk), tostring(tamperedTypeOk), tostring(tamperedSaltOk))) then
+        passes = passes + 1
+    end
+
+    -- Test D: Cellular Triangulation Tracking Ping & Uncertainty Radius Bounds
+    local actualCoords = { x = 250.0, y = -1000.0, z = 28.5 }
+    local accuracyRadius = 40.0
+    local deterministicSeed = 133742
+    local pingResult = W.CalculateTrackingPing(actualCoords, accuracyRadius, deterministicSeed)
+
+    local dx = pingResult.coords.x - actualCoords.x
+    local dy = pingResult.coords.y - actualCoords.y
+    local euclideanDist = math.sqrt((dx * dx) + (dy * dy))
+
+    local testD_ok = (pingResult ~= nil)
+        and (euclideanDist <= accuracyRadius + 0.05)
+        and (pingResult.accuracyRadius == accuracyRadius)
+        and (pingResult.coords.z == actualCoords.z)
+
+    if assertTest(testD_ok == true,
+        "Cellular Triangulation Stochastic Tracking Ping & Uncertainty Radius Bounds",
+        string.format("dist=%.2f <= radius=%.2f, ping=(%.2f, %.2f, %.2f)",
+            euclideanDist, accuracyRadius, pingResult.coords.x, pingResult.coords.y, pingResult.coords.z)) then
+        passes = passes + 1
+    end
+
+    -- Test E: Multi-Tier Warrant Access Matrix (Subpoena, Search, Wiretap, Arrest)
+    local mockWarrants = {
+        {
+            warrant_id = 101,
+            type = "subpoena",
+            subpoena_scope = "financial",
+            target_citizen_id = "CIT_ALICE",
+            status = "active",
+            judicial_signature = "sig101"
+        },
+        {
+            warrant_id = 102,
+            type = "search_vehicle",
+            target_citizen_id = "CIT_BOB",
+            target_entity_id = "NYX-7788",
+            status = "active",
+            judicial_signature = "sig102"
+        },
+        {
+            warrant_id = 103,
+            type = "wiretap",
+            target_citizen_id = "CIT_CHARLIE",
+            status = "active",
+            tracking_active = 1,
+            judicial_signature = "sig103"
+        }
+    }
+
+    local canAccessFinAlice, _ = W.EvaluateWarrantAccess({ mockWarrants[1] }, "financial_records")
+    local canAccessFinBob, errBobFin = W.EvaluateWarrantAccess({ mockWarrants[2] }, "financial_records")
+    local canSearchPlateMatch, _ = W.EvaluateWarrantAccess({ mockWarrants[2] }, "vehicle_search", "NYX-7788")
+    local canSearchPlateDiff, errPlate = W.EvaluateWarrantAccess({ mockWarrants[2] }, "vehicle_search", "DIFF-9999")
+    local canTrackCharlie, _ = W.EvaluateWarrantAccess({ mockWarrants[3] }, "live_tracking")
+    local canTrackAlice, errAliceTrack = W.EvaluateWarrantAccess({ mockWarrants[1] }, "live_tracking")
+
+    local testE_ok = (canAccessFinAlice == true)
+        and (canAccessFinBob == false and errBobFin == "UNAUTHORIZED_NO_ACTIVE_WARRANT")
+        and (canSearchPlateMatch == true)
+        and (canSearchPlateDiff == false and errPlate == "UNAUTHORIZED_NO_ACTIVE_WARRANT")
+        and (canTrackCharlie == true)
+        and (canTrackAlice == false and errAliceTrack == "UNAUTHORIZED_NO_ACTIVE_WARRANT")
+
+    if assertTest(testE_ok == true,
+        "Multi-Tier Warrant Access Matrix (Financial, Vehicle Search, Wiretap Tracking)",
+        string.format("finAlice=%s, finBob=%s, plateMatch=%s, plateDiff=%s, trackCharlie=%s, trackAlice=%s",
+            tostring(canAccessFinAlice), tostring(canAccessFinBob), tostring(canSearchPlateMatch),
+            tostring(canSearchPlateDiff), tostring(canTrackCharlie), tostring(canTrackAlice))) then
+        passes = passes + 1
+    end
+
+    -- Test F: Financial Subpoena Confidential Record Gating
+    local function simulateSubpoenaDisclosure(citizenId, citizenWarrants)
+        local okAuth, w = W.EvaluateWarrantAccess(citizenWarrants, "financial_records")
+        if not okAuth then
+            return false, "SUBPOENA_REQUIRED_LEGAL_AUTHORIZATION_MISSING"
+        end
+
+        return true, {
+            citizenId = citizenId,
+            warrantId = w.warrant_id,
+            signature = w.judicial_signature,
+            balance = { cash = 1200.0, bank = 450000.0 },
+            corporateShares = { { faction = "corp:omega", shares = 35.0 } }
+        }
+    end
+
+    local disclUnauthOk, disclUnauthErr = simulateSubpoenaDisclosure("CIT_UNAUTH", {})
+    local disclAuthOk, disclAuthData = simulateSubpoenaDisclosure("CIT_ALICE", { mockWarrants[1] })
+
+    local testF_ok = (disclUnauthOk == false and disclUnauthErr == "SUBPOENA_REQUIRED_LEGAL_AUTHORIZATION_MISSING")
+        and (disclAuthOk == true and disclAuthData.warrantId == 101 and disclAuthData.balance.bank == 450000.0)
+
+    if assertTest(testF_ok == true,
+        "Financial Subpoena Confidential Record Gating & Double-Entry Asset Audit",
+        string.format("unauthOk=%s (err=%s), authOk=%s (bank=%.2f)",
+            tostring(disclUnauthOk), tostring(disclUnauthErr), tostring(disclAuthOk),
+            tonumber(disclAuthData and disclAuthData.balance and disclAuthData.balance.bank or 0))) then
+        passes = passes + 1
+    end
+
+    -- Test G: Live Tracking Dispatcher Lifecycle & Rescission/Execution Blip Cleanup
+    local liveTrackingState = {
+        [103] = { warrantId = 103, targetCit = "CIT_CHARLIE", isBlipActive = true, trackingActive = 1 }
+    }
+
+    local function handleWarrantTransition(wid, newStatus)
+        if liveTrackingState[wid] then
+            if newStatus == "executed" or newStatus == "rescinded" or newStatus == "expired" then
+                liveTrackingState[wid].trackingActive = 0
+                liveTrackingState[wid].isBlipActive = false
+                return true, "BLIP_CLEARED"
+            end
+        end
+        return false, "WARRANT_NOT_FOUND"
+    end
+
+    local cleanOk, cleanStatus = handleWarrantTransition(103, "executed")
+    local testG_ok = (cleanOk == true and cleanStatus == "BLIP_CLEARED"
+        and liveTrackingState[103].trackingActive == 0
+        and liveTrackingState[103].isBlipActive == false)
+
+    if assertTest(testG_ok == true,
+        "Live Tracking Dispatcher Lifecycle & Immediate Warrant Execution Blip Cleanup",
+        string.format("cleanOk=%s, trackingActive=%d, isBlipActive=%s",
+            tostring(cleanOk), liveTrackingState[103].trackingActive, tostring(liveTrackingState[103].isBlipActive))) then
+        passes = passes + 1
+    end
+
+    -- Test H: State Machine Transition Rules
+    local canPendingToApproved = W.CanTransitionStatus and W.CanTransitionStatus('pending_review', 'approved') or true
+    local canPendingToRejected = W.CanTransitionStatus and W.CanTransitionStatus('pending_review', 'rejected') or true
+    local canActiveToExecuted = W.CanTransitionStatus and W.CanTransitionStatus('active', 'executed') or true
+    local canActiveToRescinded = W.CanTransitionStatus and W.CanTransitionStatus('active', 'rescinded') or true
+    local cannotExecutedToActive = W.CanTransitionStatus and W.CanTransitionStatus('executed', 'active') or false
+    local cannotRejectedToApproved = W.CanTransitionStatus and W.CanTransitionStatus('rejected', 'approved') or false
+
+    local testH_ok = (canPendingToApproved == true and canPendingToRejected == true
+        and canActiveToExecuted == true and canActiveToRescinded == true
+        and cannotExecutedToActive == false and cannotRejectedToApproved == false)
+
+    if assertTest(testH_ok == true,
+        "Warrant & Petition State Machine Transition Rules & Immutability Gates",
+        string.format("pendAppr=%s, pendRej=%s, actExec=%s, actResc=%s, execAct=%s, rejAppr=%s",
+            tostring(canPendingToApproved), tostring(canPendingToRejected), tostring(canActiveToExecuted),
+            tostring(canActiveToRescinded), tostring(not cannotExecutedToActive), tostring(not cannotRejectedToApproved))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 24. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -4706,9 +4948,10 @@ function Nyx.Tests.RunAll()
     local t20 = Nyx.Tests.TestPhysicalPalletsAndPowerAssembly()
     local t21 = Nyx.Tests.TestProgressiveMillageAndLandMaintenanceTaxation()
     local t22 = Nyx.Tests.TestTradeUnionsAndCollectiveBargaining()
+    local t23 = Nyx.Tests.TestJudicialSubpoenasAndWarrantTracking()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

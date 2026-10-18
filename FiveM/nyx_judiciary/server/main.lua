@@ -64,9 +64,177 @@ CreateThread(function()
                 payload.type,
                 payload.causeSummary,
                 payload.targetEntityId,
-                payload.durationHours
+                payload.durationHours,
+                payload.petitionId,
+                payload.subpoenaScope
             )
             return { success = ok, warrant = warrant, error = (not ok and warrant or nil) }
+        end)
+
+        -- Submit formal probable cause warrant petition (Officer -> Judicial Council)
+        exports['nyx_core']:RegisterRPC("judiciary:petitionWarrant", function(src, payload)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local job = player:getMetadata("job")
+            local isAuthorized = (Config.Warrants.AuthorizedPetitioners and Config.Warrants.AuthorizedPetitioners[job]) or false
+            if not isAuthorized then
+                for perm, _ in pairs(Config.Warrants.AuthorizedPermissions) do
+                    if player:hasPermission(perm) then isAuthorized = true break end
+                end
+            end
+
+            if not isAuthorized then
+                return { success = false, error = "UNAUTHORIZED_PETITIONER" }
+            end
+
+            local ok, petition = Nyx.Judiciary.PetitionWarrant(
+                player.citizenId,
+                payload.targetCitizenId,
+                payload.warrantType,
+                payload.probableCauseSummary,
+                payload.targetEntityId,
+                payload.subpoenaScope,
+                payload.requestedDurationHours
+            )
+            return { success = ok, petition = petition, error = (not ok and petition or nil) }
+        end)
+
+        -- Query pending warrant petitions (Judicial Council review queue)
+        exports['nyx_core']:RegisterRPC("judiciary:getPendingPetitions", function(src)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local job = player:getMetadata("job")
+            local isAuthorized = (job == "judge" or job == "doj") or player:hasPermission("admin")
+            if not isAuthorized then
+                for perm, _ in pairs(Config.Warrants.AuthorizedPermissions) do
+                    if player:hasPermission(perm) then isAuthorized = true break end
+                end
+            end
+
+            if not isAuthorized then
+                return { success = false, error = "UNAUTHORIZED_JUDICIAL_ACCESS" }
+            end
+
+            local petitions = Nyx.Judiciary.GetPendingPetitions()
+            return { success = true, petitions = petitions }
+        end)
+
+        -- Review warrant petition: Approve with SHA-256 seal or Reject with cause (Judge)
+        exports['nyx_core']:RegisterRPC("judiciary:reviewPetition", function(src, payload)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local job = player:getMetadata("job")
+            local isAuthorized = (job == "judge" or job == "doj") or player:hasPermission("admin")
+            if not isAuthorized then
+                for perm, _ in pairs(Config.Warrants.AuthorizedPermissions) do
+                    if player:hasPermission(perm) then isAuthorized = true break end
+                end
+            end
+
+            if not isAuthorized then
+                return { success = false, error = "UNAUTHORIZED_JUDICIAL_ACCESS" }
+            end
+
+            if not payload or not payload.petitionId or not payload.decision then
+                return { success = false, error = "INVALID_PAYLOAD" }
+            end
+
+            local ok, res = Nyx.Judiciary.ReviewPetition(
+                payload.petitionId,
+                player.citizenId,
+                payload.decision,
+                payload.reviewNotes
+            )
+            return { success = ok, result = res, error = (not ok and res or nil) }
+        end)
+
+        -- Subpoena Financial Records Disclosure Gatekeeper
+        exports['nyx_core']:RegisterRPC("judiciary:getSubpoenaRecords", function(src, targetCitizenId)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local job = player:getMetadata("job")
+            local isAuthorized = (Config.Warrants.AuthorizedPetitioners and Config.Warrants.AuthorizedPetitioners[job]) or false
+            if not isAuthorized then
+                for perm, _ in pairs(Config.Warrants.AuthorizedPermissions) do
+                    if player:hasPermission(perm) then isAuthorized = true break end
+                end
+            end
+
+            if not isAuthorized then
+                return { success = false, error = "UNAUTHORIZED_LAW_ENFORCEMENT_ACCESS" }
+            end
+
+            local ok, records = Nyx.Judiciary.GetSubpoenaFinancials(targetCitizenId, player.citizenId)
+            return { success = ok, records = records, error = (not ok and records or nil) }
+        end)
+
+        -- Query active tracking warrants (wiretaps and active arrest warrants)
+        exports['nyx_core']:RegisterRPC("judiciary:getActiveTrackingWarrants", function(src)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local job = player:getMetadata("job")
+            local isAuthorized = (Config.Warrants.AuthorizedPetitioners and Config.Warrants.AuthorizedPetitioners[job]) or false
+            if not isAuthorized then
+                for perm, _ in pairs(Config.Warrants.AuthorizedPermissions) do
+                    if player:hasPermission(perm) then isAuthorized = true break end
+                end
+            end
+
+            if not isAuthorized then
+                return { success = false, error = "UNAUTHORIZED_LAW_ENFORCEMENT_ACCESS" }
+            end
+
+            local warrants = Nyx.Judiciary.GetActiveTrackingWarrants()
+            return { success = true, warrants = warrants }
+        end)
+
+        -- Execute active warrant upon arrest or search
+        exports['nyx_core']:RegisterRPC("judiciary:executeWarrant", function(src, warrantId)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local job = player:getMetadata("job")
+            local isAuthorized = (Config.Warrants.AuthorizedPetitioners and Config.Warrants.AuthorizedPetitioners[job]) or false
+            if not isAuthorized then
+                for perm, _ in pairs(Config.Warrants.AuthorizedPermissions) do
+                    if player:hasPermission(perm) then isAuthorized = true break end
+                end
+            end
+
+            if not isAuthorized then
+                return { success = false, error = "UNAUTHORIZED_LAW_ENFORCEMENT_ACCESS" }
+            end
+
+            local ok, err = Nyx.Judiciary.ExecuteWarrant(warrantId, player.citizenId)
+            return { success = ok, error = (not ok and err or nil) }
+        end)
+
+        -- Rescind active warrant
+        exports['nyx_core']:RegisterRPC("judiciary:rescindWarrant", function(src, payload)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local job = player:getMetadata("job")
+            local isAuthorized = (job == "judge" or job == "doj") or player:hasPermission("admin")
+            if not isAuthorized then
+                for perm, _ in pairs(Config.Warrants.AuthorizedPermissions) do
+                    if player:hasPermission(perm) then isAuthorized = true break end
+                end
+            end
+
+            if not isAuthorized then
+                return { success = false, error = "UNAUTHORIZED_JUDICIAL_ACCESS" }
+            end
+
+            local warrantId = type(payload) == "table" and payload.warrantId or payload
+            local reason = type(payload) == "table" and payload.reason or "Judicial motion to quash"
+            local ok, err = Nyx.Judiciary.RescindWarrant(warrantId, player.citizenId, reason)
+            return { success = ok, error = (not ok and err or nil) }
         end)
 
         -- Start formal trial session in isolated courtroom routing bucket
@@ -292,6 +460,59 @@ CreateThread(function()
             Wait(30000)
             if Nyx.Judiciary.CheckDeliberationTimeouts then
                 Nyx.Judiciary.CheckDeliberationTimeouts()
+            end
+        end
+    end)
+
+    -- 6. Live Suspect Tracking Dispatcher Sweep (every 20 seconds)
+    CreateThread(function()
+        local interval = (Config.Warrants and Config.Warrants.Tracking and Config.Warrants.Tracking.IntervalSeconds or 20) * 1000
+        while true do
+            Wait(interval)
+            local trackingWarrants = Nyx.Judiciary.GetActiveTrackingWarrants()
+            if trackingWarrants and #trackingWarrants > 0 then
+                for _, w in ipairs(trackingWarrants) do
+                    local targetPlayer = Nyx.GetPlayerByCitizenId(w.target_citizen_id)
+                    if targetPlayer and targetPlayer.source then
+                        local ped = GetPlayerPed(tostring(targetPlayer.source))
+                        if ped and DoesEntityExist(ped) then
+                            local pCoords = GetEntityCoords(ped)
+                            local accRadius = (Config.Warrants and Config.Warrants.Tracking and Config.Warrants.Tracking.DefaultAccuracyRadius) or 35.0
+                            local pingResult = Nyx.Warrants.CalculateTrackingPing(pCoords, accRadius)
+                            if pingResult then
+                                Nyx.Judiciary.RecordTrackingPing(w.warrant_id, w.target_citizen_id, pingResult.coords, accRadius, "cellular_triangulation")
+
+                                local pingPayload = {
+                                    warrantId = w.warrant_id,
+                                    targetCitizenId = w.target_citizen_id,
+                                    targetName = targetPlayer.name or ("Suspect " .. w.target_citizen_id),
+                                    warrantType = w.type,
+                                    coords = pingResult.coords,
+                                    accuracyRadius = accRadius,
+                                    timestamp = pingResult.timestamp
+                                }
+
+                                for _, officerSrc in ipairs(GetPlayers()) do
+                                    local oId = tonumber(officerSrc)
+                                    local isAuth = false
+                                    if exports['nyx_mdt'] and exports['nyx_mdt'].IsAuthorized then
+                                        isAuth = exports['nyx_mdt']:IsAuthorized(oId)
+                                    else
+                                        local oPlr = Nyx.GetPlayer(oId)
+                                        local oJob = oPlr and oPlr:getMetadata("job")
+                                        if oJob == "police" or oJob == "sheriff" or oJob == "state_police" or oJob == "doj" then
+                                            isAuth = true
+                                        end
+                                    end
+
+                                    if isAuth then
+                                        TriggerClientEvent("nyx:mdt:client:warrantTrackingPing", oId, pingPayload)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
             end
         end
     end)

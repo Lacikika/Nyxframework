@@ -26,5 +26,6 @@
   "025_spatial_grid_drops_and_durability_decay.sql",
   "026_logistics_physical_pallets_and_power_assembly.sql",
   "027_properties_progressive_millage_and_maintenance_taxation.sql",
-  "028_factions_trade_unions_and_collective_bargaining.sql"
+  "028_factions_trade_unions_and_collective_bargaining.sql",
+  "029_judiciary_subpoenas_and_warrant_tracking.sql"
 ]

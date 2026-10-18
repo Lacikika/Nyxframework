@@ -68,10 +68,39 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] QA: Add concurrency unit tests for inventory mutex locks and treasury double-entry conservation (`nyx_core/server/tests.lua`)
 - [x] Feature: Progressive property millage & dynamic land maintenance taxation (`nyx_properties` / `nyx_treasury`)
 - [x] Feature: Trade unionization framework, collective bargaining agreements & binding labor arbitration (`nyx_factions` / `nyx_treasury` / `nyx_judiciary`)
+- [x] Feature: Judicial subpoenas, probable cause warrants & live MDT dispatch tracking integration (`nyx_judiciary` / `nyx_mdt`)
 
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Judicial subpoenas, probable cause warrants & live MDT dispatch tracking integration (`nyx_judiciary` / `nyx_mdt`)**
+  - **Database Migration & Schema Extensions (`029_judiciary_subpoenas_and_warrant_tracking.sql`, `index.json`)**:
+    - Created `nyx_judiciary_warrant_petitions` table managing formal sworn probable cause warrant petitions (`petitioner_citizen_id`, `target_citizen_id`, `warrant_type`, `subpoena_scope`, `target_entity_id`, `probable_cause_summary`, `requested_duration_hours`, `status` [pending_review, approved, rejected, withdrawn], `reviewed_by_judge_id`, `review_notes`, `judicial_signature`).
+    - Extended `nyx_judiciary_warrants` table supporting expanded warrant types (`subpoena`, `wiretap`), `petition_id`, `subpoena_scope` (`all`, `financial`, `property`, `telecom`), `judicial_signature` (SHA-256 seal), `tracking_active` (TINYINT), and `last_ping_at`.
+    - Created `nyx_judiciary_tracking_logs` table recording immutable audit history of cellular triangulation pings, reported coords, accuracy radii, and source types.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 29) and mirrored to `nyx_judiciary`.
+  - **Pure Lua 5.4 Shared Engine (`nyx_judiciary/shared/warrants.lua`, `fxmanifest.lua`, `config.lua`)**:
+    - *Probable Cause Petition Validator (`Nyx.Warrants.ValidatePetition`)*: Enforces petitioner/target citizen presence, recognized warrant types, minimum probable cause summary narrative threshold (>= 20 characters), and duration clamping to $[1, 336]$ hours (14 days max).
+    - *Cryptographic Judicial Authorization Seal (`Nyx.Warrants.GenerateJudicialSignature` & `VerifyJudicialSignature`)*: Generates deterministic SHA-256 seal from `petitionId:judgeId:targetCitizenId:warrantType:timestamp:salt` with constant-time equality checks preventing timing attack side-channels.
+    - *Cellular Triangulation Tracking Ping Math (`Nyx.Warrants.CalculateTrackingPing`)*: Implements uniform disk sampling math ($r = R_{\text{accuracy}} \times \sqrt{u}, \theta \in [0, 2\pi)$) generating approximate cell-tower triangulation coordinates within a bounded uncertainty radius ($10\text{m} \le R \le 150\text{m}$) with zero floating-point drift.
+    - *Multi-Tier Warrant Access Matrix (`Nyx.Warrants.EvaluateWarrantAccess`)*: Evaluates whether active warrants authorize `financial_records` (subpoenas), `property_search`, `vehicle_search`, or `live_tracking` (wiretaps and active arrest warrants).
+    - *Warrant & Petition State Machine (`Nyx.Warrants.CanTransitionStatus`)*: Enforces unidirectional transitions and immutability for finalized states (`executed`, `expired`, `rescinded`, `rejected`).
+  - **Authoritative Server Warrant, Subpoena & Tracking Subsystem (`nyx_judiciary/server/warrants.lua`, `server/main.lua`, `server/exports.lua`)**:
+    - *Petition Workflow (`Nyx.Judiciary.PetitionWarrant`)*: Generates petition records, validates sworn affidavits, and triggers `nyx:judiciary:client:petitionSubmitted` to presiding judges and DOJ officers.
+    - *Judicial Review & Signing (`Nyx.Judiciary.ReviewPetition`)*: Enables judges to approve or reject petitions. Upon approval, computes cryptographic SHA-256 seal, instantiates active warrant, enables live tracking for wiretaps/arrests, and broadcasts `nyx:judiciary:client:warrantIssued` and `nyx:mdt:client:newWarrantAlert`.
+    - *Confidential Subpoena Financial Disclosure (`Nyx.Judiciary.GetSubpoenaFinancials`)*: Strictly gates access to citizen financial ledgers, debit/credit transactions in `nyx_treasury_ledger`, owned real estate properties, and corporate shareholdings behind an active, verified `subpoena` warrant, rejecting unauthorized probes with `SUBPOENA_REQUIRED_LEGAL_AUTHORIZATION_MISSING`.
+    - *Warrant Execution & Rescission (`ExecuteWarrant`, `RescindWarrant`)*: Immediately clears `tracking_active = 0` and broadcasts `nyx:mdt:client:clearTrackingBlip` to extinguish tactical radar blips upon apprehension or judicial motion to quash.
+    - *Live Suspect Tracking Dispatcher Sweep*: 20-second background loop querying active tracking warrants, resolving online target player peds, generating cellular triangulation pings within 35m uncertainty radius, logging to `nyx_judiciary_tracking_logs`, and streaming `nyx:mdt:client:warrantTrackingPing` to on-duty MDT units.
+  - **MDT Server Integration & Client Tactical Tracking Display (`nyx_mdt/server/records.lua`, `nyx_mdt/client/dispatch.lua`, `nyx_judiciary/client/courtroom.lua`)**:
+    - Integrated `mdt:getSubpoenaRecords`, `mdt:petitionWarrant`, and `mdt:reviewWarrantPetition` RPC endpoints into `nyx_mdt`.
+    - Enriched `mdt:searchCitizen` profiles with judicial signature, subpoena scope, and live tracking status.
+    - Added real-time radar blip rendering in `nyx_mdt/client/dispatch.lua` creating pulsing uncertainty radius blips (`AddBlipForRadius`) and central suspect marker blips (`AddBlipForCoord`) with audible tactical radio cues.
+    - Added courthouse clerk Third-Eye interaction `court_warrant_registry` and chat commands (`/petitionwarrant`, `/reviewpetition`, `/subpoenarecords`).
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestJudicialSubpoenasAndWarrantTracking()` (Test 23) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created standalone Python unit test suite `tests/test_judicial_subpoenas_and_warrant_tracking.py` validating 9 distinct test scenarios (petition validation, SHA-256 judicial signature math, cryptographic tamper detection, cellular triangulation bounds, multi-tier warrant access matrix, confidential financial disclosure gatekeeping, tracking blip lifecycle cleanup, state machine transition immutability, and migration/manifest integrity).
+    - Full pytest suite: 185/185 tests passing (100% pass rate).
+    - Verified clean passes across all 13 resources, 181 Lua files, and all 29 SQL migrations via `scripts/validator.py` and `scripts/verify.ps1`.
 - **[2026-10-18] Feature: Trade unionization framework, collective bargaining agreements & binding labor arbitration (`nyx_factions` / `nyx_treasury` / `nyx_judiciary`)**
   - **Database Migration & Schema Extensions (`028_factions_trade_unions_and_collective_bargaining.sql`, `index.json`)**:
     - Created `nyx_factions_unions` table storing trade union charters, legal names, industry sectors (`logistics`, `manufacturing`, `mining`, `services`, `healthcare`, `civil`), treasury accounts (`union:<union_id>`), dues mode (`flat` vs `percentage`), strike fund balances, and daily strike pay rates ($150/day).

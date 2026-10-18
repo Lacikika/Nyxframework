@@ -62,6 +62,30 @@ exports("GetActiveWarrants", function(targetCitId)
     return Nyx.Judiciary.GetActiveWarrants(targetCitId)
 end)
 
+exports("PetitionWarrant", function(petitionerCitId, targetCitId, warrantType, causeSummary, targetEntityId, subpoenaScope, durationHours)
+    return Nyx.Judiciary.PetitionWarrant(petitionerCitId, targetCitId, warrantType, causeSummary, targetEntityId, subpoenaScope, durationHours)
+end)
+
+exports("ReviewPetition", function(petitionId, judgeCitId, decision, reviewNotes)
+    return Nyx.Judiciary.ReviewPetition(petitionId, judgeCitId, decision, reviewNotes)
+end)
+
+exports("GetPendingPetitions", function()
+    return Nyx.Judiciary.GetPendingPetitions()
+end)
+
+exports("GetSubpoenaFinancials", function(targetCitId, requestingOfficerCitId)
+    return Nyx.Judiciary.GetSubpoenaFinancials(targetCitId, requestingOfficerCitId)
+end)
+
+exports("GetActiveTrackingWarrants", function()
+    return Nyx.Judiciary.GetActiveTrackingWarrants()
+end)
+
+exports("RecordTrackingPing", function(warrantId, targetCitId, coords, accuracyRadius, sourceType)
+    return Nyx.Judiciary.RecordTrackingPing(warrantId, targetCitId, coords, accuracyRadius, sourceType)
+end)
+
 -- Juries, Civic Summons & Courtroom Routing
 exports("SummonJury", function(docketId, requiredCount)
     return Nyx.Judiciary.SummonJury(docketId, requiredCount)

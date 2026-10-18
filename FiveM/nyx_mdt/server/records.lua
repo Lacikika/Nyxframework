@@ -59,7 +59,7 @@ exports['nyx_core']:RegisterRPC("mdt:searchCitizen", function(src, query)
 
     -- 4. Fetch Active Warrants from nyx_judiciary
     local warrants = MySQL.query.await([[
-        SELECT `warrant_id`, `type`, `probable_cause_summary`, `expires_at`
+        SELECT `warrant_id`, `type`, `probable_cause_summary`, `judicial_signature`, `subpoena_scope`, `tracking_active`, `expires_at`
         FROM `nyx_judiciary_warrants`
         WHERE `target_citizen_id` = ? AND `status` = 'active'
     ]], { citId }) or {}
@@ -277,4 +277,78 @@ RegisterNetEvent("nyx:parliament:lawsUpdated", function(actions)
             message = "A Parlament új büntető törvénykönyvi és adózási rendeletet hirdetett ki. Bírsághatárok frissítve."
         })
     end
+end)
+
+-- 6. RPC: Subpoena Confidential Financial & Asset Records
+exports['nyx_core']:RegisterRPC("mdt:getSubpoenaRecords", function(src, targetCitizenId)
+    if not Nyx.MDT.IsAuthorized(src) then
+        return { success = false, error = "UNAUTHORIZED" }
+    end
+
+    if not targetCitizenId then
+        return { success = false, error = "MISSING_TARGET_CITIZEN_ID" }
+    end
+
+    local officer = exports['nyx_core']:GetPlayer(src)
+    local officerCitId = officer and officer.citizenId or "OFFICER"
+
+    if exports['nyx_judiciary'] and exports['nyx_judiciary'].GetSubpoenaFinancials then
+        local ok, records = exports['nyx_judiciary']:GetSubpoenaFinancials(targetCitizenId, officerCitId)
+        if not ok then
+            return { success = false, error = records }
+        end
+        return { success = true, records = records }
+    end
+
+    return { success = false, error = "JUDICIARY_SUBSYSTEM_UNAVAILABLE" }
+end)
+
+-- 7. RPC: File Formal Warrant Petition from MDT Terminal
+exports['nyx_core']:RegisterRPC("mdt:petitionWarrant", function(src, payload)
+    if not Nyx.MDT.IsAuthorized(src) then
+        return { success = false, error = "UNAUTHORIZED" }
+    end
+
+    local officer = exports['nyx_core']:GetPlayer(src)
+    local officerCitId = officer and officer.citizenId or "OFFICER"
+
+    if exports['nyx_judiciary'] and exports['nyx_judiciary'].PetitionWarrant then
+        local ok, petition = exports['nyx_judiciary']:PetitionWarrant(
+            officerCitId,
+            payload.targetCitizenId,
+            payload.warrantType,
+            payload.probableCauseSummary,
+            payload.targetEntityId,
+            payload.subpoenaScope,
+            payload.requestedDurationHours
+        )
+        return { success = ok, petition = petition, error = (not ok and petition or nil) }
+    end
+
+    return { success = false, error = "JUDICIARY_SUBSYSTEM_UNAVAILABLE" }
+end)
+
+-- 8. RPC: Judicial Council Petition Review from MDT
+exports['nyx_core']:RegisterRPC("mdt:reviewWarrantPetition", function(src, payload)
+    if not Nyx.MDT.IsAuthorized(src) then
+        return { success = false, error = "UNAUTHORIZED" }
+    end
+
+    local player = exports['nyx_core']:GetPlayer(src)
+    local job = player and player:getMetadata("job")
+    if job ~= "judge" and job ~= "doj" and not (player and player.hasPermission and player:hasPermission("admin")) then
+        return { success = false, error = "UNAUTHORIZED_JUDICIAL_ACCESS" }
+    end
+
+    if exports['nyx_judiciary'] and exports['nyx_judiciary'].ReviewPetition then
+        local ok, res = exports['nyx_judiciary']:ReviewPetition(
+            payload.petitionId,
+            player.citizenId,
+            payload.decision,
+            payload.reviewNotes
+        )
+        return { success = ok, result = res, error = (not ok and res or nil) }
+    end
+
+    return { success = false, error = "JUDICIARY_SUBSYSTEM_UNAVAILABLE" }
 end)

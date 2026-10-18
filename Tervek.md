@@ -87,8 +87,8 @@ created: 2026-09-20
 ## 4. Community Judiciary & Legal Architecture (`nyx_judiciary`)
 
 ### 4.1 Digital Case Filing & Evidence Registry
-- [ ] **Cryptographic Chain of Custody:** Evidence items (spent shell casings, forensic swabs, CCTV camera snapshots) generate immutable SHA-256 metadata fingerprints on creation.
-- [ ] **Subpoenas & Public Warrants:** Judicial council members sign active warrants directly through the UI, exposing suspect tracking pings across police dispatch stations only after legal authorization.
+- [x] **Cryptographic Chain of Custody:** Evidence items (spent shell casings, forensic swabs, CCTV camera snapshots) generate immutable SHA-256 metadata fingerprints on creation.
+- [x] **Subpoenas & Public Warrants:** Judicial council members sign active warrants directly through the UI, exposing suspect tracking pings across police dispatch stations only after legal authorization.
 
 ### 4.2 Automated Civic Jury Pools
 - [ ] **Jury Summons Routing:** Random active citizens receive automated summons when a trial is scheduled.
