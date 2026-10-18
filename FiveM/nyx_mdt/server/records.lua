@@ -93,10 +93,20 @@ exports['nyx_core']:RegisterRPC("mdt:searchVehicle", function(src, plate)
 
     local veh = MySQL.single.await([[
         SELECT v.*, CONCAT(c.first_name, ' ', c.last_name) AS `owner_name`
-        FROM `nyx_vehicles` v
+        FROM `nyx_vehicles_owned` v
         LEFT JOIN `nyx_characters` c ON v.owner_citizen_id = c.citizen_id
         WHERE REPLACE(v.plate, ' ', '') = ?
     ]], { cleanPlate })
+
+    if not veh then
+        -- Fallback to legacy view/table if present
+        veh = MySQL.single.await([[
+            SELECT v.*, CONCAT(c.first_name, ' ', c.last_name) AS `owner_name`
+            FROM `nyx_vehicles` v
+            LEFT JOIN `nyx_characters` c ON v.owner_citizen_id = c.citizen_id
+            WHERE REPLACE(v.plate, ' ', '') = ?
+        ]], { cleanPlate })
+    end
 
     if not veh then
         return { success = false, error = "VEHICLE_NOT_FOUND" }
@@ -111,18 +121,47 @@ exports['nyx_core']:RegisterRPC("mdt:searchVehicle", function(src, plate)
         ]], { veh.owner_citizen_id })
     end
 
+    local isImpounded = (veh.storage_state == "impounded" or (veh.impound_state and veh.impound_state > 0))
+
     return {
         success = true,
         vehicle = {
+            vin = veh.vin,
             plate = veh.plate,
-            model = veh.model,
+            model = veh.model_name or veh.model,
             ownerName = veh.owner_name or "Nincs Nyilvántartva",
             ownerCitizenId = veh.owner_citizen_id,
             garage = veh.garage_id,
-            isImpounded = (veh.impound_state and veh.impound_state > 0),
+            storageState = veh.storage_state or "stored",
+            isImpounded = isImpounded,
+            impoundLotId = veh.impound_lot_id,
+            impoundFee = veh.impound_fee or 0.0,
+            impoundReason = veh.impound_reason,
+            registrationStatus = veh.registration_status or "valid",
+            registrationExpiresAt = veh.registration_expires_at or 0,
             hasOwnerWarrant = (ownerWarrant and ownerWarrant > 0)
         }
     }
+end)
+
+-- 2b. RPC: MDT Impound Vehicle
+exports['nyx_core']:RegisterRPC("mdt:impoundVehicle", function(src, payload)
+    if not Nyx.MDT.IsAuthorized(src) then
+        return { success = false, error = "UNAUTHORIZED" }
+    end
+    local player = Nyx.GetPlayer(src)
+    if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+    local vin = payload and payload.vin
+    local reason = payload and payload.reason
+    local fee = payload and payload.fee
+    local lotId = payload and payload.lotId or "impound_lot_ls"
+
+    local ok, res = exports['nyx_vehicles']:ImpoundVehicle(vin, reason, fee, lotId, player.citizenId)
+    if not ok then
+        return { success = false, error = res }
+    end
+    return { success = true, result = res }
 end)
 
 -- 3. RPC: Issue Citation & Automated Direct Fine Debit

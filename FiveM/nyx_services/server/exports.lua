@@ -73,3 +73,16 @@ end)
 exports("RestockHospital", function(src, hospitalId, item, amount)
     return Nyx.Services.RestockHospital(src, hospitalId, item, amount)
 end)
+
+-- Public Auto-Repair Stations
+exports("GetRepairStations", function()
+    return Nyx.Services.RepairStations or {}
+end)
+
+exports("GetRepairEstimate", function(src, stationId, vehicleNetId)
+    return Nyx.Services.GetRepairEstimate(src, stationId, vehicleNetId)
+end)
+
+exports("RepairVehicleAtStation", function(src, stationId, vehicleNetId)
+    return Nyx.Services.RepairVehicleAtStation(src, stationId, vehicleNetId)
+end)

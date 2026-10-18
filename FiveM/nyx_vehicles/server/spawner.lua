@@ -247,6 +247,8 @@ function Nyx.Vehicles.GetPlayerVehicles(citizenId)
     local rows = MySQL.query.await([[
         SELECT v.`vin`, v.`plate`, v.`model_name`, v.`model_hash`, v.`garage_id`, v.`storage_state`,
                v.`fuel_level`, v.`lock_state`, v.`condition_data`, v.`created_at`,
+               v.`registration_status`, v.`registration_expires_at`,
+               v.`impound_lot_id`, v.`impound_fee`, v.`impound_reason`, v.`impounded_at`,
                COALESCE(w.`mileage`, 0.00) AS `mileage`,
                COALESCE(w.`trip_odometer`, 0.00) AS `trip_odometer`,
                COALESCE(w.`oil_quality`, 100.00) AS `oil_quality`,

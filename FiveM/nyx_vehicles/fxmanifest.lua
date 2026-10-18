@@ -15,7 +15,9 @@ version '1.0.0'
 
 shared_scripts {
     '@nyx_core/shared/math.lua',
-    'config.lua'
+    '@nyx_treasury/shared/degradation.lua',
+    'config.lua',
+    'shared/registration.lua'
 }
 
 server_scripts {
@@ -23,6 +25,8 @@ server_scripts {
     'server/damage.lua',
     'server/wear.lua',
     'server/keys.lua',
+    'server/impound.lua',
+    'server/registration.lua',
     'server/spawner.lua',
     'server/main.lua',
     'server/exports.lua'
@@ -33,6 +37,7 @@ client_scripts {
     'client/storage.lua',
     'client/sync.lua',
     'client/wear.lua',
+    'client/impound.lua',
     'client/main.lua',
     'client/exports.lua'
 }

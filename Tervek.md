@@ -37,14 +37,14 @@ created: 2026-09-20
          │ Payroll & Fleet │  │ Infrastructure  │  │ & Small Grants  │
          └─────────────────┘  └─────────────────┘  └─────────────────┘
 ### 1.1 Revenue Collection Mechanics
-- [ ] **Dynamic Transaction Tax:** Server-wide point-of-sale tax (0%–15%) automatically deducted on all store, auction, and P2P transfers.
-- [ ] **Progressive Property Millage:** Hourly or weekly maintenance rates applied to real estate, commercial plots, and dynamic lockable spaces based on total land footprint.
-- [ ] **Civil Penalties & Permitting:** 100% of fines, court damages, business registration fees, and vehicle registration renewals flow directly to the treasury ledger.
+- [x] **Dynamic Transaction Tax:** Server-wide point-of-sale tax (0%–15%) automatically deducted on all store, auction, and P2P transfers.
+- [x] **Progressive Property Millage:** Hourly or weekly maintenance rates applied to real estate, commercial plots, and dynamic lockable spaces based on total land footprint.
+- [x] **Civil Penalties & Permitting:** 100% of fines, court damages, business registration fees, and vehicle registration renewals flow directly to the treasury ledger.
 
 ### 1.2 Expenditure & Fiscal Crisis States
-- [ ] **Self-Adjusting Paychecks:** If treasury reserves drop below defined thresholds ($T_{\text{crit}}$), municipal paychecks scale down logarithmically:
+- [x] **Self-Adjusting Paychecks:** If treasury reserves drop below defined thresholds ($T_{\text{crit}}$), municipal paychecks scale down logarithmically:
   $$\text{Payout} = \text{BaseWage} \times \left(\frac{\text{CurrentBalance}}{\text{TargetReserve}}\right)$$
-- [ ] **Infrastructure Degradation Mode:** Zero-balance treasury disables public NPC services (e.g., auto-repair stations, municipal impound lots, AI dispatchers).
+- [x] **Infrastructure Degradation Mode:** Zero-balance treasury disables public NPC services (e.g., auto-repair stations, municipal impound lots, AI dispatchers).
 - [ ] **Auditable Public Ledger UI:** Read-only webview showing real-time balance sheets, transaction history, outgoing payrolls, and official allocations.
 
 ---

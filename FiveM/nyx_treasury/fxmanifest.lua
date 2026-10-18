@@ -14,12 +14,14 @@ dependencies {
 
 shared_scripts {
     'config.lua',
-    'shared/circuit.lua'
+    'shared/circuit.lua',
+    'shared/degradation.lua'
 }
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/circuit.lua',
+    'server/degradation.lua',
     'server/ledger.lua',
     'server/taxes.lua',
     'server/payroll.lua',

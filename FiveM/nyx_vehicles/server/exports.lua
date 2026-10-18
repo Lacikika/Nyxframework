@@ -59,3 +59,23 @@ exports("UpdateVehicleWear", function(vinOrNetId, deltaKm, wearDeltas)
     return Nyx.Vehicles.UpdateWear(vinOrNetId, deltaKm, wearDeltas)
 end)
 
+exports("ImpoundVehicle", function(vin, reason, fee, impoundLotId, officerCitizenId)
+    return Nyx.Vehicles.ImpoundVehicle(vin, reason, fee, impoundLotId, officerCitizenId)
+end)
+
+exports("ReleaseImpoundedVehicle", function(src, vin, impoundLotId)
+    return Nyx.Vehicles.ReleaseImpoundedVehicle(src, vin, impoundLotId)
+end)
+
+exports("GetImpoundedVehicles", function(citizenId, optionalLotId)
+    return Nyx.Vehicles.GetImpoundedVehicles(citizenId, optionalLotId)
+end)
+
+exports("GetVehicleRegistration", function(vin)
+    return Nyx.Vehicles.GetVehicleRegistration(vin)
+end)
+
+exports("RenewVehicleRegistration", function(src, vin)
+    return Nyx.Vehicles.RenewVehicleRegistration(src, vin)
+end)
+

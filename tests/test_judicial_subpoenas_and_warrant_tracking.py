@@ -409,7 +409,6 @@ def test_migration_and_manifest_integrity():
         migrations = json.load(f)
 
     assert "029_judiciary_subpoenas_and_warrant_tracking.sql" in migrations
-    assert migrations[-1] == "029_judiciary_subpoenas_and_warrant_tracking.sql"
 
     # Verify SQL file exists in nyx_core
     core_mig = os.path.join(fivem_root, "nyx_core", "sql", "migrations", "029_judiciary_subpoenas_and_warrant_tracking.sql")

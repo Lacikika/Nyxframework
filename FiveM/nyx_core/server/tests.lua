@@ -4920,7 +4920,164 @@ function Nyx.Tests.TestJudicialSubpoenasAndWarrantTracking()
     return passes == total
 end
 
--- 24. Master Test Runner
+-- 24. Test Municipal Infrastructure Degradation Mode, Impound Reclamation & Vehicle Registration
+function Nyx.Tests.TestInfrastructureDegradationAndVehicleImpounds()
+    print("^3[Nyx:Tests] Running Infrastructure Degradation & Impounds Suite...^7")
+    local passes = 0
+    local total = 7
+
+    local D = Nyx.Degradation
+    local R = Nyx.Registration
+
+    -- Test A: Fiscal Solvency Tier Classification & Boundary Math
+    local tierOptimal = D.EvaluateFiscalTier(150000.0)
+    local tierSolventEdge = D.EvaluateFiscalTier(50000.01)
+    local tierStressExact = D.EvaluateFiscalTier(50000.0)
+    local tierStressEdge = D.EvaluateFiscalTier(20000.01)
+    local tierDegradedExact = D.EvaluateFiscalTier(20000.0)
+    local tierDegradedEdge = D.EvaluateFiscalTier(0.01)
+    local tierBankruptZero = D.EvaluateFiscalTier(0.0)
+    local tierBankruptNeg = D.EvaluateFiscalTier(-1500.0)
+
+    local testA_ok = (tierOptimal == "solvent")
+        and (tierSolventEdge == "solvent")
+        and (tierStressExact == "fiscal_stress")
+        and (tierStressEdge == "fiscal_stress")
+        and (tierDegradedExact == "degraded")
+        and (tierDegradedEdge == "degraded")
+        and (tierBankruptZero == "bankrupt")
+        and (tierBankruptNeg == "bankrupt")
+
+    if assertTest(testA_ok == true,
+        "Municipal Fiscal Solvency Tier Classification & Boundary Math",
+        string.format("opt=%s, solEdge=%s, strEx=%s, strEdge=%s, degEx=%s, degEdge=%s, bnkZero=%s, bnkNeg=%s",
+            tierOptimal, tierSolventEdge, tierStressExact, tierStressEdge, tierDegradedExact, tierDegradedEdge, tierBankruptZero, tierBankruptNeg)) then
+        passes = passes + 1
+    end
+
+    -- Test B: Impound Release Storage & Emergency Bankruptcy Surcharges
+    local calcSolvent = D.CalculateImpoundReleaseCost(500.0, 2, 150.0, "solvent")
+    local calcDegraded = D.CalculateImpoundReleaseCost(500.0, 1, 150.0, "degraded")
+    local calcBankrupt = D.CalculateImpoundReleaseCost(500.0, 3, 150.0, "bankrupt")
+
+    local testB_ok = (calcSolvent.baseFee == 500.0 and calcSolvent.storageFee == 300.0 and calcSolvent.emergencySurcharge == 0.0 and calcSolvent.totalFee == 800.0)
+        and (calcDegraded.baseFee == 500.0 and calcDegraded.storageFee == 150.0 and calcDegraded.emergencySurcharge == 100.0 and calcDegraded.totalFee == 750.0)
+        and (calcBankrupt.baseFee == 500.0 and calcBankrupt.storageFee == 450.0 and calcBankrupt.emergencySurcharge == 250.0 and calcBankrupt.totalFee == 1200.0)
+
+    if assertTest(testB_ok == true,
+        "Impound Storage Fees & Fiscal Surcharge Modeling (Solvent, Degraded, Bankrupt)",
+        string.format("solTot=%.2f, degTot=%.2f, bnkTot=%.2f",
+            calcSolvent.totalFee, calcDegraded.totalFee, calcBankrupt.totalFee)) then
+        passes = passes + 1
+    end
+
+    -- Test C: Public Auto-Repair Cost & Bankruptcy Repair Kit Interlock
+    local repSolventOk, repSolvent = D.CalculatePublicRepairCost(150.0, 0.5, 1.0, "solvent", false)
+    local repBankruptNoKitOk, repBankruptNoKitErr = D.CalculatePublicRepairCost(150.0, 0.4, 1.0, "bankrupt", false)
+    local repBankruptWithKitOk, repBankruptWithKit = D.CalculatePublicRepairCost(150.0, 0.4, 1.0, "bankrupt", true)
+
+    local testC_ok = (repSolventOk == true and repSolvent.laborFee == 150.0 and repSolvent.partsFee == 250.0 and repSolvent.surcharge == 0.0 and repSolvent.totalCost == 400.0)
+        and (repBankruptNoKitOk == false and repBankruptNoKitErr == "STATION_INSOLVENT_REQUIRES_REPAIR_KIT")
+        and (repBankruptWithKitOk == true and repBankruptWithKit.laborFee == 75.0 and repBankruptWithKit.partsFee == 200.0 and repBankruptWithKit.surcharge == 100.0 and repBankruptWithKit.totalCost == 375.0)
+
+    if assertTest(testC_ok == true,
+        "Public Repair Station Pricing & Bankruptcy Repair Kit Interlock",
+        string.format("solCost=%.2f, bnkNoKitErr=%s, bnkWithKitCost=%.2f",
+            repSolvent and repSolvent.totalCost or 0, tostring(repBankruptNoKitErr), repBankruptWithKit and repBankruptWithKit.totalCost or 0)) then
+        passes = passes + 1
+    end
+
+    -- Test D: Vehicle Registration Expiration Status & Renewal Fees
+    local now = 1700000000
+    local stValid = R.EvaluateStatus("valid", now + 86400, now)
+    local stExpired = R.EvaluateStatus("valid", now - 10, now)
+    local stSuspended = R.EvaluateStatus("suspended", now + 86400, now)
+
+    local feeSedan = R.CalculateRenewalFee("sedan", false, 0)
+    local feeSuperExpired = R.CalculateRenewalFee("super", true, 5)
+    local feeMoto = R.CalculateRenewalFee("motorcycle", false, 0)
+
+    local testD_ok = (stValid == "valid" and stExpired == "expired" and stSuspended == "suspended")
+        and (feeSedan.baseFee == 250.0 and feeSedan.latePenalty == 0.0 and feeSedan.totalFee == 250.0)
+        and (feeSuperExpired.baseFee == 500.0 and feeSuperExpired.latePenalty == 125.0 and feeSuperExpired.totalFee == 625.0)
+        and (feeMoto.baseFee == 150.0 and feeMoto.totalFee == 150.0)
+
+    if assertTest(testD_ok == true,
+        "Vehicle Registration Expiration Lifecycle & Statutory Renewal Penalties",
+        string.format("stValid=%s, stExp=%s, stSusp=%s, sedan=%.2f, superExp=%.2f, moto=%.2f",
+            stValid, stExpired, stSuspended, feeSedan.totalFee, feeSuperExpired.totalFee, feeMoto.totalFee)) then
+        passes = passes + 1
+    end
+
+    -- Test E: Closed-Loop Double-Entry Fee Conservation Law
+    local simPlayerBal = 5000.00
+    local simMasterBal = 12000.00
+    local simImpoundCost = D.CalculateImpoundReleaseCost(500.0, 2, 150.0, "degraded")
+    local debitAmt = simImpoundCost.totalFee -- 900.00
+
+    local newPlayerBal = math.floor(((simPlayerBal - debitAmt) * 100) + 0.5) / 100
+    local newMasterBal = math.floor(((simMasterBal + debitAmt) * 100) + 0.5) / 100
+
+    local deltaPlayer = math.floor(((simPlayerBal - newPlayerBal) * 100) + 0.5) / 100
+    local deltaMaster = math.floor(((newMasterBal - simMasterBal) * 100) + 0.5) / 100
+    local systemConserved = ((newPlayerBal + newMasterBal) == (simPlayerBal + simMasterBal))
+
+    local testE_ok = (deltaPlayer == 900.00 and deltaMaster == 900.00 and systemConserved == true)
+
+    if assertTest(testE_ok == true,
+        "Double-Entry Treasury Impound Fee Conservation (Sum(Debits) == Sum(Credits))",
+        string.format("deltaPlayer=%.2f, deltaMaster=%.2f, conserved=%s",
+            deltaPlayer, deltaMaster, tostring(systemConserved))) then
+        passes = passes + 1
+    end
+
+    -- Test F: Impound Lot State Machine Transition & Immutability
+    local mockVehImpounded = { storage_state = "impounded", emergencyLocked = false }
+    local mockVehStored = { storage_state = "stored", emergencyLocked = false }
+    local mockVehBankruptLocked = { storage_state = "impounded", emergencyLocked = true }
+
+    local canReleaseImpounded, _ = R.CanReleaseFromImpound(mockVehImpounded, "solvent")
+    local canReleaseStored, errStored = R.CanReleaseFromImpound(mockVehStored, "solvent")
+    local canReleaseLocked, errLocked = R.CanReleaseFromImpound(mockVehBankruptLocked, "bankrupt")
+
+    local testF_ok = (canReleaseImpounded == true)
+        and (canReleaseStored == false and errStored == "VEHICLE_NOT_IMPOUNDED")
+        and (canReleaseLocked == false and errLocked == "IMPOUND_COMPOUND_LOCKED_MUNICIPAL_INSOLVENCY")
+
+    if assertTest(testF_ok == true,
+        "Impound Lot State Machine Gates & Municipal Insolvency Lockout",
+        string.format("canRel=%s, storedErr=%s, lockedErr=%s",
+            tostring(canReleaseImpounded), tostring(errStored), tostring(errLocked))) then
+        passes = passes + 1
+    end
+
+    -- Test G: MDT Vehicle Search & Impound Telemetry
+    local mockMdtRecord = {
+        vin = "1NYX778899AABB112",
+        plate = "NYX 778",
+        model = "sultan",
+        ownerCitizenId = "CIT_ALICE",
+        storageState = "impounded",
+        isImpounded = true,
+        impoundLotId = "impound_lot_ls",
+        impoundFee = 500.0,
+        registrationStatus = "valid"
+    }
+
+    local testG_ok = (mockMdtRecord.isImpounded == true and mockMdtRecord.impoundLotId == "impound_lot_ls"
+        and mockMdtRecord.registrationStatus == "valid" and mockMdtRecord.impoundFee == 500.0)
+
+    if assertTest(testG_ok == true,
+        "MDT Vehicle Search Record Enrichment (Registration & Impound Status)",
+        string.format("isImp=%s, lot=%s, reg=%s, fee=%.2f",
+            tostring(mockMdtRecord.isImpounded), mockMdtRecord.impoundLotId, mockMdtRecord.registrationStatus, mockMdtRecord.impoundFee)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 25. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -4949,9 +5106,10 @@ function Nyx.Tests.RunAll()
     local t21 = Nyx.Tests.TestProgressiveMillageAndLandMaintenanceTaxation()
     local t22 = Nyx.Tests.TestTradeUnionsAndCollectiveBargaining()
     local t23 = Nyx.Tests.TestJudicialSubpoenasAndWarrantTracking()
+    local t24 = Nyx.Tests.TestInfrastructureDegradationAndVehicleImpounds()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

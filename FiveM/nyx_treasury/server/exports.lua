@@ -78,5 +78,31 @@ end)
 
 exports("IsMunicipalDegraded", function()
     local state = Nyx.Treasury.GetFiscalState()
-    return (state == "CRITICAL_DEFICIT" or Nyx.Treasury.IsCircuitTripped())
+    return (state == "CRITICAL_DEFICIT" or Nyx.Treasury.IsCircuitTripped() or Nyx.Treasury.IsInfrastructureDegraded())
+end)
+
+exports("GetMunicipalFiscalTier", function()
+    return Nyx.Treasury.GetMunicipalFiscalTier()
+end)
+
+exports("GetMunicipalFiscalState", function()
+    return Nyx.Treasury.GetMunicipalFiscalState()
+end)
+
+exports("IsInfrastructureDegraded", function()
+    return Nyx.Treasury.IsInfrastructureDegraded()
+end)
+
+exports("IsMunicipalBankrupt", function()
+    return Nyx.Treasury.IsMunicipalBankrupt()
+end)
+
+exports("CalculateImpoundReleaseCost", function(baseFee, daysImpounded, dailyRate)
+    local tier = Nyx.Treasury.GetMunicipalFiscalTier()
+    return Nyx.Degradation.CalculateImpoundReleaseCost(baseFee, daysImpounded, dailyRate, tier)
+end)
+
+exports("CalculatePublicRepairCost", function(baseLabor, damageRatio, partsMultiplier, hasRepairKit)
+    local tier = Nyx.Treasury.GetMunicipalFiscalTier()
+    return Nyx.Degradation.CalculatePublicRepairCost(baseLabor, damageRatio, partsMultiplier, tier, hasRepairKit)
 end)

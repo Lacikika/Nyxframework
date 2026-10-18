@@ -14,6 +14,7 @@ description 'Civil Infrastructure, Regional Power Grids, Utility Billing & Healt
 version '1.0.0'
 
 shared_scripts {
+    '@nyx_treasury/shared/degradation.lua',
     'config.lua'
 }
 
@@ -22,6 +23,7 @@ server_scripts {
     'server/powergrid.lua',
     'server/billing.lua',
     'server/medical.lua',
+    'server/repair_stations.lua',
     'server/main.lua',
     'server/exports.lua'
 }
@@ -29,6 +31,7 @@ server_scripts {
 client_scripts {
     'client/blackout.lua',
     'client/substations.lua',
+    'client/repair_stations.lua',
     'client/main.lua',
     'client/exports.lua'
 }

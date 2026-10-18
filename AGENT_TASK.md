@@ -69,10 +69,40 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] Feature: Progressive property millage & dynamic land maintenance taxation (`nyx_properties` / `nyx_treasury`)
 - [x] Feature: Trade unionization framework, collective bargaining agreements & binding labor arbitration (`nyx_factions` / `nyx_treasury` / `nyx_judiciary`)
 - [x] Feature: Judicial subpoenas, probable cause warrants & live MDT dispatch tracking integration (`nyx_judiciary` / `nyx_mdt`)
+- [x] Feature: Municipal infrastructure degradation mode, civic impound reclamation & vehicle registration revenue (`nyx_treasury` / `nyx_vehicles` / `nyx_services`)
 
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Municipal infrastructure degradation mode, civic impound reclamation & vehicle registration revenue (`nyx_treasury` / `nyx_vehicles` / `nyx_services`)**
+  - **Database Migration & Schema Extensions (`030_treasury_infrastructure_degradation_and_vehicle_impounds.sql`, `index.json`)**:
+    - Created `nyx_treasury_fiscal_states` table tracking municipal solvency states (`master_account_id`, `liquid_balance`, `fiscal_tier` [`solvent`, `fiscal_stress`, `degraded`, `bankrupt`], `auto_repair_status`, `impound_lot_status`, `ai_dispatch_latency_sec`, `notes`, `evaluated_at`).
+    - Extended `nyx_vehicles_owned` with `registration_status` (`valid`, `expired`, `suspended`), `registration_expires_at`, `impound_lot_id`, `impound_fee`, `impound_reason`, `impounded_by`, and `impounded_at`.
+    - Created `nyx_vehicles_impound_lots` table persisting municipal impound lot compounds (`lot_id`, `label`, `coords`, `release_coords`, `base_fee`, `daily_storage_fee`).
+    - Created `nyx_vehicles_impound_logs` table maintaining immutable audit history of vehicle impounds, releases, statutory base fees, emergency surcharges, total amounts paid, and treasury transaction UUIDs.
+    - Created `nyx_services_repair_stations` table persisting public auto-repair depots (`station_id`, `label`, `coords`, `base_labor_fee`, `parts_cost_multiplier`, `status`).
+    - Seeded canonical facilities: `impound_lot_ls` (Innocence Blvd), `impound_lot_sandy` (Sheriff compound), `repair_depot_ls`, `repair_sandy_shores`, and `repair_paleto_bay`. Registered in `FiveM/nyx_core/sql/migrations/index.json` (Step 30) and mirrored to `nyx_vehicles` and `nyx_treasury`.
+  - **Pure Lua 5.4 Shared Engines (`nyx_treasury/shared/degradation.lua`, `nyx_vehicles/shared/registration.lua`, `fxmanifest.lua`)**:
+    - *Municipal Solvency Tier Evaluator (`Nyx.Degradation.EvaluateFiscalTier`)*: Enforces mathematical boundaries: `solvent` ($B > \$50,000$), `fiscal_stress` ($\$20,000 < B \le \$50,000$, +10% repair surcharge), `degraded` ($\$0 < B \le \$20,000$, +25% repair surcharge, +$100 impound emergency surcharge, +20s AI dispatch latency), and `bankrupt` ($B \le \$0$, +50% repair surcharge, +$250 impound emergency surcharge, +60s AI dispatch latency).
+    - *Dynamic Impound Storage & Surcharge Calculator (`Nyx.Degradation.CalculateImpoundReleaseCost`)*: Formulates $F_{\text{total}} = F_{\text{base}} + (\text{days} \times \text{dailyRate}) + F_{\text{surcharge}}$ with exact cent-precision arithmetic ($\Delta = 0.00$).
+    - *Public Repair Station Pricing & Insolvency Interlock (`Nyx.Degradation.CalculatePublicRepairCost`)*: Computes labor and parts with tier surcharges; in municipal bankruptcy, strictly halts automated subsidized repairs unless citizen supplies physical tool repair kits (`tool_repairkit`).
+    - *Vehicle Registration Lifecycle & Statutory Penalty Evaluator (`Nyx.Registration.EvaluateStatus` & `CalculateRenewalFee`)*: Evaluates timestamp expiration; applies 20% late statutory fine + $5.00/day expired surcharge, renewing for standard 14-day intervals (1,209,600s).
+    - *Impound Compound State Machine Gates (`Nyx.Registration.CanReleaseFromImpound`)*: Enforces valid `impounded` state checks and insolvency lockout rules.
+  - **Authoritative Server Degradation, Impound & Registration Subsystems (`nyx_treasury/server/degradation.lua`, `nyx_vehicles/server/impound.lua`, `server/registration.lua`, `nyx_services/server/repair_stations.lua`, `nyx_mdt/server/records.lua`)**:
+    - *Real-Time Solvency Watchdog*: Background loop synchronizing `GlobalState.municipalFiscalTier` and `GlobalState.municipalFiscalState` across all OneSync clients, broadcasting state transitions upon treasury fluctuations.
+    - *Authoritative Vehicle Impounding & Release*: Implemented `ImpoundVehicle` (despawning active entities, recording fee, lot ID, and reason) and `ReleaseImpoundedVehicle` (processing closed-loop double-entry settlement from player wallet/bank directly into `gov:city:master` with zero balance leakage: $\sum \text{Debits} == \sum \text{Credits}$).
+    - *Vehicle Registration Renewal*: Implemented `RenewVehicleRegistration` executing atomic treasury debit and extending registration timestamps.
+    - *Municipal Public Auto-Repair*: Implemented `GetRepairEstimate` and `RepairVehicleAtStation` executing repairs, consuming `tool_repairkit` during bankruptcy, and crediting municipal master reserves.
+    - *MDT Integration*: Enriched `mdt:searchVehicle` with registration validity, expiration timestamps, impound status, lot IDs, and fees; added `mdt:impoundVehicle` RPC for law enforcement.
+  - **Client UI & Third-Eye (`LALT`) Integration (`nyx_vehicles/client/impound.lua`, `nyx_services/client/repair_stations.lua`)**:
+    - Registered Third-Eye interaction points at municipal impounds: "Lefoglalt Járművek Kiváltása" and "Forgalmi Engedély Megújítása".
+    - Registered Third-Eye interaction points at municipal repair stations: "Városi Járműszerviz" with real-time damage diagnostics, solvency cost estimates, and bankruptcy repair kit warnings.
+    - Added player commands: `/myimpounds`, `/releasevehicle <VIN>`, `/vehiclereg <VIN>`, `/renewreg <VIN>`, and `/muni_repair`.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestInfrastructureDegradationAndVehicleImpounds()` (Test 24) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created standalone Python test suite `tests/test_infrastructure_degradation_and_impounds.py` validating 10 distinct test scenarios (solvency tier boundaries, impound release storage math & surcharges, public repair pricing, bankruptcy repair kit interlock, registration status & late penalties, double-entry closed-loop conservation, impound state machine gates, MDT vehicle search telemetry, SQL migration 030, and fxmanifest declarations).
+    - Full pytest suite: 195/195 tests passing (100% pass rate).
+    - Verified clean passes across all 13 resources, 189 Lua files, and all 30 SQL migrations via `scripts/validator.py` and `scripts/verify.ps1`.
 - **[2026-10-18] Feature: Judicial subpoenas, probable cause warrants & live MDT dispatch tracking integration (`nyx_judiciary` / `nyx_mdt`)**
   - **Database Migration & Schema Extensions (`029_judiciary_subpoenas_and_warrant_tracking.sql`, `index.json`)**:
     - Created `nyx_judiciary_warrant_petitions` table managing formal sworn probable cause warrant petitions (`petitioner_citizen_id`, `target_citizen_id`, `warrant_type`, `subpoena_scope`, `target_entity_id`, `probable_cause_summary`, `requested_duration_hours`, `status` [pending_review, approved, rejected, withdrawn], `reviewed_by_judge_id`, `review_notes`, `judicial_signature`).
