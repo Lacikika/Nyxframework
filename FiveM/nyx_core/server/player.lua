@@ -165,6 +165,35 @@ function PlayerObject:setMetadata(key, value)
     TriggerClientEvent("nyx:core:client:metadataUpdated", self.source, key, value)
 end
 
+-- Inventory Weight Tracking
+function PlayerObject:getWeight()
+    if not self.metadata.inventory_weight then
+        return { current = 0, max = 30000, ratio = 0.0 }
+    end
+    return self.metadata.inventory_weight
+end
+
+function PlayerObject:setWeight(current, max)
+    local cur = math.max(0, tonumber(current) or 0)
+    local maxW = math.max(1, tonumber(max) or 30000)
+    local ratio = cur / maxW
+
+    local weightData = {
+        current = cur,
+        max = maxW,
+        ratio = ratio
+    }
+
+    self.metadata.inventory_weight = weightData
+    self:markDirty()
+
+    TriggerClientEvent("nyx:core:client:updateWeight", self.source, weightData)
+    TriggerClientEvent("nyx:core:client:metadataUpdated", self.source, "inventory_weight", weightData)
+    TriggerEvent("nyx:core:server:playerWeightUpdated", self.source, cur, maxW, ratio)
+
+    return weightData
+end
+
 -- Position & Coordinates
 function PlayerObject:getPosition()
     local ped = GetPlayerPed(tostring(self.source))

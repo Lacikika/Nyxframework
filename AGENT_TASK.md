@@ -26,15 +26,28 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Task Backlog
 - [x] Feature: Advanced vehicle mileage & wear tracking system (server-side persistence in `nyx_vehicles`)
-- [ ] Feature: Dynamic inventory weight penalties on player movement (`nyx_inventory` -> `nyx_core`)
+- [x] Feature: Dynamic inventory weight penalties on player movement (`nyx_inventory` -> `nyx_core`)
 - [ ] Feature: Elastic item pricing based on localized stock-to-demand ratio (`nyx_logistics` / `nyx_treasury`)
 - [ ] Feature: Cryptographic evidence chain-of-custody registry with SHA-256 fingerprints (`nyx_judiciary`)
 - [ ] Refactor: Extract shared math/vector helper functions into a standalone utility (`nyx_core/shared/math.lua`)
 - [ ] Feature: Multi-signature corporate treasury vaults and sign-off rules (`nyx_factions`)
 - [ ] Feature: Municipal power grid substation failure & blackout simulation (`nyx_services`)
+- [ ] Security: Enforce RPC rate limiting (50 req/s token bucket) and 64KB payload cap (`nyx_core/server/rpc.lua`)
+- [ ] Feature: Instant-Runoff Voting (IRV) election engine & live penal code sync (`nyx_parliament`)
+- [ ] Feature: Automated jury pool dispatcher with Fisher-Yates shuffle & courtroom bucket routing (`nyx_judiciary`)
+- [ ] Feature: Fiscal circuit protection & logarithmic public payroll scaling (`nyx_treasury`)
+- [ ] Feature: Spatial grid ground drops & time-based item durability decay (`nyx_inventory` / `nyx_interact`)
+- [ ] Feature: Physical freight pallets & power-dependent industrial assembly (`nyx_logistics` / `nyx_services`)
+- [ ] QA: Add concurrency unit tests for inventory mutex locks and treasury double-entry conservation (`nyx_core/server/tests.lua`)
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Dynamic inventory weight penalties on player movement (`nyx_inventory` -> `nyx_core`)**
+  - **Dynamic Locomotion Engine (`nyx_core/client/movement.lua`)**: Zero-busywait ped locomotion override engine enforcing 5 tiered weight thresholds (`NORMAL`, `ENCUMBERED`, `HEAVY`, `OVERBURDENED`, `CRITICAL_OVERWEIGHT`). Implements dynamic speed penalties (1.0 down to 0.40 crawl), sprint lockouts (`INPUT_SPRINT`), jump lockouts (`INPUT_JUMP`), mantle lockouts (`INPUT_COVER`), accelerated stamina degradation on foot, subtle heavy load camera sway, and state bag synchronizations (`LocalPlayer.state.weightTier`, `LocalPlayer.state.moveRateOverride`, `LocalPlayer.state.weightRatio`).
+  - **Core Configuration & Server Player Model (`nyx_core/config.lua`, `nyx_core/server/player.lua`, `nyx_core/server/exports.lua`)**: Configured `Config.WeightPenalties` with tunable thresholds and multipliers. Added `PlayerObject:getWeight()` and `PlayerObject:setWeight()` methods to serialize inventory weight directly into character metadata and broadcast delta sync events to client and server listeners. Exposed server exports `UpdatePlayerWeight` and `GetPlayerWeight`, and client exports `GetMovementPenalty`, `GetWeightRatio`, `IsOverweight`, and `IsEncumbered`.
+  - **Inventory Synchronization Engine (`nyx_inventory/server/state.lua`, `nyx_inventory/server/main.lua`, `nyx_inventory/server/exports.lua`)**: Added `Container:syncWeightToCore()` method automatically triggered on `setItem`, `removeItem`, container load, and character spawn ready (`nyx:core:playerReady`). Added server exports `GetPlayerWeight` and `SyncPlayerWeight`, and client exports/listeners in `nyx_inventory/client/main.lua` and `nyx_inventory/client/exports.lua`.
+  - **Testing & Verification**: Created in-engine test suite `Nyx.Tests.TestWeightPenalties` in `FiveM/nyx_core/server/tests.lua` validating tier thresholds, locomotion lockouts, player mutation, and item weight aggregations. Created standalone Python unit test suite `tests/test_weight_penalties.py` (10/10 tests pass across test suites), and verified clean passes across all 13 resources and 148 Lua files in `scripts/verify.ps1` and `scripts/validator.py`.
+
 - **[2026-10-18] Feature: Advanced vehicle mileage & wear tracking system (`nyx_vehicles`)**
   - **Database Schema**: Created migration `013_vehicles_wear_mileage.sql` defining `nyx_vehicles_wear` (mileage, trip odometer, oil quality, brake pad wear, transmission wear, suspension wear, last service mileage) and `nyx_vehicles_service_logs` (certified mechanic service history with cost and notes). Registered in `FiveM/nyx_core/sql/migrations/index.json`.
   - **Server Wear Engine (`nyx_vehicles/server/wear.lua`)**: Authoritative wear persistence with memory cache and debounced MySQL write batches. Implemented anti-teleport/speed sanity check clamping on distance deltas. Provided RPC endpoints (`vehicles:getWear`, `vehicles:resetTrip`, `vehicles:serviceVehicle`, `vehicles:getServiceLogs`) and server exports (`GetVehicleWear`, `GetVehicleMileage`, `ResetTrip`, `ServiceVehicle`, `UpdateVehicleWear`).

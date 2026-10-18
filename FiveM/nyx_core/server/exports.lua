@@ -44,3 +44,17 @@ end)
 exports("GetRoutingBucket", function(src)
     return Nyx.Buckets.Get(src)
 end)
+
+-- Player Inventory Weight Management
+exports("UpdatePlayerWeight", function(src, currentWeight, maxWeight, ratio)
+    local player = Nyx.GetPlayer(src)
+    if not player then return nil end
+    return player:setWeight(currentWeight, maxWeight)
+end)
+
+exports("GetPlayerWeight", function(src)
+    local player = Nyx.GetPlayer(src)
+    if not player then return 0, 30000, 0.0 end
+    local w = player:getWeight()
+    return w.current or 0, w.max or 30000, w.ratio or 0.0
+end)

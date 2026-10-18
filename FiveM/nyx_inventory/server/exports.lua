@@ -227,3 +227,30 @@ exports("RegisterContainer", function(invId, label, maxWeight, maxSlots, coords)
     return container
 end)
 
+-- Query player inventory weight and capacity
+exports("GetPlayerWeight", function(src)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return 0, 30000, 0.0 end
+
+    local invId = string.format("char:%s:main", player.citizenId)
+    local container = Nyx.Inventories[invId] or Nyx.Inventory.Get(invId, 'player')
+    if not container then return 0, 30000, 0.0 end
+
+    local cur = container:getWeight()
+    local maxW = container.maxWeight
+    return cur, maxW, cur / math.max(1, maxW)
+end)
+
+-- Force immediate weight synchronization for player
+exports("SyncPlayerWeight", function(src)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return false end
+
+    local invId = string.format("char:%s:main", player.citizenId)
+    local container = Nyx.Inventories[invId] or Nyx.Inventory.Get(invId, 'player')
+    if not container then return false end
+
+    container:syncWeightToCore()
+    return true
+end)
+

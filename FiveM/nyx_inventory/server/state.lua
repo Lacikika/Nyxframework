@@ -68,7 +68,32 @@ function Container:setItem(slot, itemData)
 
     self:markDirty()
     self:broadcastDelta("SLOT_UPDATE", { slot = slot, item = self.items[slot] })
+    if self.type == "player" then
+        self:syncWeightToCore()
+    end
     return true
+end
+
+-- Synchronize container weight to nyx_core if this is a player container
+function Container:syncWeightToCore()
+    if self.type ~= "player" then return end
+
+    local citizenId = self.id:match("^char:([^:]+):main$")
+    if not citizenId then return end
+
+    local player = exports['nyx_core']:GetPlayerByCitizenId(citizenId)
+    if not player or not player.source then return end
+
+    local currentWeight = self:getWeight()
+    local maxWeight = self.maxWeight
+    local ratio = currentWeight / math.max(1, maxWeight)
+
+    exports['nyx_core']:UpdatePlayerWeight(player.source, currentWeight, maxWeight, ratio)
+    TriggerClientEvent("nyx:inventory:client:updateWeight", player.source, {
+        current = currentWeight,
+        max = maxWeight,
+        ratio = ratio
+    })
 end
 
 -- Remove item from slot
@@ -268,6 +293,10 @@ function Nyx.Inventory.Get(invId, autoCreateType, defaultCoords)
                 metadata = meta
             }
         end
+    end
+
+    if container.type == "player" then
+        container:syncWeightToCore()
     end
 
     return container

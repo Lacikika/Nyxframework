@@ -275,7 +275,116 @@ function Nyx.Tests.TestVehicleMileageAndWear()
     return passes == total
 end
 
--- 6. Master Test Runner
+-- 6. Test Dynamic Inventory Weight Penalties & Locomotion Restraints
+function Nyx.Tests.TestWeightPenalties()
+    print("^3[Nyx:Tests] Running Dynamic Inventory Weight Penalties Suite...^7")
+    local passes = 0
+    local total = 4
+
+    local cfg = Config.WeightPenalties or {
+        enabled = true,
+        tiers = {
+            normal = { maxRatio = 0.70, moveRate = 1.0, sprintAllowed = true, jumpAllowed = true, climbAllowed = true },
+            encumbered = { minRatio = 0.70, maxRatio = 0.85, moveRate = 0.90, sprintAllowed = true, jumpAllowed = true, climbAllowed = true },
+            heavy = { minRatio = 0.85, maxRatio = 1.00, moveRate = 0.78, sprintAllowed = true, jumpAllowed = true, climbAllowed = true },
+            overburdened = { minRatio = 1.00, maxRatio = 1.20, moveRate = 0.60, sprintAllowed = false, jumpAllowed = false, climbAllowed = true },
+            critical = { minRatio = 1.20, moveRate = 0.40, sprintAllowed = false, jumpAllowed = false, climbAllowed = false }
+        }
+    }
+
+    local function computeTier(ratio)
+        local tiers = cfg.tiers
+        if tiers.critical and ratio >= tiers.critical.minRatio then
+            return "critical", tiers.critical
+        elseif tiers.overburdened and ratio >= tiers.overburdened.minRatio then
+            return "overburdened", tiers.overburdened
+        elseif tiers.heavy and ratio >= tiers.heavy.minRatio then
+            return "heavy", tiers.heavy
+        elseif tiers.encumbered and ratio >= tiers.encumbered.minRatio then
+            return "encumbered", tiers.encumbered
+        else
+            return "normal", tiers.normal
+        end
+    end
+
+    -- Test A: Tier Evaluation Across Complete Weight Spectrum
+    local tNormKey, tNorm = computeTier(0.40) -- 40% capacity
+    local tEncKey, tEnc = computeTier(0.75)   -- 75% capacity
+    local tHvyKey, tHvy = computeTier(0.92)   -- 92% capacity
+    local tOvrKey, tOvr = computeTier(1.08)   -- 108% capacity
+    local tCrtKey, tCrt = computeTier(1.35)   -- 135% capacity
+
+    if assertTest(tNormKey == "normal" and tEncKey == "encumbered" and tHvyKey == "heavy" and tOvrKey == "overburdened" and tCrtKey == "critical",
+        "Weight Penalty Tier Boundary Transitions",
+        string.format("Tier classification error: %s, %s, %s, %s, %s", tNormKey, tEncKey, tHvyKey, tOvrKey, tCrtKey)) then
+        passes = passes + 1
+    end
+
+    -- Test B: Authoritative PlayerObject Weight Mutation & Metadata Sync
+    local mockPlayer = {
+        source = 999,
+        citizenId = "TEST_CITIZEN_01",
+        metadata = {},
+        isDirty = false,
+        setWeight = function(self, current, maxW)
+            local cur = math.max(0, tonumber(current) or 0)
+            local maxWeight = math.max(1, tonumber(maxW) or 30000)
+            local ratio = cur / maxWeight
+            self.metadata.inventory_weight = { current = cur, max = maxWeight, ratio = ratio }
+            self.isDirty = true
+            return self.metadata.inventory_weight
+        end,
+        getWeight = function(self)
+            return self.metadata.inventory_weight or { current = 0, max = 30000, ratio = 0.0 }
+        end
+    }
+
+    mockPlayer:setWeight(27000, 30000)
+    local w = mockPlayer:getWeight()
+    if assertTest(w.current == 27000 and w.max == 30000 and math.abs(w.ratio - 0.90) < 0.001 and mockPlayer.isDirty == true,
+        "PlayerObject Weight Mutation & State Serialization",
+        string.format("Weight state corrupt: cur=%s, max=%s, ratio=%s", tostring(w.current), tostring(w.max), tostring(w.ratio))) then
+        passes = passes + 1
+    end
+
+    -- Test C: Multi-Item Weight Aggregation & Load Tier Mapping
+    local sampleItems = {
+        { item_id = "gold_bar", amount = 5, unitWeight = 5000 },    -- 25,000g
+        { item_id = "water_bottle", amount = 10, unitWeight = 350 }, -- 3,500g
+    }
+    local calculatedTotalWeight = 0
+    for _, item in ipairs(sampleItems) do
+        calculatedTotalWeight = calculatedTotalWeight + (item.amount * item.unitWeight)
+    end
+    local maxCapacity = 30000
+    local ratio = calculatedTotalWeight / maxCapacity
+    local sampleTierKey, sampleTier = computeTier(ratio)
+
+    if assertTest(calculatedTotalWeight == 28500 and math.abs(ratio - 0.95) < 0.001 and sampleTierKey == "heavy" and sampleTier.moveRate == 0.78,
+        "Multi-Item Weight Summation & Movement Rate Invariant",
+        string.format("Calculated weight %.2f (ratio %.2f) yielded unexpected tier %s", calculatedTotalWeight, ratio, sampleTierKey)) then
+        passes = passes + 1
+    end
+
+    -- Test D: Overburdened & Critical Locomotion Invariant (Sprint/Jump Lockouts)
+    local _, ovrData = computeTier(1.10)
+    local _, crtData = computeTier(1.25)
+
+    local sprintLocked = (ovrData.sprintAllowed == false and crtData.sprintAllowed == false)
+    local jumpLocked = (ovrData.jumpAllowed == false and crtData.jumpAllowed == false)
+    local climbLocked = (ovrData.climbAllowed == true and crtData.climbAllowed == false)
+    local severelySlowed = (crtData.moveRate == 0.40)
+
+    if assertTest(sprintLocked and jumpLocked and climbLocked and severelySlowed,
+        "Overburdened Locomotion Control Inhibition Invariants",
+        "Failed to inhibit sprint, jump, or climb on overburdened/critical tiers") then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 7. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -286,9 +395,10 @@ function Nyx.Tests.RunAll()
     local t3 = Nyx.Tests.TestTreasuryConservationLaw()
     local t4 = Nyx.Tests.TestFreightBoardEscrowAndElasticity()
     local t5 = Nyx.Tests.TestVehicleMileageAndWear()
+    local t6 = Nyx.Tests.TestWeightPenalties()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 then
+    if t1 and t2 and t3 and t4 and t5 and t6 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

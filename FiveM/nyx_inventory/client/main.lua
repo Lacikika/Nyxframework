@@ -9,6 +9,21 @@ Nyx.Inventory = Nyx.Inventory or {}
 
 Nyx.Inventory.IsOpen = false
 Nyx.Inventory.ActiveTargetInv = nil
+Nyx.Inventory.Weight = {
+    current = 0,
+    max = 30000,
+    ratio = 0.0
+}
+
+RegisterNetEvent("nyx:inventory:client:updateWeight", function(data)
+    if data then
+        Nyx.Inventory.Weight = {
+            current = tonumber(data.current) or 0,
+            max = tonumber(data.max) or 30000,
+            ratio = tonumber(data.ratio) or 0.0
+        }
+    end
+end)
 
 -- Request ground drops synchronization upon spawn
 CreateThread(function()

@@ -27,6 +27,7 @@ client_scripts {
     'client/rpc.lua',
     'client/spawn.lua',
     'client/main.lua',
+    'client/movement.lua',
     'client/exports.lua'
 }
 

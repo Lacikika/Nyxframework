@@ -17,3 +17,7 @@ end)
 exports("IsInventoryOpen", function()
     return Nyx.Inventory.IsOpen
 end)
+
+exports("GetPlayerWeight", function()
+    return Nyx.Inventory.Weight or { current = 0, max = 30000, ratio = 0.0 }
+end)

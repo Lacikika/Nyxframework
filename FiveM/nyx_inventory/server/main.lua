@@ -13,8 +13,11 @@ AddEventHandler("nyx:core:playerReady", function(src, citizenId)
 
     CreateThread(function()
         local container = Nyx.Inventory.Get(invId, 'player')
-        if container and Config.Debug then
-            print(string.format("^2[Nyx:Inventory] Loaded player inventory '%s' for source %s (%d items)^7", invId, src, #container.items))
+        if container then
+            container:syncWeightToCore()
+            if Config.Debug then
+                print(string.format("^2[Nyx:Inventory] Loaded player inventory '%s' for source %s (%d items)^7", invId, src, #container.items))
+            end
         end
     end)
 end)
