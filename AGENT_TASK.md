@@ -75,7 +75,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Physical Vehicle Keys, Fleet RFID Tokens & Lockpicking Forensics (`nyx_vehicles` & `nyx_inventory`)**
   - **Implementation:** Metadata-driven ignition keys (`item_vehicle_key`), corporate RFID proximity access, and lockpicking mechanics that generate latent fingerprints for `nyx_judiciary`.
 
-- [ ] **Feature: Penal Labor Processing & Civic Sentence Reductions (`nyx_judiciary` & `nyx_logistics`)**
+- [x] **Feature: Penal Labor Processing & Civic Sentence Reductions (`nyx_judiciary` & `nyx_logistics`)**
   - **Implementation:** Bolingbroke penitentiary industrial work benches allowing inmates to assemble bulk civic materials to reduce prison sentence minutes and fund public reserves.
 
 - [ ] **Feature: Agricultural Extraction, Milling & Perishable Food Logistics (`nyx_services` & `nyx_logistics`)**
@@ -107,6 +107,49 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Penal Labor Processing & Civic Sentence Reductions (`nyx_judiciary` & `nyx_logistics`)**
+  - **Database Migration (`045_penal_labor_processing_and_sentence_reductions.sql`, `index.json`)**:
+    - Created `nyx_judiciary_penal_records` table (`record_id` PK, `citizen_id` UNIQUE, `original_sentence_months`, `current_sentence_months`, `labor_cycles_completed`, `total_reduction_months`, `total_civic_value_generated`, `status`, `cell_assigned`, `last_labor_at`, timestamps) for custodial inmate tracking.
+    - Created `nyx_judiciary_penal_labor_logs` table (`log_id` PK, `log_uuid` UNIQUE, `citizen_id`, `workstation_id`, `recipe_id`, `sentence_reduced_months`, `sentence_remaining_months`, `civic_funds_generated`, `items_consumed_json`, `items_produced_json`, `destination_stash`, `created_at`) for immutable labor and reduction auditing.
+    - Seeded Corrections Labor Account (`gov:corrections:penal_labor`) in `nyx_treasury_accounts` with $1,000,000.00 starting municipal reserve balance.
+    - Registered Bolingbroke workshop storage stashes in `nyx_inventories`: `stash:bolingbroke_workshop` (raw materials depot) and `stash:bolingbroke_civic_output` (finished civic goods dispatch).
+    - Seeded initial raw fabrication materials into `stash:bolingbroke_workshop`: 50x `refined_iron`, 40x `plastic_polymer`, 30x `raw_fabric`, 30x `raw_timber`.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 45) and mirrored to `FiveM/nyx_judiciary/sql/migrations/`.
+  - **Item Registry Integration (`nyx_inventory/shared/items.lua`)**:
+    - Registered raw inputs: `raw_fabric` (Industrial Cotton/Fabric Roll) and `raw_timber` (Industrial Lumber Bundle).
+    - Registered civic manufactured outputs: `civic_license_plate` (Stamped State License Plate), `civic_road_barrier` (Welded Steel Road Barrier), `civic_inmate_uniform` (Penal Workwear Jumpsuit), `civic_emergency_cot` (Emergency Field Cot), and `civic_wooden_pallet` (Standard Freight Wooden Pallet).
+    - Extended `CreateDefaultMetadata` with automatic metadata generation for stamped license plates (`SA%04d`, `bolingbroke_penitentiary`) and inmate jumpsuits.
+  - **Shared Pure Lua 5.4 Logic Engine (`nyx_judiciary/shared/penal_labor.lua`, `fxmanifest.lua`)**:
+    - Registered 4 Bolingbroke industrial workstations: `bolingbroke_metalwork` (Stamping Press), `bolingbroke_textile` (Textile Loom), `bolingbroke_carpentry` (Assembly Station), and `bolingbroke_general` (Packaging Station).
+    - Registered 5 declarative penal manufacturing recipes: `license_plates` (-2 mo, +$120), `road_barriers` (-3 mo, +$250), `inmate_uniforms` (-1 mo, +$100), `emergency_cots` (-4 mo, +$350), and `wooden_pallets` (-2 mo, +$180).
+    - Implemented `Nyx.PenalLabor.CalculateSentenceReduction` enforcing mathematical floor clamping at 0 and computing discharge eligibility flags.
+    - Implemented `Nyx.PenalLabor.CalculateCivicValue` for closed-loop treasury reserve credits.
+    - Implemented `Nyx.PenalLabor.ValidateLaborEligibility` ensuring only active incarcerated inmates with positive remaining sentences can work.
+    - Implemented `Nyx.PenalLabor.ValidateLaborInputs` checking workshop stock against recipe batch requirements.
+    - Implemented `Nyx.PenalLabor.CalculateLaborOutputs` populating serials and facility metadata.
+    - Implemented `Nyx.PenalLabor.FormatPenalStatusBadge`, `FormatCurrency`, and zero-trust `ValidateLaborPayload`.
+    - Declared `shared/penal_labor.lua` in `FiveM/nyx_judiciary/fxmanifest.lua`.
+  - **Logistics Integration (`nyx_logistics/shared/recipes.lua`, `shared/contracts.lua`, `server/contracts.lua`)**:
+    - Added civic manufacturing recipes under facilityType `'penal_workshop'` into `Nyx.Logistics.Recipes.Registry`.
+    - Added `terminal_bolingbroke_penal` (Bolingbroke Penitentiary Civic Freight Dock) into `Nyx.Logistics.FreightConfig.DispatchTerminals`.
+    - Added event hook in `logistics:deliverContract` triggering `nyx:judiciary:server:workshopMaterialsDelivered` when logistics haulers deliver raw materials to `stash:bolingbroke_workshop` or pick up from `stash:bolingbroke_civic_output`.
+  - **Server-Side Subsystem & RPCs (`nyx_judiciary/server/penal_labor.lua`, `server/execution.lua`, `server/exports.lua`)**:
+    - Implemented `IncarcerateCitizen` handling initial sentencing and sentence extensions.
+    - Wired `IncarcerateCitizen` into `Nyx.Judiciary.ExecuteVerdict` in `server/execution.lua` when custodial sentences are handed down.
+    - Implemented `ExecuteLaborCycle`: verifies inmate proximity, checks workshop inventory stock, deducts raw materials, deposits finished civic goods into `stash:bolingbroke_civic_output`, reduces prison sentence months, credits `gov:corrections:penal_labor` in `nyx_treasury`, commits immutable entry to `nyx_judiciary_penal_labor_logs`, and auto-triggers discharge if sentence drops to 0.
+    - Implemented `ReleaseInmate`: resets sentence, clears `inJail` metadata, restores network routing bucket from 5000 to 0, teleports ped to Bolingbroke release gates, and broadcasts discharge notification.
+    - Registered RPC endpoints: `judiciary:getPenalOverview`, `judiciary:executePenalLabor`, `judiciary:requestPenalRelease`, `judiciary:getPenalWorkstations`.
+    - Exported `IncarcerateCitizen`, `GetPenalRecord`, `GetWorkshopSupplies`, `ExecuteLaborCycle`, `ReleaseInmate`, and `GetPenalLaborLogs` in `FiveM/nyx_judiciary/server/exports.lua`.
+  - **Client-Side Subsystem & Interactions (`nyx_judiciary/client/penal_labor.lua`, `client/exports.lua`)**:
+    - Implemented proximity resolution for Bolingbroke workstations.
+    - Registered player commands: `/penallabor` (`/labor`, `/bortonmunka`) with animation playback, `/penalstatus` (`/sentence`, `/buntetes`), and `/requestrelease` (`/szabadulas`).
+    - Handled `nyx:judiciary:client:released` discharge sound, message, and release telemetry.
+    - Exported `GetNearestPenalWorkstation`, `IsPerformingLabor`, and `GetCachedPenalOverview` in `FiveM/nyx_judiciary/client/exports.lua`.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestPenalLaborProcessingAndSentenceReductions()` (Test 40) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_penal_labor_processing_and_sentence_reductions.py` with 10 test cases covering migration 045 schema, fxmanifest declarations, item registry, logistics integration, sentence reduction clamping, civic funds math, inmate eligibility, workshop supplies validation, zero-trust payloads, and in-engine registration (10/10 passing).
+    - Full pytest suite: 358/358 tests passing (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 233 Lua files, 45 migrations, 100% clean verification.
 - **[2026-10-18] Feature: Physical Vehicle Keys, Fleet RFID Tokens & Lockpicking Forensics (`nyx_vehicles` & `nyx_inventory`)**
   - **Database Migration (`044_vehicle_keys_rfid_and_lockpicking_forensics.sql`, `index.json`)**:
     - Created `nyx_vehicles_rfid_tokens` table (`token_id` PK, `token_uuid` UNIQUE, `faction_id`, `holder_citizen_id`, `access_level`, `label`, `is_revoked`, `revoked_by`, `revocation_reason`, `expires_at`, `created_at`) for corporate fleet transponder passes.

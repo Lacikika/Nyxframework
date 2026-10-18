@@ -146,6 +146,90 @@ Nyx.Logistics.Recipes.Registry = {
                 }
             }
         }
+    },
+    ['civic_license_plates'] = {
+        key = 'civic_license_plates',
+        label = 'State Vehicle Registration License Plates',
+        facilityType = 'penal_workshop',
+        processingTime = 15,
+        powerRequirementKw = 5,
+        inputs = {
+            { item = 'refined_iron', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'civic_license_plate',
+                amount = 2,
+                metadata = {
+                    facility = 'bolingbroke_penitentiary',
+                    durability = 100.0
+                }
+            }
+        }
+    },
+    ['civic_road_barrier'] = {
+        key = 'civic_road_barrier',
+        label = 'Welded Steel Road Hazard Barrier',
+        facilityType = 'penal_workshop',
+        processingTime = 25,
+        powerRequirementKw = 8,
+        inputs = {
+            { item = 'refined_iron', amount = 2 },
+            { item = 'plastic_polymer', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'civic_road_barrier',
+                amount = 1,
+                metadata = {
+                    facility = 'bolingbroke_penitentiary',
+                    durability = 100.0
+                }
+            }
+        }
+    },
+    ['civic_emergency_cot'] = {
+        key = 'civic_emergency_cot',
+        label = 'Collapsible Field Hospital Emergency Cot',
+        facilityType = 'penal_workshop',
+        processingTime = 30,
+        powerRequirementKw = 6,
+        inputs = {
+            { item = 'refined_iron', amount = 1 },
+            { item = 'raw_fabric', amount = 1 },
+            { item = 'raw_timber', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'civic_emergency_cot',
+                amount = 1,
+                metadata = {
+                    facility = 'bolingbroke_penitentiary',
+                    durability = 100.0
+                }
+            }
+        }
+    },
+    ['civic_wooden_pallet'] = {
+        key = 'civic_wooden_pallet',
+        label = 'Standard Milled Lumber Freight Pallet',
+        facilityType = 'penal_workshop',
+        processingTime = 20,
+        powerRequirementKw = 6,
+        inputs = {
+            { item = 'raw_timber', amount = 2 },
+            { item = 'refined_iron', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'civic_wooden_pallet',
+                amount = 1,
+                metadata = {
+                    facility = 'bolingbroke_penitentiary',
+                    durability = 100.0
+                }
+            }
+        }
     }
 }
 

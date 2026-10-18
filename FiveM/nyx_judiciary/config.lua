@@ -184,10 +184,39 @@ Config.Courtroom = {
     DeliberationChamber = vector4(-530.0, -190.0, 38.2, 0.0)
 }
 
--- Bolingbroke State Penitentiary Custodial Routing
+-- Bolingbroke State Penitentiary Custodial Routing & Penal Labor
 Config.Penitentiary = {
     RoutingBucket = 5000,
     CellCoords = vector4(1679.0, 2513.5, 45.5, 220.0),
     ReleaseCoords = vector4(1848.0, 2586.0, 45.6, 270.0),
-    SentenceMinuteSeconds = 60 -- 1 in-game month = 60 seconds (or configurable)
+    SentenceMinuteSeconds = 60, -- 1 in-game month = 60 seconds (or configurable)
+    WorkshopStashId = 'stash:bolingbroke_workshop',
+    CivicOutputStashId = 'stash:bolingbroke_civic_output',
+    LaborAccount = 'gov:corrections:penal_labor',
+    Workstations = {
+        ['bolingbroke_metalwork'] = {
+            id = 'bolingbroke_metalwork',
+            name = 'Bolingbroke Sheet Metal & Stamping Press',
+            coords = vector3(1692.5, 2568.2, 45.5),
+            radius = 2.5
+        },
+        ['bolingbroke_textile'] = {
+            id = 'bolingbroke_textile',
+            name = 'Bolingbroke Industrial Textile Loom',
+            coords = vector3(1696.8, 2568.2, 45.5),
+            radius = 2.5
+        },
+        ['bolingbroke_carpentry'] = {
+            id = 'bolingbroke_carpentry',
+            name = 'Bolingbroke Carpentry & Assembly Station',
+            coords = vector3(1700.5, 2568.2, 45.5),
+            radius = 2.5
+        },
+        ['bolingbroke_general'] = {
+            id = 'bolingbroke_general',
+            name = 'Bolingbroke Civic Packaging Station',
+            coords = vector3(1704.2, 2568.2, 45.5),
+            radius = 2.5
+        }
+    }
 }

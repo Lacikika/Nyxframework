@@ -193,3 +193,28 @@ exports("ConcludeTrial", function(docketId, verdictRuling)
     return Nyx.Judiciary.ConcludeTrial(docketId, verdictRuling)
 end)
 
+-- Penal Labor & Correctional Rehabilitation
+exports("IncarcerateCitizen", function(citizenId, sentenceMonths, cellAssigned)
+    return Nyx.Judiciary.IncarcerateCitizen(citizenId, sentenceMonths, cellAssigned)
+end)
+
+exports("GetPenalRecord", function(citizenId)
+    return Nyx.Judiciary.GetPenalRecord(citizenId)
+end)
+
+exports("GetWorkshopSupplies", function(stashId)
+    return Nyx.Judiciary.GetWorkshopSupplies(stashId)
+end)
+
+exports("ExecuteLaborCycle", function(src, payload)
+    return Nyx.Judiciary.ExecuteLaborCycle(src, payload)
+end)
+
+exports("ReleaseInmate", function(citizenId, optionalSrc)
+    return Nyx.Judiciary.ReleaseInmate(citizenId, optionalSrc)
+end)
+
+exports("GetPenalLaborLogs", function(citizenId, limit)
+    return Nyx.Judiciary.GetPenalLaborLogs(citizenId, limit)
+end)
+

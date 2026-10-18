@@ -16,7 +16,8 @@ shared_scripts {
     'config.lua',
     'shared/jury.lua',
     'shared/warrants.lua',
-    'shared/courtroom_ui.lua'
+    'shared/courtroom_ui.lua',
+    'shared/penal_labor.lua'
 }
 
 server_scripts {
@@ -26,6 +27,7 @@ server_scripts {
     'server/warrants.lua',
     'server/jury.lua',
     'server/execution.lua',
+    'server/penal_labor.lua',
     'server/main.lua',
     'server/exports.lua'
 }
@@ -33,6 +35,7 @@ server_scripts {
 client_scripts {
     'client/forensics.lua',
     'client/courtroom.lua',
+    'client/penal_labor.lua',
     'client/main.lua',
     'client/exports.lua'
 }
@@ -43,4 +46,8 @@ dependencies {
     'nyx_inventory',
     'nyx_treasury',
     'nyx_parliament'
+}
+
+files {
+    'sql/migrations/*.sql'
 }

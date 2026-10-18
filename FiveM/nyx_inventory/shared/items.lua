@@ -302,6 +302,69 @@ Nyx.Items.Registry = {
         type = 'material',
         description = 'Pelletized thermal plastic for injection molding.'
     },
+    ['raw_fabric'] = {
+        name = 'raw_fabric',
+        label = 'Industrial Cotton/Fabric Roll',
+        weight = 1200,
+        stackable = true,
+        maxStack = 30,
+        type = 'material',
+        description = 'Raw bolt of heavy industrial cotton and synthetic fabric for garment and uniform production.'
+    },
+    ['raw_timber'] = {
+        name = 'raw_timber',
+        label = 'Industrial Lumber Bundle',
+        weight = 4000,
+        stackable = true,
+        maxStack = 20,
+        type = 'material',
+        description = 'Heavy-grade milled timber planks and lumber studs for civic and industrial assembly.'
+    },
+    ['civic_license_plate'] = {
+        name = 'civic_license_plate',
+        label = 'Stamped State License Plate',
+        weight = 500,
+        stackable = true,
+        maxStack = 20,
+        type = 'utility',
+        description = 'Official stamped aluminum vehicle registration plate produced via correctional penal labor.'
+    },
+    ['civic_road_barrier'] = {
+        name = 'civic_road_barrier',
+        label = 'Welded Steel Road Barrier',
+        weight = 15000,
+        stackable = true,
+        maxStack = 5,
+        type = 'utility',
+        description = 'High-visibility welded steel road barrier for municipal traffic redirection and public works.'
+    },
+    ['civic_inmate_uniform'] = {
+        name = 'civic_inmate_uniform',
+        label = 'Penal Workwear Jumpsuit',
+        weight = 800,
+        stackable = true,
+        maxStack = 10,
+        type = 'utility',
+        description = 'Standard-issue high-visibility durable denim/canvas correctional jumpsuit manufactured by inmates.'
+    },
+    ['civic_emergency_cot'] = {
+        name = 'civic_emergency_cot',
+        label = 'Emergency Field Cot',
+        weight = 10000,
+        stackable = true,
+        maxStack = 5,
+        type = 'utility',
+        description = 'Collapsible reinforced canvas and tubular steel field bed for municipal emergency shelters and field clinics.'
+    },
+    ['civic_wooden_pallet'] = {
+        name = 'civic_wooden_pallet',
+        label = 'Standard Freight Wooden Pallet',
+        weight = 12000,
+        stackable = true,
+        maxStack = 5,
+        type = 'freight',
+        description = 'Standardized heavy lumber freight pallet for forklift logistics and warehouse storage.'
+    },
     ['pallet_sheet_metal'] = {
         name = 'pallet_sheet_metal',
         label = 'Sheet Metal Pallet',
@@ -542,6 +605,13 @@ function Nyx.Items.CreateDefaultMetadata(name, extra)
             meta.accessLevel = (type(extra) == "table" and extra.accessLevel) or "driver"
             meta.isRevoked = false
             meta.issuedAt = os.time()
+        elseif item.name == 'civic_license_plate' then
+            meta.plate = (type(extra) == "table" and extra.plate) or string.format("SA%04d", math.random(1000, 9999))
+            meta.stampedAt = os.time()
+            meta.facility = "bolingbroke_penitentiary"
+        elseif item.name == 'civic_inmate_uniform' then
+            meta.inmateNumber = (type(extra) == "table" and extra.inmateNumber) or string.format("INM-%05d", math.random(10000, 99999))
+            meta.facility = "bolingbroke_penitentiary"
         end
     end
 

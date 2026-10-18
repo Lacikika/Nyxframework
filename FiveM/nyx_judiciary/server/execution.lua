@@ -99,6 +99,11 @@ function Nyx.Judiciary.ExecuteVerdict(docketId, verdictPayload, presidingJudgeCi
 
         -- Step 3: Custodial Sentencing Enforcement
         if sentenceMonths > 0 then
+            -- Commit incarceration record into penal labor database
+            if Nyx.Judiciary.IncarcerateCitizen then
+                Nyx.Judiciary.IncarcerateCitizen(docket.defendant_citizen_id, sentenceMonths, "cell_block_a")
+            end
+
             local defendantPlayer = Nyx.GetPlayerByCitizenId(docket.defendant_citizen_id)
             if defendantPlayer then
                 defendantPlayer:setMetadata("inJail", true)

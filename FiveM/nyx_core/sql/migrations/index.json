@@ -42,5 +42,6 @@
   "041_anatomical_trauma_and_medical_injury_engine.sql",
   "042_pillbox_hospital_supply_depletion_and_emergency_hauls.sql",
   "043_gas_station_reservoirs_and_bulk_fuel_hauling.sql",
-  "044_vehicle_keys_rfid_and_lockpicking_forensics.sql"
+  "044_vehicle_keys_rfid_and_lockpicking_forensics.sql",
+  "045_penal_labor_processing_and_sentence_reductions.sql"
 ]

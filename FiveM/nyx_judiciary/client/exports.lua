@@ -39,3 +39,17 @@ exports("CloseCourtTerminal", function()
     end
     return false
 end)
+
+-- Penal Labor Client Exports
+exports("GetNearestPenalWorkstation", function()
+    local ws, dist = exports['nyx_judiciary']:GetNearestPenalWorkstation()
+    return ws, dist
+end)
+
+exports("IsPerformingLabor", function()
+    return exports['nyx_judiciary']:IsPerformingLabor()
+end)
+
+exports("GetCachedPenalOverview", function()
+    return exports['nyx_judiciary']:GetCachedPenalOverview()
+end)

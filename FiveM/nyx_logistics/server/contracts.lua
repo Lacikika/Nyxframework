@@ -537,6 +537,11 @@ Nyx.RPC.Register("logistics:deliverContract", function(src, payload)
         TriggerEvent("nyx:vehicles:server:bulkFuelDelivered", destInvId, contractId, contract.item_id, contract.quantity)
     end
 
+    -- Notify judiciary / corrections if destination is Bolingbroke workshop or civic output
+    if destInvId and (destInvId == "stash:bolingbroke_workshop" or destInvId == "stash:bolingbroke_civic_output") then
+        TriggerEvent("nyx:judiciary:server:workshopMaterialsDelivered", destInvId, contractId, contract.item_id, contract.quantity)
+    end
+
     return {
         success = true,
         payout = payout,

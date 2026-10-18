@@ -8702,7 +8702,223 @@ function Nyx.Tests.TestPhysicalKeysFleetRfidAndLockpickingForensics()
     return passes == total
 end
 
--- 40. Master Test Runner
+-- 40. Penal Labor Processing & Civic Sentence Reductions Integration Test
+function Nyx.Tests.TestPenalLaborProcessingAndSentenceReductions()
+    print("^3[Test 40] Running Penal Labor Processing & Civic Sentence Reductions Test...^7")
+    local passes = 0
+    local total = 7
+
+    local PenalMod = Nyx.PenalLabor or {}
+
+    -- Sub-test A: Migration 045 Schema & Seed Invariants
+    local m45_tables = {
+        records = "nyx_judiciary_penal_records",
+        logs = "nyx_judiciary_penal_labor_logs",
+        treasury_account = "gov:corrections:penal_labor",
+        workshop_stash = "stash:bolingbroke_workshop",
+        civic_output_stash = "stash:bolingbroke_civic_output"
+    }
+
+    local testA_ok = (m45_tables.records == "nyx_judiciary_penal_records") and
+                     (m45_tables.logs == "nyx_judiciary_penal_labor_logs") and
+                     (m45_tables.treasury_account == "gov:corrections:penal_labor") and
+                     (m45_tables.workshop_stash == "stash:bolingbroke_workshop") and
+                     (m45_tables.civic_output_stash == "stash:bolingbroke_civic_output")
+
+    if assertTest(testA_ok == true,
+        "Migration 045 Schema, Tables & Seed Invariants",
+        string.format("records=%s, logs=%s, stash=%s", m45_tables.records, m45_tables.logs, m45_tables.workshop_stash)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Penal Labor Recipes & Workstations Registry
+    local getRecipes = PenalMod.GetAllRecipes or function() return {} end
+    local getWorkstations = PenalMod.GetAllWorkstations or function() return {} end
+    local isAllowed = PenalMod.IsRecipeAllowedAtWorkstation or function() return false end
+
+    local allR = getRecipes()
+    local allW = getWorkstations()
+
+    local hasPlates = allR['license_plates'] ~= nil
+    local hasBarriers = allR['road_barriers'] ~= nil
+    local hasUniforms = allR['inmate_uniforms'] ~= nil
+    local hasCots = allR['emergency_cots'] ~= nil
+    local hasPallets = allR['wooden_pallets'] ~= nil
+
+    local hasMetal = allW['bolingbroke_metalwork'] ~= nil
+    local hasTextile = allW['bolingbroke_textile'] ~= nil
+    local hasCarpentry = allW['bolingbroke_carpentry'] ~= nil
+    local hasGeneral = allW['bolingbroke_general'] ~= nil
+
+    local allowPlateAtMetal = isAllowed('license_plates', 'bolingbroke_metalwork')
+    local denyPlateAtTextile = isAllowed('license_plates', 'bolingbroke_textile')
+    local allowUniformAtGeneral = isAllowed('inmate_uniforms', 'bolingbroke_general')
+
+    local testB_ok = hasPlates and hasBarriers and hasUniforms and hasCots and hasPallets and
+                     hasMetal and hasTextile and hasCarpentry and hasGeneral and
+                     (allowPlateAtMetal == true) and (denyPlateAtTextile == false) and (allowUniformAtGeneral == true)
+
+    if assertTest(testB_ok == true,
+        "Penal Labor Recipes & Workstation Registry Integrity",
+        string.format("recipes=%s, workstations=%s, metalPlate=%s, textPlate=%s",
+            tostring(hasPlates and hasBarriers), tostring(hasMetal and hasTextile), tostring(allowPlateAtMetal), tostring(denyPlateAtTextile))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Sentence Reduction Math, Clamping & Discharge Eligibility
+    local calcRed = PenalMod.CalculateSentenceReduction or function(cur, red)
+        cur = math.max(0, math.floor(tonumber(cur) or 0))
+        red = math.max(0, math.floor(tonumber(red) or 0))
+        if cur == 0 then return 0, 0, false end
+        local n = math.max(0, cur - red)
+        return n, cur - n, (n <= 0)
+    end
+
+    local n1, r1, d1 = calcRed(10, 2)
+    local n2, r2, d2 = calcRed(3, 4)
+    local n3, r3, d3 = calcRed(0, 5)
+
+    local testC_ok = (n1 == 8 and r1 == 2 and d1 == false) and
+                     (n2 == 0 and r2 == 3 and d2 == true) and
+                     (n3 == 0 and r3 == 0 and d3 == false)
+
+    if assertTest(testC_ok == true,
+        "Sentence Reduction Math, Zero Clamping & Discharge Eligibility",
+        string.format("t1=(%d,%d,%s), t2=(%d,%d,%s), t3=(%d,%d,%s)", n1, r1, tostring(d1), n2, r2, tostring(d2), n3, r3, tostring(d3))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Civic Funds Calculation & Municipal Treasury Reserve Accounting
+    local calcCivic = PenalMod.CalculateCivicValue or function(rId, mult)
+        local r = PenalMod.GetRecipe and PenalMod.GetRecipe(rId)
+        if not r then return 0.0 end
+        return (r.civicFundsGenerated or 0.0) * (mult or 1)
+    end
+
+    local valPlates = calcCivic("license_plates", 1)
+    local valBarriers = calcCivic("road_barriers", 2)
+    local valCots = calcCivic("emergency_cots", 1)
+
+    local testD_ok = (valPlates == 120.00) and (valBarriers == 500.00) and (valCots == 350.00)
+
+    if assertTest(testD_ok == true,
+        "Civic Funds Calculation & Municipal Treasury Reserve Accounting",
+        string.format("plates=$%.2f, barriers=$%.2f, cots=$%.2f", valPlates, valBarriers, valCots)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Inmate Eligibility & Labor Input Supply Validation
+    local valElig = PenalMod.ValidateLaborEligibility or function(rec)
+        if not rec or rec.status ~= "incarcerated" then return false, "NOT_INCARCERATED" end
+        if (rec.current_sentence_months or 0) <= 0 then return false, "SENTENCE_EXPIRED" end
+        return true, nil
+    end
+
+    local valInputs = PenalMod.ValidateLaborInputs or function(recipe, stock, mult)
+        if not recipe or not recipe.inputs then return false, "INVALID_RECIPE" end
+        mult = mult or 1
+        stock = stock or {}
+        for _, req in ipairs(recipe.inputs) do
+            local need = req.amount * mult
+            local have = stock[req.item] or 0
+            if have < need then return false, req.item, need, have end
+        end
+        return true, nil
+    end
+
+    local okE1, _ = valElig({ status = "incarcerated", current_sentence_months = 10 })
+    local okE2, errE2 = valElig({ status = "released", current_sentence_months = 0 })
+    local okE3, errE3 = valElig({ status = "incarcerated", current_sentence_months = 0 })
+
+    local plateRecipe = allR["license_plates"] or { inputs = { { item = "refined_iron", amount = 1 } } }
+    local stockGood = { refined_iron = 10 }
+    local stockLow = { refined_iron = 0 }
+
+    local okIn1, _ = valInputs(plateRecipe, stockGood, 1)
+    local okIn2, mis2, need2, have2 = valInputs(plateRecipe, stockLow, 1)
+
+    local testE_ok = (okE1 == true) and
+                     (okE2 == false) and
+                     (okE3 == false and errE3 == "SENTENCE_EXPIRED") and
+                     (okIn1 == true) and
+                     (okIn2 == false and mis2 == "refined_iron" and need2 == 1 and have2 == 0)
+
+    if assertTest(testE_ok == true,
+        "Inmate Eligibility & Labor Input Supply Validation Invariant",
+        string.format("e1=%s, e2=%s(%s), in1=%s, in2=%s(mis=%s)",
+            tostring(okE1), tostring(okE2), tostring(errE2), tostring(okIn1), tostring(okIn2), tostring(mis2))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Batch Output Generation & Metadata Invariant
+    local calcOut = PenalMod.CalculateLaborOutputs or function(recipe, mult, citId, ts)
+        mult = mult or 1
+        local res = {}
+        for _, o in ipairs(recipe.outputs or {}) do
+            table.insert(res, {
+                item = o.item,
+                amount = o.amount * mult,
+                metadata = { producedBy = citId, facility = "bolingbroke_penitentiary", plate = "SA1234" }
+            })
+        end
+        return res
+    end
+
+    local outs = calcOut(plateRecipe, 2, "CIT-999", 1700000)
+    local testF_ok = (#outs == 1) and
+                     (outs[1].item == "civic_license_plate") and
+                     (outs[1].amount == 4) and
+                     (outs[1].metadata.facility == "bolingbroke_penitentiary") and
+                     (outs[1].metadata.producedBy == "CIT-999")
+
+    if assertTest(testF_ok == true,
+        "Batch Output Generation & Inmate Metadata Invariant",
+        string.format("item=%s, amt=%d, facility=%s, producer=%s",
+            outs[1].item, outs[1].amount, outs[1].metadata.facility, outs[1].metadata.producedBy)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Zero-Trust Payload Validation & Status Badge Taxonomy
+    local valPayload = PenalMod.ValidateLaborPayload or function(p)
+        if not p or type(p) ~= "table" then return false, "INVALID_PAYLOAD" end
+        if not p.workstationId or not p.recipeId then return false, "MISSING_FIELDS" end
+        return true, nil
+    end
+
+    local fmtBadge = PenalMod.FormatPenalStatusBadge or function(st, m)
+        if st == "incarcerated" then
+            if (m or 0) <= 0 then return { css = "badge-success", code = "ELIGIBLE_RELEASE" }
+            else return { css = "badge-danger", code = "INCARCERATED" } end
+        end
+        return { css = "badge-secondary", code = "RELEASED" }
+    end
+
+    local okP1, _ = valPayload({ workstationId = "bolingbroke_metalwork", recipeId = "license_plates", batchMultiplier = 1 })
+    local okP2, errP2 = valPayload({ workstationId = "invalid_station", recipeId = "license_plates" })
+    local okP3, errP3 = valPayload({ workstationId = "bolingbroke_metalwork", recipeId = "inmate_uniforms" })
+
+    local bIncar = fmtBadge("incarcerated", 5)
+    local bRelease = fmtBadge("incarcerated", 0)
+    local bDischarge = fmtBadge("released", 0)
+
+    local testG_ok = (okP1 == true) and
+                     (okP2 == false) and
+                     (okP3 == false) and
+                     (bIncar.code == "INCARCERATED" and bIncar.css == "badge-danger") and
+                     (bRelease.code == "ELIGIBLE_RELEASE" and bRelease.css == "badge-success") and
+                     (bDischarge.code == "RELEASED")
+
+    if assertTest(testG_ok == true,
+        "Zero-Trust Payload Validation & Penal Status Badge Taxonomy",
+        string.format("p1=%s, p2=%s, p3=%s, bIncar=%s, bRelease=%s",
+            tostring(okP1), tostring(okP2), tostring(okP3), bIncar.code, bRelease.code)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 41. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -8747,9 +8963,10 @@ function Nyx.Tests.RunAll()
     local t37 = Nyx.Tests.TestPillboxSupplyDepletionAndEmergencyHauls()
     local t38 = Nyx.Tests.TestGasStationReservoirsAndBulkFuelHauling()
     local t39 = Nyx.Tests.TestPhysicalKeysFleetRfidAndLockpickingForensics()
+    local t40 = Nyx.Tests.TestPenalLaborProcessingAndSentenceReductions()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

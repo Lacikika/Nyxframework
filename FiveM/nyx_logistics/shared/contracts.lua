@@ -66,6 +66,13 @@ Nyx.Logistics.FreightConfig = {
             coords = vector3(-168.4, 6315.8, 31.5),
             model = `prop_terminal_01`,
             heading = 0.0
+        },
+        {
+            id = "terminal_bolingbroke_penal",
+            name = "Bolingbroke Penitentiary Civic Freight Dock",
+            coords = vector3(1705.0, 2577.5, 45.5),
+            model = `prop_terminal_01`,
+            heading = 180.0
         }
     }
 }
