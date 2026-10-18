@@ -81,11 +81,10 @@ while true; do
             echo "[$TIMESTAMP] Committing verified changes..."
             git add -A
             COMMIT_MSG="autonomous: feature iteration $TIMESTAMP (cycle $CYCLE_COUNT)"
-            git commit -m "$COMMIT_MSG" >> "$LOG_FILE" 2>&1
-            if git remote | grep -q "^origin$"; then
-                echo "[$TIMESTAMP] Pushing to remote branch $BRANCH_NAME..."
-                git push origin "$BRANCH_NAME" >> "$LOG_FILE" 2>&1 || true
-            fi
+            for rem in $(git remote); do
+                echo "[$TIMESTAMP] Pushing to remote '$rem' branch $BRANCH_NAME..."
+                git push "$rem" "$BRANCH_NAME" >> "$LOG_FILE" 2>&1 || true
+            done
             echo "[$TIMESTAMP] Successfully committed: $COMMIT_MSG" >> "$LOG_FILE"
         else
             echo "[$TIMESTAMP] Verification passed, but no working tree modifications detected."

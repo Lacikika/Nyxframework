@@ -117,11 +117,13 @@ while ($true) {
             $CommitMsg = "autonomous: feature iteration $Timestamp (cycle $CycleCount)"
             git commit -m $CommitMsg 2>&1 | Out-File -FilePath $LogFile -Append -Encoding utf8
 
-            # Attempt push if remote is configured
-            $HasRemote = git remote
-            if ($HasRemote) {
-                Write-Host "[$Timestamp] Pushing to remote branch $BranchName..." -ForegroundColor Gray
-                git push origin $BranchName 2>&1 | Out-File -FilePath $LogFile -Append -Encoding utf8
+            # Attempt push to all configured remotes (e.g. proxmox, origin)
+            $Remotes = git remote
+            if ($Remotes) {
+                foreach ($rem in $Remotes) {
+                    Write-Host "[$Timestamp] Pushing to remote '$rem' branch $BranchName..." -ForegroundColor Gray
+                    git push $rem $BranchName 2>&1 | ForEach-Object { "$_" } | Out-File -FilePath $LogFile -Append -Encoding utf8
+                }
             }
             Write-Log "[$Timestamp] Successfully committed: $CommitMsg"
         } else {
