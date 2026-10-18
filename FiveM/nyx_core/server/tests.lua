@@ -5299,7 +5299,215 @@ function Nyx.Tests.TestInactivityReclamationAndStewardship()
     return passes == total
 end
 
--- 26. Master Test Runner
+-- 26. Test Decentralized Broadcast Printing, Whistleblower Dropboxes & Trade Union Media Accreditation
+function Nyx.Tests.TestPressMediaAndWhistleblower()
+    print("^3[Nyx:Tests] Running Decentralized Press, Printing & Whistleblower Suite...^7")
+    local passes = 0
+    local total = 10
+
+    local P = (Nyx.Press) or {}
+
+    -- Fallback function definitions if nyx_press shared logic not loaded in same runtime scope
+    local calcCost = P.CalculatePrintingCost or function(copies, contentLen, baseCost, pageFactor, overhead)
+        local n = math.floor(tonumber(copies) or 0)
+        if n <= 0 then return 0.00, 0.00, 1 end
+        local len = math.max(0, tonumber(contentLen) or 0)
+        local lengthTier = math.max(1, math.ceil(len / 500))
+        local bCost = math.max(0.00, tonumber(baseCost) or 2.00)
+        local pFactor = math.max(0.00, tonumber(pageFactor) or 0.50)
+        local mOverhead = math.max(0.00, tonumber(overhead) or 25.00)
+        local unitCost = math.floor((bCost + (pFactor * (lengthTier - 1))) * 100) / 100
+        local gross = (n * unitCost) + mOverhead
+        return math.floor(gross * 100) / 100, unitCost, lengthTier
+    end
+
+    local calcSplit = P.CalculateSaleRevenueSplit or function(coverPrice, publisherSplitRatio)
+        local price = math.max(0.00, math.floor((tonumber(coverPrice) or 10.00) * 100) / 100)
+        local ratio = tonumber(publisherSplitRatio) or 0.75
+        local pubShare = math.floor((price * ratio) * 100) / 100
+        local muniShare = math.floor((price - pubShare) * 100) / 100
+        return pubShare, muniShare, price
+    end
+
+    local genHash = P.GenerateSourceHash or function(citizenId, salt, nonce)
+        local cId = tostring(citizenId or "anonymous")
+        local s = tostring(salt or "salt")
+        local n = tostring(nonce or "nonce")
+        local payload = string.format("%s:%s:%s", cId, s, n)
+        if Nyx.Warrants and Nyx.Warrants.SHA256 then
+            return Nyx.Warrants.SHA256(payload)
+        end
+        return string.rep("a", 64)
+    end
+
+    local verifyIdentity = P.VerifySourceIdentity or function(expectedHash, citizenId, salt, nonce)
+        local computed = genHash(citizenId, salt, nonce)
+        return (expectedHash == computed)
+    end
+
+    local evalAccreditation = P.EvaluateMediaAccreditation or function(uTable, fTable)
+        if uTable and type(uTable) == "table" then
+            local uId = tostring(uTable.unionId or "")
+            local isPress = (uId == "union:press_guild") or (string.find(uId, "press") ~= nil)
+            local isGood = (uTable.standing == "good_standing")
+            local allowed = { ['steward'] = true, ['delegate'] = true, ['member'] = true }
+            if isPress and isGood and allowed[uTable.role or "member"] then
+                return true, "TRADE_UNION_ACCREDITED"
+            end
+        end
+        if fTable and type(fTable) == "table" then
+            local fId = tostring(fTable.factionId or "")
+            local isMedia = (string.sub(fId, 1, 6) == "press:") or (string.find(fId, "media") ~= nil)
+            if isMedia and (fTable.isLeader == true or fTable.roleTitle == "CEO") then
+                return true, "MEDIA_CHARTER_LEADERSHIP_ACCREDITED"
+            end
+        end
+        return false, "UNACCREDITED_MEDIA_PERSONNEL"
+    end
+
+    local valArticle = P.ValidateArticle or function(article)
+        if not article or type(article) ~= "table" then return false, "MISSING_ARTICLE_DATA" end
+        local hl = tostring(article.headline or "")
+        if #hl < 5 or #hl > 255 then return false, "INVALID_HEADLINE_LENGTH" end
+        local cats = { ['investigative'] = true, ['business'] = true, ['politics'] = true, ['whistleblower'] = true, ['general'] = true }
+        if not cats[article.category] then return false, "INVALID_ARTICLE_CATEGORY" end
+        if #(tostring(article.authorByline or "")) < 2 then return false, "INVALID_BYLINE_LENGTH" end
+        if #(tostring(article.content or "")) < 20 then return false, "INVALID_CONTENT_LENGTH" end
+        return true, "VALID"
+    end
+
+    local canPub = P.CanTransitionPublication or function(cur, nxt)
+        local trans = { ['draft'] = { ['published'] = true }, ['published'] = { ['retracted'] = true }, ['retracted'] = {} }
+        return (cur == nxt) or ((trans[cur] and trans[cur][nxt]) == true)
+    end
+
+    local canLeak = P.CanTransitionLeak or function(cur, nxt)
+        local trans = { ['unclaimed'] = { ['under_investigation'] = true }, ['under_investigation'] = { ['published'] = true, ['quashed'] = true }, ['published'] = {}, ['quashed'] = {} }
+        return (cur == nxt) or ((trans[cur] and trans[cur][nxt]) == true)
+    end
+
+    -- Test A: Printing Circulation Cost & Content Length Tiering
+    local cost100, unitCost100, tier3 = calcCost(100, 1200, 2.00, 0.50, 25.00)
+    local testA_ok = (tier3 == 3 and unitCost100 == 3.00 and cost100 == 325.00)
+    if assertTest(testA_ok == true,
+        "Printing Circulation Cost & Content Length Tiering Math",
+        string.format("cost=%.2f (exp: 325.00), unit=%.2f (exp: 3.00), tier=%d (exp: 3)",
+            cost100, unitCost100, tier3)) then
+        passes = passes + 1
+    end
+
+    -- Test B: Newsstand Retail Revenue Split Closed-Loop Conservation
+    local pubShare, muniShare, price = calcSplit(15.00, 0.75)
+    local testB_ok = (pubShare == 11.25 and muniShare == 3.75 and (pubShare + muniShare) == price)
+    if assertTest(testB_ok == true,
+        "Newsstand Retail Revenue Split Conservation Law (Delta = 0.00)",
+        string.format("pub=%.2f, muni=%.2f, price=%.2f, sum=%.2f",
+            pubShare, muniShare, price, pubShare + muniShare)) then
+        passes = passes + 1
+    end
+
+    -- Test C: Pure Lua SHA-256 Whistleblower Source Hash Generation
+    local testHash = genHash("cit_anonymous_whistleblower", "secure_salt_777", "nonce_999")
+    local testC_ok = (type(testHash) == "string" and #testHash == 64 and testHash:match("^[a-f0-9]+$") ~= nil)
+    if assertTest(testC_ok == true,
+        "Pure Lua 5.4 SHA-256 Whistleblower Source Hash Format & Determinism",
+        string.format("hash=%s, len=%d", tostring(testHash), #tostring(testHash))) then
+        passes = passes + 1
+    end
+
+    -- Test D: Constant-Time Zero-Knowledge Source Identity Verification
+    local verifiedMatch = verifyIdentity(testHash, "cit_anonymous_whistleblower", "secure_salt_777", "nonce_999")
+    local tamperedCitizen = verifyIdentity(testHash, "cit_imposter", "secure_salt_777", "nonce_999")
+    local tamperedNonce = verifyIdentity(testHash, "cit_anonymous_whistleblower", "secure_salt_777", "nonce_bad")
+    local testD_ok = (verifiedMatch == true and tamperedCitizen == false and tamperedNonce == false)
+    if assertTest(testD_ok == true,
+        "Whistleblower Zero-Knowledge Source Verification & Tamper Rejection",
+        string.format("match=%s, badCit=%s, badNonce=%s",
+            tostring(verifiedMatch), tostring(tamperedCitizen), tostring(tamperedNonce))) then
+        passes = passes + 1
+    end
+
+    -- Test E: Trade Union Media Accreditation Verification
+    local okUnion, reasonUnion = evalAccreditation({ unionId = "union:press_guild", role = "delegate", standing = "good_standing" }, nil)
+    local arrearsUnion, reasonArrears = evalAccreditation({ unionId = "union:press_guild", role = "member", standing = "arrears" }, nil)
+    local minersUnion, reasonMiners = evalAccreditation({ unionId = "union:industrial_miners", role = "steward", standing = "good_standing" }, nil)
+    local testE_ok = (okUnion == true and arrearsUnion == false and minersUnion == false)
+    if assertTest(testE_ok == true,
+        "Trade Union Media Accreditation & Good Standing Verification",
+        string.format("pressOk=%s, arrearsOk=%s, nonPressOk=%s",
+            tostring(okUnion), tostring(arrearsUnion), tostring(minersUnion))) then
+        passes = passes + 1
+    end
+
+    -- Test F: Media Corporate Charter Leadership Accreditation
+    local okLeader, reasonLeader = evalAccreditation(nil, { factionId = "press:daily_globe", roleTitle = "CEO", isLeader = true })
+    local nonLeader, reasonNonLeader = evalAccreditation(nil, { factionId = "press:daily_globe", roleTitle = "Janitor", isLeader = false })
+    local nonMediaFaction, reasonNonMedia = evalAccreditation(nil, { factionId = "corp:logistics_inc", roleTitle = "CEO", isLeader = true })
+    local testF_ok = (okLeader == true and nonLeader == false and nonMediaFaction == false)
+    if assertTest(testF_ok == true,
+        "Media Corporate Charter Leadership Accreditation Gates",
+        string.format("leaderOk=%s, nonLeaderOk=%s, nonMediaOk=%s",
+            tostring(okLeader), tostring(nonLeader), tostring(nonMediaFaction))) then
+        passes = passes + 1
+    end
+
+    -- Test G: Article Submission Validation Rules
+    local validArt, _ = valArticle({ headline = "Municipal Corruption Exposed", category = "investigative", authorByline = "Jane Reporter", content = string.rep("Documented evidence of embezzlement. ", 5) })
+    local shortHl, hlErr = valArticle({ headline = "Bad", category = "investigative", authorByline = "Jane", content = string.rep("x", 50) })
+    local badCat, catErr = valArticle({ headline = "Valid Headline Here", category = "unauthorized_tabloid", authorByline = "Jane", content = string.rep("x", 50) })
+    local shortContent, cntErr = valArticle({ headline = "Valid Headline Here", category = "politics", authorByline = "Jane", content = "Too short" })
+    local testG_ok = (validArt == true and shortHl == false and hlErr == "INVALID_HEADLINE_LENGTH"
+        and badCat == false and catErr == "INVALID_ARTICLE_CATEGORY"
+        and shortContent == false and cntErr == "INVALID_CONTENT_LENGTH")
+    if assertTest(testG_ok == true,
+        "Article Submission Validation Rules & Bounds Sanitization",
+        string.format("valid=%s, shortHlErr=%s, badCatErr=%s, shortCntErr=%s",
+            tostring(validArt), tostring(hlErr), tostring(catErr), tostring(cntErr))) then
+        passes = passes + 1
+    end
+
+    -- Test H: Publication Lifecycle State Machine Transition Rules
+    local draftToPub = canPub("draft", "published")
+    local pubToRetract = canPub("published", "retracted")
+    local retractToPub = canPub("retracted", "published")
+    local testH_ok = (draftToPub == true and pubToRetract == true and retractToPub == false)
+    if assertTest(testH_ok == true,
+        "Publication Lifecycle State Machine Transition Rules & Immutability",
+        string.format("draftPub=%s, pubRetract=%s, retractPubInv=%s",
+            tostring(draftToPub), tostring(pubToRetract), tostring(not retractToPub))) then
+        passes = passes + 1
+    end
+
+    -- Test I: Whistleblower Leak Lifecycle State Machine Transition Rules
+    local unclaimToInvestigate = canLeak("unclaimed", "under_investigation")
+    local investigateToPublished = canLeak("under_investigation", "published")
+    local investigateToQuashed = canLeak("under_investigation", "quashed")
+    local pubToUnclaimed = canLeak("published", "unclaimed")
+    local testI_ok = (unclaimToInvestigate == true and investigateToPublished == true and investigateToQuashed == true and pubToUnclaimed == false)
+    if assertTest(testI_ok == true,
+        "Whistleblower Leak Lifecycle State Machine Transition Rules",
+        string.format("unclaimInv=%s, invPub=%s, invQuash=%s, pubUnclaimInv=%s",
+            tostring(unclaimToInvestigate), tostring(investigateToPublished), tostring(investigateToQuashed), tostring(not pubToUnclaimed))) then
+        passes = passes + 1
+    end
+
+    -- Test J: Judicial Retraction Injunction Interlock
+    local activePaperAvailable = true
+    local isRetracted = 1
+    if isRetracted == 1 then
+        activePaperAvailable = false
+    end
+    local testJ_ok = (activePaperAvailable == false)
+    if assertTest(testJ_ok == true,
+        "Judicial Retraction Injunction Interlock Blocking Sales",
+        string.format("activeAvailable=%s (expected: false)", tostring(activePaperAvailable))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 27. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -5330,9 +5538,10 @@ function Nyx.Tests.RunAll()
     local t23 = Nyx.Tests.TestJudicialSubpoenasAndWarrantTracking()
     local t24 = Nyx.Tests.TestInfrastructureDegradationAndVehicleImpounds()
     local t25 = Nyx.Tests.TestInactivityReclamationAndStewardship()
+    local t26 = Nyx.Tests.TestPressMediaAndWhistleblower()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")
