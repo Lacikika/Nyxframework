@@ -194,6 +194,58 @@ Nyx.Items.Registry = {
         type = 'medical',
         description = 'Autoclaved surgical pack with hemostats, scalpel, and suturing gear.'
     },
+    ['bandage_sterile'] = {
+        name = 'bandage_sterile',
+        label = 'Sterile Pressure Bandage',
+        weight = 100,
+        stackable = true,
+        maxStack = 20,
+        type = 'medical',
+        healAmount = 25,
+        bleedReduction = 0.5,
+        description = 'Compressed sterile pressure bandage for field dressing of lacerations and bleeding control.'
+    },
+    ['first_aid_pack'] = {
+        name = 'first_aid_pack',
+        label = 'Tactical First Aid Pack',
+        weight = 1200,
+        stackable = true,
+        maxStack = 5,
+        type = 'medical',
+        healAmount = 60,
+        fractureStabilization = true,
+        description = 'Tactical trauma first aid pack containing hemostatic gauze, pressure dressing, and bone splints.'
+    },
+    ['tourniquet'] = {
+        name = 'tourniquet',
+        label = 'Combat Application Tourniquet',
+        weight = 150,
+        stackable = true,
+        maxStack = 10,
+        type = 'medical',
+        arrestsArterial = true,
+        description = 'Combat application tourniquet designed for rapid extremity arterial occlusion.'
+    },
+    ['splint'] = {
+        name = 'splint',
+        label = 'Malleable Structural Splint',
+        weight = 300,
+        stackable = true,
+        maxStack = 5,
+        type = 'medical',
+        treatsFracture = true,
+        description = 'Malleable structural aluminum splint for immobilizing fractured limb bones.'
+    },
+    ['morphine_ampoule'] = {
+        name = 'morphine_ampoule',
+        label = 'Morphine Sulfate Ampoule (10mg)',
+        weight = 50,
+        stackable = true,
+        maxStack = 10,
+        type = 'medical',
+        painRelief = 100,
+        description = 'Injectable opioid analgesic for acute traumatic shock and severe pain suppression.'
+    },
     ['industrial_fuel'] = {
         name = 'industrial_fuel',
         label = 'Industrial Generator Fuel (50L)',

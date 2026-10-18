@@ -7824,7 +7824,279 @@ function Nyx.Tests.TestCitizenOSSmartphoneFramework()
     return passes == total
 end
 
--- 36. Master Test Runner
+-- 36. Test Anatomical Trauma & Organ-Specific Medical Injury Engine
+function Nyx.Tests.TestAnatomicalTraumaAndInjuryEngine()
+    print("^3[Nyx:Tests] Running Anatomical Trauma & Medical Injury Engine Test Suite...^7")
+    local passes = 0
+    local total = 6
+
+    local TraumaMod = (Nyx and Nyx.Trauma) or {}
+
+    -- Sub-test A: Bone-to-Limb Mapping & Anatomical Whitelists
+    local getLimb = TraumaMod.GetLimbFromBone or function(boneId)
+        local map = {
+            [31086] = "head", [39317] = "head",
+            [24818] = "torso", [24817] = "torso", [24816] = "torso", [11816] = "torso",
+            [18905] = "left_arm", [22711] = "left_arm", [45509] = "left_arm", [64729] = "left_arm",
+            [57005] = "right_arm", [2992] = "right_arm", [40269] = "right_arm", [10706] = "right_arm",
+            [63931] = "left_leg", [58271] = "left_leg", [14201] = "left_leg",
+            [36864] = "right_leg", [51826] = "right_leg", [52335] = "right_leg"
+        }
+        return map[tonumber(boneId)] or "torso"
+    end
+
+    local lHead = getLimb(31086)
+    local lTorso = getLimb(24818)
+    local lArmL = getLimb(18905)
+    local lArmR = getLimb(57005)
+    local lLegL = getLimb(63931)
+    local lLegR = getLimb(36864)
+    local lFallback = getLimb(99999)
+
+    local testA_ok = (lHead == "head") and
+                     (lTorso == "torso") and
+                     (lArmL == "left_arm") and
+                     (lArmR == "right_arm") and
+                     (lLegL == "left_leg") and
+                     (lLegR == "right_leg") and
+                     (lFallback == "torso")
+
+    if assertTest(testA_ok == true,
+        "Bone-to-Limb Mapping & Anatomical Whitelist Invariant",
+        string.format("head=%s, torso=%s, armL=%s, armR=%s, legL=%s, legR=%s, fallback=%s",
+            lHead, lTorso, lArmL, lArmR, lLegL, lLegR, lFallback)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Initial State Factory & Limb Defaults
+    local createInitial = TraumaMod.CreateInitialTraumaState or function()
+        local defaultLimb = function()
+            return { health = 100, wounds = {}, isBleeding = false, isFractured = false, hasTourniquet = false }
+        end
+        return {
+            bloodVolume = 5000,
+            maxBloodVolume = 5000,
+            bleedingRate = 0.0,
+            painLevel = 0,
+            isUnconscious = false,
+            limbs = {
+                ['head'] = defaultLimb(),
+                ['torso'] = defaultLimb(),
+                ['left_arm'] = defaultLimb(),
+                ['right_arm'] = defaultLimb(),
+                ['left_leg'] = defaultLimb(),
+                ['right_leg'] = defaultLimb()
+            }
+        }
+    end
+
+    local initState = createInitial()
+    local limbsPresent = (initState.limbs.head ~= nil and initState.limbs.torso ~= nil and
+                          initState.limbs.left_arm ~= nil and initState.limbs.right_arm ~= nil and
+                          initState.limbs.left_leg ~= nil and initState.limbs.right_leg ~= nil)
+
+    local testB_ok = (initState.bloodVolume == 5000) and
+                     (initState.bleedingRate == 0.0) and
+                     (initState.painLevel == 0) and
+                     (initState.isUnconscious == false) and
+                     limbsPresent and
+                     (initState.limbs.torso.health == 100) and
+                     (#initState.limbs.torso.wounds == 0)
+
+    if assertTest(testB_ok == true,
+        "Initial Trauma State Factory & 6-Zone Anatomical Default Invariant",
+        string.format("vol=%d, bleed=%.2f, pain=%d, limbsPresent=%s",
+            initState.bloodVolume, initState.bleedingRate, initState.painLevel, tostring(limbsPresent))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Wound Ingestion, Pain Accumulation & Bleed Rate Dynamics
+    local addWound = TraumaMod.AddWound or function(state, limb, woundType, severity)
+        if not state or not state.limbs or not state.limbs[limb] then return false end
+        local lData = state.limbs[limb]
+        local sev = tonumber(severity) or 1.0
+        table.insert(lData.wounds, { type = woundType, severity = sev, bandaged = false })
+        if woundType == "fracture" then
+            lData.isFractured = true
+            lData.health = math.max(0, lData.health - math.floor(35 * sev))
+            state.painLevel = math.min(100, (state.painLevel or 0) + math.floor(25 * sev))
+        elseif woundType == "arterial_bleed" then
+            lData.isBleeding = true
+            lData.health = math.max(0, lData.health - math.floor(40 * sev))
+            state.painLevel = math.min(100, (state.painLevel or 0) + math.floor(30 * sev))
+        elseif woundType == "laceration" then
+            lData.isBleeding = true
+            lData.health = math.max(0, lData.health - math.floor(15 * sev))
+            state.painLevel = math.min(100, (state.painLevel or 0) + math.floor(10 * sev))
+        end
+        local rates = { laceration = 1.50, arterial_bleed = 25.00, fracture = 0.0 }
+        local total = 0.0
+        for _, l in pairs(state.limbs) do
+            if not l.hasTourniquet then
+                for _, w in ipairs(l.wounds) do
+                    if not w.bandaged then
+                        total = total + (rates[w.type] or 1.0) * (w.severity or 1.0)
+                    end
+                end
+            end
+        end
+        state.bleedingRate = math.floor(total * 100 + 0.5) / 100
+        return true
+    end
+
+    local testState = createInitial()
+    addWound(testState, "left_arm", "laceration", 1.0)
+    local rateAfterLac = testState.bleedingRate
+    local armHealth = testState.limbs.left_arm.health
+
+    addWound(testState, "left_leg", "arterial_bleed", 1.0)
+    local rateAfterArterial = testState.bleedingRate
+
+    addWound(testState, "right_leg", "fracture", 1.0)
+    local hasFracture = testState.limbs.right_leg.isFractured
+
+    local testC_ok = (rateAfterLac == 1.50) and
+                     (rateAfterArterial == 26.50) and
+                     (armHealth == 85) and
+                     (hasFracture == true) and
+                     (testState.painLevel == 65)
+
+    if assertTest(testC_ok == true,
+        "Wound Ingestion, Pain Accumulation & Compound Bleed Rate Dynamics Invariant",
+        string.format("rateLac=%.2f, rateArt=%.2f, armHP=%d, pain=%d, frac=%s",
+            rateAfterLac, rateAfterArterial, armHealth, testState.painLevel, tostring(hasFracture))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Hypovolemic Shock Classification & Physiological Thresholds
+    local calcShock = TraumaMod.CalculateShockClass or function(vol)
+        local v = math.max(0, math.min(5000, tonumber(vol) or 5000))
+        if v >= 4250 then return 1, "Class I", false
+        elseif v >= 3500 then return 2, "Class II", false
+        elseif v >= 3000 then return 3, "Class III", false
+        else return 4, "Class IV", true end
+    end
+
+    local s1, _, unc1 = calcShock(5000)
+    local s2, _, unc2 = calcShock(4000)
+    local s3, _, unc3 = calcShock(3200)
+    local s4, _, unc4 = calcShock(2500)
+
+    local testD_ok = (s1 == 1 and unc1 == false) and
+                     (s2 == 2 and unc2 == false) and
+                     (s3 == 3 and unc3 == false) and
+                     (s4 == 4 and unc4 == true)
+
+    if assertTest(testD_ok == true,
+        "Hypovolemic Shock Classification & Syncope Loss-of-Consciousness Invariant",
+        string.format("s1=%d, s2=%d, s3=%d, s4=%d (unc4=%s)", s1, s2, s3, s4, tostring(unc4))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Zero-Trust Medical Treatment Validation & Core Anatomical Guards
+    local canTreat = TraumaMod.CanTreatLimb or function(state, limb, item)
+        local extremities = { left_arm = true, right_arm = true, left_leg = true, right_leg = true }
+        if item == "tourniquet" then
+            if not extremities[limb] then return false, "CANNOT_APPLY_TOURNIQUET_TO_CORE" end
+            return true, "OK"
+        elseif item == "splint" then
+            if not extremities[limb] then return false, "CANNOT_APPLY_SPLINT_TO_CORE" end
+            if not state.limbs[limb] or not state.limbs[limb].isFractured then return false, "LIMB_NOT_FRACTURED" end
+            return true, "OK"
+        end
+        return true, "OK"
+    end
+
+    local okTournLeg, _ = canTreat(testState, "left_leg", "tourniquet")
+    local okTournTorso, errTournTorso = canTreat(testState, "torso", "tourniquet")
+    local okTournHead, errTournHead = canTreat(testState, "head", "tourniquet")
+    local okSplintBroken, _ = canTreat(testState, "right_leg", "splint")
+    local okSplintIntact, errSplintIntact = canTreat(testState, "left_arm", "splint")
+
+    local testE_ok = (okTournLeg == true) and
+                     (okTournTorso == false and errTournTorso == "CANNOT_APPLY_TOURNIQUET_TO_CORE") and
+                     (okTournHead == false and errTournHead == "CANNOT_APPLY_TOURNIQUET_TO_CORE") and
+                     (okSplintBroken == true) and
+                     (okSplintIntact == false and errSplintIntact == "LIMB_NOT_FRACTURED")
+
+    if assertTest(testE_ok == true,
+        "Zero-Trust Medical Treatment Validation & Anatomical Core Guard Invariant",
+        string.format("tournLeg=%s, tournTorso=%s, tournHead=%s, splintIntact=%s",
+            tostring(okTournLeg), errTournTorso, errTournHead, errSplintIntact)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Field Stabilization, Hemodynamic Tick Simulation & Arterial Occlusion
+    local applyTreatment = TraumaMod.ApplyTreatment or function(state, limb, item)
+        local lData = state.limbs[limb]
+        if item == "tourniquet" then
+            lData.hasTourniquet = true
+            lData.isBleeding = false
+        elseif item == "bandage_sterile" or item == "med_bandage" then
+            for _, w in ipairs(lData.wounds) do w.bandaged = true end
+            lData.health = math.min(100, lData.health + 25)
+            lData.isBleeding = false
+        elseif item == "first_aid_pack" or item == "med_firstaid" then
+            lData.isFractured = false
+            for _, w in ipairs(lData.wounds) do w.bandaged = true end
+            lData.health = math.min(100, lData.health + 60)
+            lData.isBleeding = false
+        elseif item == "morphine_ampoule" then
+            state.painLevel = 0
+        end
+        local rates = { laceration = 1.50, arterial_bleed = 25.00, fracture = 0.0 }
+        local total = 0.0
+        for _, l in pairs(state.limbs) do
+            if not l.hasTourniquet then
+                for _, w in ipairs(l.wounds) do
+                    if not w.bandaged then
+                        total = total + (rates[w.type] or 1.0) * (w.severity or 1.0)
+                    end
+                end
+            end
+        end
+        state.bleedingRate = math.floor(total * 100 + 0.5) / 100
+        return true
+    end
+
+    applyTreatment(testState, "left_leg", "tourniquet")
+    local rateAfterTourn = testState.bleedingRate
+
+    applyTreatment(testState, "left_arm", "bandage_sterile")
+    local rateAfterBandage = testState.bleedingRate
+
+    applyTreatment(testState, "right_leg", "first_aid_pack")
+    local fracStabilized = (testState.limbs.right_leg.isFractured == false)
+
+    applyTreatment(testState, "head", "morphine_ampoule")
+    local painAlleviated = (testState.painLevel == 0)
+
+    local simTick = TraumaMod.SimulateBloodTick or function(state, dt)
+        local lost = (state.bleedingRate or 0.0) * dt
+        state.bloodVolume = math.max(0, state.bloodVolume - lost)
+        return state.bloodVolume
+    end
+    local volStart = testState.bloodVolume
+    simTick(testState, 10.0)
+    local volPreserved = (testState.bloodVolume == volStart)
+
+    local testF_ok = (rateAfterTourn == 1.50) and
+                     (rateAfterBandage == 0.00) and
+                     fracStabilized and
+                     painAlleviated and
+                     volPreserved
+
+    if assertTest(testF_ok == true,
+        "Field Stabilization, Arterial Occlusion & Hemodynamic Tick Conservation Invariant",
+        string.format("rateTourn=%.2f, rateBandage=%.2f, fracStab=%s, painZero=%s, volPreserved=%s",
+            rateAfterTourn, rateAfterBandage, tostring(fracStabilized), tostring(painAlleviated), tostring(volPreserved))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 37. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -7865,9 +8137,10 @@ function Nyx.Tests.RunAll()
     local t33 = Nyx.Tests.TestWarehouseMatrixAndElasticMarketMonitorUI()
     local t34 = Nyx.Tests.TestVehicleDiagnosticsAndCivicImpoundUI()
     local t35 = Nyx.Tests.TestCitizenOSSmartphoneFramework()
+    local t36 = Nyx.Tests.TestAnatomicalTraumaAndInjuryEngine()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

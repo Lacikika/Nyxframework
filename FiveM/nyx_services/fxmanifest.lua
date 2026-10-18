@@ -15,7 +15,8 @@ version '1.0.0'
 
 shared_scripts {
     '@nyx_treasury/shared/degradation.lua',
-    'config.lua'
+    'config.lua',
+    'shared/trauma.lua'
 }
 
 server_scripts {
@@ -23,6 +24,7 @@ server_scripts {
     'server/powergrid.lua',
     'server/billing.lua',
     'server/medical.lua',
+    'server/trauma.lua',
     'server/repair_stations.lua',
     'server/main.lua',
     'server/exports.lua'
@@ -32,6 +34,7 @@ client_scripts {
     'client/blackout.lua',
     'client/substations.lua',
     'client/repair_stations.lua',
+    'client/trauma.lua',
     'client/main.lua',
     'client/exports.lua'
 }

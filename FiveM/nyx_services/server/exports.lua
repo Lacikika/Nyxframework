@@ -90,3 +90,36 @@ end)
 exports("RepairVehicleAtStation", function(src, stationId, vehicleNetId)
     return Nyx.Services.RepairVehicleAtStation(src, stationId, vehicleNetId)
 end)
+
+-- Anatomical Trauma & Medical Injury Engine
+exports("GetPlayerTraumaState", function(src)
+    return Nyx.Services.GetPlayerTrauma(src)
+end)
+
+exports("AddLimbDamage", function(src, limb, woundType, severity)
+    return Nyx.Services.AddLimbDamage(src, limb, woundType, severity)
+end)
+
+exports("ApplyMedicalTreatment", function(medicSrc, patientSrc, limb, item)
+    return Nyx.Services.ApplyMedicalTreatment(medicSrc, patientSrc, limb, item)
+end)
+
+exports("DiagnosePlayerTrauma", function(examinerSrc, patientSrc)
+    return Nyx.Services.DiagnosePatient(examinerSrc, patientSrc)
+end)
+
+exports("ResetTraumaState", function(src)
+    return Nyx.Services.ResetTraumaState(src)
+end)
+
+exports("SetPlayerBloodVolume", function(src, volume)
+    local state = Nyx.Services.GetPlayerTrauma(src)
+    if state then
+        state.bloodVolume = math.max(0, math.min(5000, tonumber(volume) or 5000))
+        local _, _, isUnc = Nyx.Trauma.CalculateShockClass(state.bloodVolume)
+        state.isUnconscious = isUnc
+        Nyx.Services.SavePlayerTrauma(src)
+        return true, state.bloodVolume
+    end
+    return false, "TRAUMA_STATE_NOT_FOUND"
+end)

@@ -110,6 +110,40 @@ CreateThread(function()
             evaluateSubstationState(s, false)
             return { success = true, substationId = substationId, isBlackout = s.isBlackout }
         end)
+
+        -- Query player trauma state
+        exports['nyx_core']:RegisterRPC("services:getTraumaState", function(src, targetSrc)
+            local target = tonumber(targetSrc) or src
+            local state = Nyx.Services.GetPlayerTrauma(target)
+            return { success = (state ~= nil), state = state, error = (not state and "TRAUMA_STATE_NOT_FOUND" or nil) }
+        end)
+
+        -- Apply medical treatment item to patient limb
+        exports['nyx_core']:RegisterRPC("services:applyMedicalItem", function(src, payload)
+            if type(payload) ~= "table" then return { success = false, error = "INVALID_PAYLOAD" } end
+            local targetSrc = tonumber(payload.targetSrc) or src
+            local limb = tostring(payload.limb or "")
+            local item = tostring(payload.item or "")
+            local ok, res = Nyx.Services.ApplyMedicalTreatment(src, targetSrc, limb, item)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- Diagnose and triage patient trauma
+        exports['nyx_core']:RegisterRPC("services:diagnosePatient", function(src, targetSrc)
+            local target = tonumber(targetSrc) or src
+            local ok, res = Nyx.Services.DiagnosePatient(src, target)
+            return { success = ok, diagnosis = res, error = (not ok and res or nil) }
+        end)
+
+        -- Ingest and sync client limb trauma damage
+        exports['nyx_core']:RegisterRPC("services:syncTraumaDamage", function(src, payload)
+            if type(payload) ~= "table" then return { success = false, error = "INVALID_PAYLOAD" } end
+            local limb = tostring(payload.limb or "torso")
+            local woundType = tostring(payload.woundType or "laceration")
+            local severity = tonumber(payload.severity) or 1.0
+            local ok, res = Nyx.Services.AddLimbDamage(src, limb, woundType, severity)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
     end
 
     -- Await nyx_core database ready signal with fallback

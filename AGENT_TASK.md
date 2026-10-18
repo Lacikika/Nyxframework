@@ -63,7 +63,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Citizen OS Master Smartphone Framework (`nyx_ui`)**
   - **Implementation:** Unified single-frame CEF smartphone OS integrating mobile banking (`nyx_treasury`), freight dispatch board (`nyx_logistics`), and emergency alerts (`nyx_mdt`).
 
-- [ ] **Feature: Anatomical Trauma & Organ-Specific Medical Injury Engine (`nyx_services`)**
+- [x] **Feature: Anatomical Trauma & Organ-Specific Medical Injury Engine (`nyx_services`)**
   - **Implementation:** Limb-specific wound system (arterial bleeding, fractures, ballistic trauma) requiring physical medical items (`bandage_sterile`, `first_aid_pack`) for field stabilization.
 
 - [ ] **Feature: Pillbox Hospital Supply Depletion & Emergency Medical Hauls (`nyx_services` & `nyx_logistics`)**
@@ -107,6 +107,37 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Anatomical Trauma & Organ-Specific Medical Injury Engine (`nyx_services`)**
+  - **Database Migration (`041_anatomical_trauma_and_medical_injury_engine.sql`, `index.json`)**:
+    - Created `nyx_medical_trauma` table (`citizen_id` PK, `blood_volume_ml`, `bleeding_rate`, `pain_level`, `wounds_json`, `is_unconscious`, `last_updated_at`) for persistent character trauma state tracking.
+    - Created `nyx_medical_treatments_log` table (`log_id` PK, `treatment_uuid`, `patient_citizen_id`, `medic_citizen_id`, `item_used`, `target_limb`, `treatment_type`, `blood_volume_before`, `blood_volume_after`, `treated_at`) for immutable audit logging.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 41) and mirrored to `FiveM/nyx_services/sql/migrations/`.
+  - **Item Registry Integration (`nyx_inventory/shared/items.lua`)**:
+    - Registered physical medical consumables required for field stabilization: `bandage_sterile` (sterile pressure bandage), `first_aid_pack` (tactical trauma kit), `tourniquet` (combat application tourniquet for arterial occlusion), `splint` (structural bone immobilization), and `morphine_ampoule` (opioid analgesia for acute shock).
+  - **Shared Pure Lua 5.4 Logic Engine (`nyx_services/shared/trauma.lua`, `fxmanifest.lua`)**:
+    - Implemented `Nyx.Trauma.GetLimbFromBone` mapping GTA ped bone IDs (head, neck, spine, pelvis, clavicles, arms, legs, feet) to 6 core anatomical zones (`head`, `torso`, `left_arm`, `right_arm`, `left_leg`, `right_leg`).
+    - Implemented `Nyx.Trauma.CalculateBleedRate` summing rates across active unbandaged wounds while honoring tourniquet extremity occlusion.
+    - Implemented `Nyx.Trauma.CalculateShockClass` providing multi-tiered hypovolemic shock status: Class I (Mild $\ge 4250$ mL), Class II (Moderate $3500-4249$ mL), Class III (Severe $3000-3499$ mL), Class IV (Critical / Lethal $< 3000$ mL, syncope & unconsciousness).
+    - Implemented `Nyx.Trauma.SimulateBloodTick` pure function for hemodynamic volume loss calculation.
+    - Implemented `Nyx.Trauma.CanTreatLimb` and `Nyx.Trauma.ApplyTreatment` with zero-trust core guards (preventing tourniquets or splints on head/torso).
+    - Implemented `Nyx.Trauma.FormatTraumaDiagnosis` generating structured medical reports for triage examination.
+    - Declared `shared/trauma.lua` in `FiveM/nyx_services/fxmanifest.lua`.
+  - **Server-Side Subsystem & RPCs (`nyx_services/server/trauma.lua`, `server/main.lua`, `server/exports.lua`)**:
+    - Managed in-memory player trauma state with debounced DB synchronization and character lifecycle persistence.
+    - Implemented 1000ms hemodynamic background simulation tick draining blood volume and triggering client syncope notifications upon shock threshold crossings.
+    - Registered RPC endpoints: `services:getTraumaState`, `services:applyMedicalItem` (with physical inventory deduction and treatment logging), `services:diagnosePatient`, and `services:syncTraumaDamage`.
+    - Exported `GetPlayerTraumaState`, `AddLimbDamage`, `ApplyMedicalTreatment`, `DiagnosePlayerTrauma`, `ResetTraumaState`, and `SetPlayerBloodVolume` in `FiveM/nyx_services/server/exports.lua`.
+  - **Client-Side Subsystem & Debuffs (`nyx_services/client/trauma.lua`, `client/exports.lua`)**:
+    - Implemented `CEventNetworkEntityDamage` damage listener mapping ped bone indices and weapon classes to anatomical wounds (ballistic, laceration, blunt, burn, arterial bleed).
+    - Implemented physiological debuff thread: leg fractures/severe damage applying `move_m@injured` limp clipset; arm fractures applying camera shake; Class IV shock causing ragdoll fainting spells.
+    - Registered client triage and field stabilization commands: `/diagnose [targetId]` and `/treat [targetId] [limb] [item]`.
+    - Exported `GetLocalTraumaState`, `GetLimbHealth`, `IsBleeding`, and `GetShockClass`.
+    - Declared `client/trauma.lua` in `FiveM/nyx_services/fxmanifest.lua`.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestAnatomicalTraumaAndInjuryEngine()` (Test 36) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_anatomical_trauma_and_injury_engine.py` with 9 test cases covering migration 041 schema, inventory item registry, bone-to-limb mapping, shock thresholds, bleed calculations, treatment guards, and hemodynamic ticks (9/9 passing).
+    - Full pytest suite: 319/319 tests passing (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 225 Lua files, 41 migrations, 100% clean verification.
 - **[2026-10-18] Feature: Citizen OS Master Smartphone Framework (`nyx_ui`)**
   - **Database Migration (`040_citizen_os_smartphone_framework.sql`, `index.json`)**:
     - Created `nyx_phone_emergency_alerts` table (`alert_id`, `alert_uuid`, `citizen_id`, `category`, `priority`, `message`, `location_label`, `created_at_unix`) for real-time and historical citizen distress and municipal broadcasts.

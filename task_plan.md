@@ -1,64 +1,80 @@
-# Task Plan: Citizen OS Master Smartphone Framework (`nyx_ui`)
+# Task Plan: Anatomical Trauma & Organ-Specific Medical Injury Engine (`nyx_services`)
 
 ## Goal
-Implement a unified single-frame CEF smartphone OS ("Citizen OS") for `nyx_ui` that integrates mobile banking (`nyx_treasury`), a mobile freight dispatch board (`nyx_logistics`), and emergency citizen alerts & 911 dispatch (`nyx_mdt`). The phone is fully CEF-compliant, delta-throttled, accessible via `/phone` or F1 keybinding, and supports seamless app switching between CivicPay, HaulExpress, CivicAlert, CivicID, and Settings.
+Implement a comprehensive limb-specific anatomical trauma and medical injury engine in `nyx_services`. The system tracks localized trauma across 6 anatomical regions (`head`, `torso`, `left_arm`, `right_arm`, `left_leg`, `right_leg`) with distinct wound types (arterial bleeding, fractures, ballistic trauma, lacerations, burns, blunt impact). It simulates dynamic blood volume depletion (5000 mL normal, multi-tier hypovolemic shock), pain levels, and physical debuffs (limping, aim sway, fainting spells). Field stabilization requires physical medical items (`bandage_sterile`, `first_aid_pack`, `tourniquet`, `splint`), with full database persistence, zero-trust RPC validation, client damage detection and debuff loops, and in-engine integration tests.
 
 ## Architecture & Requirements
-1. **Database Migration (`040_citizen_os_smartphone_framework.sql` & `index.json`)**:
-   - `nyx_phone_emergency_alerts`: Immutable log of citizen emergency alerts (`alert_id`, `alert_uuid`, `citizen_id`, `caller_name`, `category`, `message`, `location_label`, `coords_json`, `priority`, `status`, `created_at`).
-   - `nyx_phone_settings`: Per-citizen phone preferences and registry (`citizen_id`, `phone_number`, `wallpaper`, `dark_mode`, `airplane_mode`, `notifications_enabled`, `updated_at`).
-   - Register in `FiveM/nyx_core/sql/migrations/index.json` (Step 40) and mirror to `FiveM/nyx_ui/sql/migrations/`.
+1. **Database Migration (`041_anatomical_trauma_and_medical_injury_engine.sql` & `index.json`)**:
+   - `nyx_medical_trauma`: Persistent player trauma state (`citizen_id` PK, `blood_volume_ml`, `bleeding_rate`, `pain_level`, `wounds_json`, `is_unconscious`, `last_updated_at`).
+   - `nyx_medical_treatments_log`: Immutable field treatment audit log (`log_id` PK, `treatment_uuid`, `patient_citizen_id`, `medic_citizen_id`, `item_used`, `target_limb`, `treatment_type`, `blood_volume_before`, `blood_volume_after`, `treated_at`).
+   - Register in `FiveM/nyx_core/sql/migrations/index.json` (Step 41) and mirror in `FiveM/nyx_services/sql/migrations/`.
 
-2. **Pure Lua 5.4 Shared Engine (`nyx_ui/shared/phone.lua`)**:
-   - `Nyx.Phone.FormatPhoneNumber(number)`: Standardized phone formatting.
-   - `Nyx.Phone.GeneratePhoneNumber(citizenId)`: Deterministic phone number derivation.
-   - `Nyx.Phone.FormatCurrency(amount)`: Standard currency formatting.
-   - `Nyx.Phone.CalculateTransferTax(amount, taxRate)`: Pure math P2P transfer tax calculation with 2-decimal cent rounding.
-   - `Nyx.Phone.ValidateTransferPayload(payload, senderCitizenId)`: Zero-trust validation (self-transfer prevention, amount bounds $1-$10,000,000, memo sanitization).
-   - `Nyx.Phone.ValidateEmergencyAlertPayload(payload)`: Category whitelist ('police', 'medical', 'fire', 'traffic', 'general'), narrative minimums (5-500 chars), priority whitelist.
-   - `Nyx.Phone.FormatAlertBadge(priority, category)`: UI badge metadata and styling tokens.
-   - `Nyx.Phone.FormatContractCard(contract)`: Formats freight hauling contract for mobile display.
-   - `Nyx.Phone.FilterFreightContracts(contracts, filterType, search)`: Case-insensitive search and category filtering.
-   - Register in `FiveM/nyx_ui/fxmanifest.lua`.
+2. **Declarative Items Registration (`nyx_inventory/shared/items.lua`)**:
+   - Register physical medical consumable items:
+     - `bandage_sterile`: Sterile pressure bandage for lacerations, minor wounds, and bleeding control.
+     - `first_aid_pack`: Advanced trauma kit for fractures, ballistic trauma stabilization, and deep wound dressing.
+     - `tourniquet`: Extremity arterial bleed clamp (`left_arm`, `right_arm`, `left_leg`, `right_leg`).
+     - `splint`: Structural stabilization for fractured limbs.
+     - `morphine_ampoule`: Fast-acting analgesic reducing pain level and stabilizing shock symptoms.
+   - Maintain backward compatibility with existing items (`med_bandage`, `med_firstaid`, `med_plasma`, `med_surgical_pack`).
 
-3. **Server-Side Subsystem & RPCs (`nyx_ui/server/phone.lua`, `server/exports.lua`)**:
-   - `GetPhoneOverview`: Aggregates citizen identity, bank balance, recent ledger transactions, active freight contract, available contract count, emergency alerts feed, and phone settings.
-   - `TransferMoney`: Double-entry atomic transfer via `nyx_treasury` with automatic transfer tax deduction to municipal treasury.
-   - `SendEmergencyAlert`: Validates payload, stores immutable alert, forwards call to `nyx_mdt` dispatch engine, and broadcasts client alert event.
-   - `GetEmergencyAlerts`: Queries active emergency broadcasts feed.
-   - `GetFreightBoard`: Queries available logistics contracts from `nyx_logistics`.
-   - `ClaimFreightContract`: Claims contract directly from phone via `nyx_logistics`.
-   - `UpdateSettings`: Updates wallpaper, dark mode, airplane mode.
-   - RPC endpoints: `phone:getOverview`, `phone:transferMoney`, `phone:getFreightBoard`, `phone:claimContract`, `phone:sendEmergencyAlert`, `phone:getEmergencyAlerts`, `phone:updateSettings`.
-   - Server exports in `server/exports.lua`.
+3. **Pure Lua 5.4 Shared Engine (`nyx_services/shared/trauma.lua`)**:
+   - `Nyx.Trauma.ValidLimbs`: Whitelist of anatomical regions (`head`, `torso`, `left_arm`, `right_arm`, `left_leg`, `right_leg`).
+   - `Nyx.Trauma.WoundTypes`: Whitelist of wound classifications (`laceration`, `ballistic`, `arterial_bleed`, `fracture`, `blunt`, `burn`).
+   - `Nyx.Trauma.BoneToLimb`: Deterministic mapping from GTA ped bone IDs to anatomical limbs.
+   - `Nyx.Trauma.CreateInitialTraumaState()`: Generates initial trauma state table (5000 mL blood, 0 pain, full limb health, no bleeding/fractures).
+   - `Nyx.Trauma.CalculateBleedRate(state)`: Calculates blood loss rate in mL/second based on active wounds, arterial bleeds, and applied tourniquets.
+   - `Nyx.Trauma.CalculateShockClass(bloodVolume)`: Determines hypovolemic shock class (Class I, II, III, IV) with physiological symptoms.
+   - `Nyx.Trauma.SimulateBloodTick(state, deltaSeconds)`: Pure function updating blood volume, applying bleed rate, and evaluating shock/unconsciousness.
+   - `Nyx.Trauma.AddWound(state, limb, woundType, severity)`: Applies localized wound, updates limb condition, and recalculates bleeding rate.
+   - `Nyx.Trauma.CanTreatLimb(state, limb, item)`: Zero-trust validation for medical item applicability on specific limbs.
+   - `Nyx.Trauma.ApplyTreatment(state, limb, item)`: Applies field stabilization effect, fixes fractures, arrests bleeding, reduces pain, and heals limb.
+   - `Nyx.Trauma.FormatTraumaDiagnosis(state)`: Generates detailed medical diagnostic summary for EMS and triage examination.
+   - Register in `FiveM/nyx_services/fxmanifest.lua`.
 
-4. **Client-Side Dispatch & UI Bridge (`nyx_ui/client/phone.lua`, `client/bridge.lua`, `client/exports.lua`)**:
-   - Client commands: `/phone`, `/smartphone`, `/citizenphone`.
-   - Key mapping: F1 for opening/closing phone.
-   - Bridge updates: parameter sanitization for phone parameters; safe NUI callbacks for `closePhone`, `phone:getOverview`, `phone:transferMoney`, `phone:getFreightBoard`, `phone:claimContract`, `phone:loadFreightPallet`, `phone:deliverContract`, `phone:abandonContract`, `phone:sendEmergencyAlert`, `phone:getEmergencyAlerts`, `phone:updateSettings`.
-   - Client exports: `OpenPhone`, `ClosePhone`, `TogglePhone`, and mapping in `OpenView`.
+4. **Server-Side Subsystem & RPCs (`nyx_services/server/trauma.lua`, `server/exports.lua`)**:
+   - In-memory trauma state management for active players with periodic debounced database sync.
+   - Character load hydration and disconnect persistence.
+   - RPC routes:
+     - `services:getTraumaState`: Fetches own trauma telemetry or nearby patient's trauma telemetry.
+     - `services:applyMedicalItem`: Validates inventory item possession, verifies distance, applies treatment, deducts item from inventory, and logs to `nyx_medical_treatments_log`.
+     - `services:diagnosePatient`: Medical examination of nearby player.
+     - `services:syncTraumaDamage`: Ingests client damage reports with server validation.
+     - `services:revivePlayer`: Integrated with `ProcessRevival` to reset trauma state.
+   - Server exports in `server/exports.lua`:
+     - `GetPlayerTraumaState`, `AddLimbDamage`, `ApplyMedicalTreatment`, `SetPlayerBloodVolume`, `DiagnosePlayerTrauma`, `ResetTraumaState`.
 
-5. **Web Single-Frame CEF SPA (`nyx_ui/web/`)**:
-   - HTML (`index.html`): Section 8H `#phone-overlay` featuring a sleek smartphone chassis (bezel, dynamic island / speaker notch, status bar with live time, WiFi, 5G, and battery), home screen app launcher grid (CivicPay, HaulExpress, CivicAlert, CivicID, Settings), and dedicated app screens for Banking, Freight Logistics, Emergency Alerts, Profile, and Settings. Also `#dev-btn-phone` in dev mode toolbar.
-   - CSS (`css/app.css`): Section 22 CEF-compliant styling strictly adhering to render budget (high-opacity dark surfaces `rgba(15, 23, 42, 0.96)`, zero GPU shaders, zero `backdrop-filter`, zero `blur()`, touch targets $\ge 40$px, WCAG AA+ contrast).
-   - JavaScript (`js/app.js`): Added `NyxState.phone` reactive state, message listeners (`PHONE_OPEN`/`PHONE_CLOSE`), app switcher state machine (`switchPhoneApp`), live balance updates, P2P transfer submission with tax calculation preview, freight contract claiming and tracking, emergency alert dispatching, escape key handling (back to home screen or close), button locking (`lockButtonAction`), and browser dev mode mock telemetry.
+5. **Client-Side Damage Listener & Debuff Loop (`nyx_services/client/trauma.lua`, `client/exports.lua`)**:
+   - Event listener: captures `CEventNetworkEntityDamage` or bone damage events, determines hit bone via `GetPedLastDamageBone`, maps to anatomical limb, and dispatches to server.
+   - Debuff execution loop:
+     - Leg injury/fracture: triggers limp animation set (`move_m@injured`).
+     - Arm injury/fracture: triggers weapon sway and handling degradation.
+     - Arterial bleed / severe blood loss: screen pulsation, vignette flash, and stumbling.
+     - Class IV hypovolemic shock (< 3000 mL): blackouts and ragdoll collapse.
+   - Commands:
+     - `/diagnose [targetId]` to perform a trauma triage check.
+     - `/treat [targetId] [limb] [item]` for field stabilization.
+   - Client exports:
+     - `GetLocalTraumaState`, `GetLimbHealth`, `IsBleeding`, `GetShockClass`.
+   - Register in `FiveM/nyx_services/fxmanifest.lua`.
 
 6. **In-Engine Integration Test (`FiveM/nyx_core/server/tests.lua`)**:
-   - Add Test 35 `Nyx.Tests.TestCitizenOSSmartphoneFramework()` covering transfer tax math, payload validation, phone formatting, priority badges, and mobile contract filtering.
-   - Wire into `RunAll()`.
+   - Test 36: `Nyx.Tests.TestAnatomicalTraumaAndInjuryEngine()`
+   - Validates bone-to-limb mapping, initial state generation, wound application, bleed rate calculations, shock classification, item treatment effects, and zero-trust validation rules.
+   - Wire into `Nyx.Tests.RunAll()`.
 
-7. **Full Verification**:
-   - Dedicated Python test suite `tests/test_citizen_os_smartphone_framework.py`.
-   - Full test suite via `pytest`.
-   - Engine syntax and asset validation via `python scripts/validator.py` and `powershell -File scripts/verify.ps1`.
+7. **Verification & Completion**:
+   - Dedicated Python test suite `tests/test_anatomical_trauma_and_injury_engine.py` (all tests passing).
+   - Full pytest regression suite.
+   - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`.
    - Update `AGENT_TASK.md` marking task completed.
 
 ## Phase Plan
-- [x] Phase 1: Test-Driven Design — Create Python test suite (`tests/test_citizen_os_smartphone_framework.py`)
-- [x] Phase 2: Database Migration — Create `040_citizen_os_smartphone_framework.sql`, register in `index.json`, mirror to `nyx_ui`
-- [x] Phase 3: Pure Lua 5.4 Shared Engine — Implement `FiveM/nyx_ui/shared/phone.lua` & update `fxmanifest.lua`
-- [x] Phase 4: Server Subsystem & RPCs — Implement `server/phone.lua`, `server/exports.lua`, update `fxmanifest.lua`
-- [x] Phase 5: Client Dispatch & UI Bridge — Implement `client/phone.lua`, update `client/bridge.lua`, and `client/exports.lua`
-- [x] Phase 6: Web Single-Frame CEF SPA — Update `index.html`, `css/app.css`, and `js/app.js`
-- [x] Phase 7: In-Engine Lua Test Suite — Implement Test 35 in `FiveM/nyx_core/server/tests.lua`
+- [x] Phase 1: Test-Driven Design — Create pytest test suite (`tests/test_anatomical_trauma_and_injury_engine.py`)
+- [x] Phase 2: Database Migration — Create `041_anatomical_trauma_and_medical_injury_engine.sql`, register in `index.json`, mirror to `nyx_services`
+- [x] Phase 3: Declarative Items — Register medical items in `FiveM/nyx_inventory/shared/items.lua`
+- [x] Phase 4: Shared Pure Lua 5.4 Trauma Engine — Implement `FiveM/nyx_services/shared/trauma.lua` & update `fxmanifest.lua`
+- [x] Phase 5: Server-Side Trauma Subsystem & RPCs — Implement `FiveM/nyx_services/server/trauma.lua`, update `server/main.lua`, `server/exports.lua`
+- [x] Phase 6: Client-Side Trauma & Debuff Subsystem — Implement `FiveM/nyx_services/client/trauma.lua`, update `client/exports.lua`, `client/main.lua`
+- [x] Phase 7: In-Engine Integration Test — Implement Test 36 in `FiveM/nyx_core/server/tests.lua` & wire into `RunAll()`
 - [x] Phase 8: Full Verification & Completion — Run pytest, validator, verify.ps1, update `AGENT_TASK.md`
