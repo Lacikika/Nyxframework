@@ -1,7 +1,8 @@
 --[[
     Nyxframework: nyx_parliament
     File: server/statutes.lua
-    Description: Authoritative legal matrix, statutory parameter boundaries, and bill formulation validator.
+    Description: Authoritative legal matrix, statutory parameter boundaries,
+                 replicated State Bag penal code sync, and bill formulation validator.
 ]]
 
 Nyx = Nyx or {}
@@ -22,36 +23,69 @@ Nyx.RPC = Nyx.RPC or {
     end
 }
 
--- Load authoritative laws into memory cache on boot
+-- Synchronize laws from database into memory and replicated State Bags
+function Nyx.Parliament.HydrateLaws()
+    local rows = MySQL.query.await("SELECT * FROM `nyx_parliament_laws`")
+    if not rows then return false end
+
+    local function parseJson(raw)
+        if type(raw) == "table" then return raw end
+        if type(raw) == "string" and #raw > 0 then
+            local ok, parsed = pcall(json.decode, raw)
+            if ok and type(parsed) == "table" then return parsed end
+        end
+        return {}
+    end
+
+    local penalCatalog = {}
+    local lawsCatalog = {}
+
+    for _, row in ipairs(rows) do
+        local lawData = {
+            id = row.law_id,
+            title = row.title,
+            category = row.category,
+            currentValue = parseJson(row.current_value),
+            minAllowed = parseJson(row.min_allowed),
+            maxAllowed = parseJson(row.max_allowed),
+            lastAmended = row.last_amended_by_session
+        }
+
+        Nyx.Parliament.Laws[row.law_id] = lawData
+        lawsCatalog[#lawsCatalog + 1] = lawData
+
+        -- Categorize into Penal Code catalog if penal infraction/misdemeanor/felony
+        if row.category:sub(1, 6) == "penal_" then
+            penalCatalog[#penalCatalog + 1] = {
+                id = row.law_id,
+                title = row.title,
+                category = row.category,
+                fine = tonumber(lawData.currentValue.fine) or 0,
+                sentenceMonths = tonumber(lawData.currentValue.months) or 0,
+                minFine = lawData.minAllowed and tonumber(lawData.minAllowed.fine) or 0,
+                maxFine = lawData.maxAllowed and tonumber(lawData.maxAllowed.fine) or 0,
+                minSentence = lawData.minAllowed and tonumber(lawData.minAllowed.months) or 0,
+                maxSentence = lawData.maxAllowed and tonumber(lawData.maxAllowed.months) or 0,
+                lastAmended = lawData.lastAmended
+            }
+        end
+    end
+
+    -- Replicate active statutes to GlobalState with 0.00ms client latency
+    GlobalState.parliamentLaws = lawsCatalog
+    GlobalState.penalCode = penalCatalog
+
+    print(string.format("^2[Nyx:Parliament] Hydrated %d statutory laws (%d penal code offenses) to GlobalState.^7",
+        #rows, #penalCatalog))
+    return true
+end
+
+-- Load authoritative laws on startup
 CreateThread(function()
     while GetResourceState("oxmysql") ~= "started" do
         Wait(50)
     end
-
-    local rows = MySQL.query.await("SELECT * FROM `nyx_parliament_laws`")
-    if rows then
-        for _, row in ipairs(rows) do
-            local function parseJson(raw)
-                if type(raw) == "table" then return raw end
-                if type(raw) == "string" and #raw > 0 then
-                    local ok, parsed = pcall(json.decode, raw)
-                    if ok and type(parsed) == "table" then return parsed end
-                end
-                return {}
-            end
-
-            Nyx.Parliament.Laws[row.law_id] = {
-                id = row.law_id,
-                title = row.title,
-                category = row.category,
-                currentValue = parseJson(row.current_value),
-                minAllowed = parseJson(row.min_allowed),
-                maxAllowed = parseJson(row.max_allowed),
-                lastAmended = row.last_amended_by_session
-            }
-        end
-        print(string.format("^2[Nyx:Parliament] Hydrated %d authoritative statutory laws and penal codes.^7", #rows))
-    end
+    Nyx.Parliament.HydrateLaws()
 end)
 
 -- Retrieve law state from memory
@@ -64,6 +98,29 @@ function Nyx.Parliament.GetLawValue(lawId, field)
     local law = Nyx.Parliament.Laws[lawId]
     if not law or not law.currentValue then return nil end
     return law.currentValue[field]
+end
+
+-- Retrieve all active penal code offenses
+function Nyx.Parliament.GetPenalCode()
+    local penal = {}
+    for id, law in pairs(Nyx.Parliament.Laws) do
+        if law.category:sub(1, 6) == "penal_" then
+            penal[#penal + 1] = {
+                id = law.id,
+                title = law.title,
+                category = law.category,
+                fine = tonumber(law.currentValue.fine) or 0,
+                sentenceMonths = tonumber(law.currentValue.months) or 0,
+                minFine = law.minAllowed and tonumber(law.minAllowed.fine) or 0,
+                maxFine = law.maxAllowed and tonumber(law.maxAllowed.fine) or 0,
+                minSentence = law.minAllowed and tonumber(law.minAllowed.months) or 0,
+                maxSentence = law.maxAllowed and tonumber(law.maxAllowed.months) or 0,
+                lastAmended = law.lastAmended
+            }
+        end
+    end
+    table.sort(penal, function(a, b) return a.id < b.id end)
+    return penal
 end
 
 -- Validate structured bill modification actions against statutory constitutional bounds
@@ -101,3 +158,8 @@ function Nyx.Parliament.ValidateBillActions(actions)
 
     return true
 end
+
+-- RPC: Query Live Penal Code
+Nyx.RPC.Register("parliament:getPenalCode", function(src)
+    return Nyx.Parliament.GetPenalCode()
+end)

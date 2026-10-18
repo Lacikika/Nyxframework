@@ -1,7 +1,8 @@
 --[[
     Nyxframework: nyx_parliament
     File: server/exports.lua
-    Description: Clean public server exports for law queries, fine retrieval, and election tabulation.
+    Description: Clean public server exports for law queries, penal code, election tabulation,
+                 and candidate management.
 ]]
 
 Nyx = Nyx or {}
@@ -24,6 +25,10 @@ exports("GetSentence", function(lawId)
     return tonumber(val) or 0
 end)
 
+exports("GetPenalCode", function()
+    return Nyx.Parliament.GetPenalCode()
+end)
+
 exports("GetSalesTaxRate", function()
     local val = Nyx.Parliament.GetLawValue("tax:sales_rate", "rate")
     return tonumber(val) or 0.08
@@ -36,4 +41,36 @@ end)
 
 exports("TabulateSession", function(sessionId)
     return Nyx.Parliament.ConcludeSession(sessionId)
+end)
+
+exports("CalculateIRV", function(ballots, candidates, options)
+    return Nyx.IRV.Tabulate(ballots, candidates, options)
+end)
+
+exports("RegisterCandidate", function(src, sessionId, displayName, party, platform)
+    return Nyx.Parliament.RegisterCandidate(src, sessionId, displayName, party, platform)
+end)
+
+exports("EndorseCandidate", function(src, candidateId)
+    return Nyx.Parliament.EndorseCandidate(src, candidateId)
+end)
+
+exports("InstateOfficial", function(officeId, citizenId, displayName, sessionId)
+    return Nyx.Parliament.InstateOfficial(officeId, citizenId, displayName, sessionId)
+end)
+
+exports("GetOfficial", function(officeId)
+    return MySQL.single.await([[
+        SELECT * FROM `nyx_parliament_officials` WHERE `office_id` = ? AND `status` = 'active'
+    ]], { officeId })
+end)
+
+exports("GetActiveOfficials", function()
+    return MySQL.query.await([[
+        SELECT * FROM `nyx_parliament_officials` WHERE `status` = 'active'
+    ]]) or {}
+end)
+
+exports("HydrateLaws", function()
+    return Nyx.Parliament.HydrateLaws()
 end)

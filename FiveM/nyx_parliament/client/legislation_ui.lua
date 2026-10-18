@@ -26,12 +26,22 @@ function Nyx.Parliament.OpenVotingUI()
             return exports['nyx_core']:TriggerRPCAwait("parliament:getLawBook", "ALL")
         end)
 
+        local okPenal, penal = pcall(function()
+            return exports['nyx_core']:TriggerRPCAwait("parliament:getPenalCode")
+        end)
+
+        local okOfficials, officials = pcall(function()
+            return exports['nyx_core']:TriggerRPCAwait("parliament:getOfficials")
+        end)
+
         Nyx.Parliament.IsOpen = true
         SetNuiFocus(true, true)
         SendNUIMessage({
             action = "OPEN_PARLIAMENT_UI",
             sessions = sessions,
-            laws = okLaws and laws or {}
+            laws = okLaws and laws or {},
+            penalCode = okPenal and penal or {},
+            officials = okOfficials and officials or {}
         })
     end)
 end
@@ -76,5 +86,43 @@ RegisterNUICallback("verifyReceipt", function(payload, cb)
 
         local result = exports['nyx_core']:TriggerRPCAwait("parliament:verifyReceipt", sessionId, receiptHash)
         cb(result or { verified = false })
+    end)
+end)
+
+RegisterNUICallback("registerCandidate", function(payload, cb)
+    CreateThread(function()
+        local result = exports['nyx_core']:TriggerRPCAwait("parliament:registerCandidate", payload)
+        cb(result or { success = false, error = "NETWORK_ERROR" })
+    end)
+end)
+
+RegisterNUICallback("endorseCandidate", function(payload, cb)
+    CreateThread(function()
+        local candidateId = payload and payload.candidateId
+        local result = exports['nyx_core']:TriggerRPCAwait("parliament:endorseCandidate", candidateId)
+        cb(result or { success = false, error = "NETWORK_ERROR" })
+    end)
+end)
+
+RegisterNUICallback("getCandidates", function(payload, cb)
+    CreateThread(function()
+        local sessionId = payload and payload.sessionId
+        local result = exports['nyx_core']:TriggerRPCAwait("parliament:getCandidates", sessionId)
+        cb(result or {})
+    end)
+end)
+
+RegisterNUICallback("fileRecallPetition", function(payload, cb)
+    CreateThread(function()
+        local result = exports['nyx_core']:TriggerRPCAwait("parliament:fileRecallPetition", payload)
+        cb(result or { success = false, error = "NETWORK_ERROR" })
+    end)
+end)
+
+RegisterNUICallback("signRecallPetition", function(payload, cb)
+    CreateThread(function()
+        local petitionId = payload and payload.petitionId
+        local result = exports['nyx_core']:TriggerRPCAwait("parliament:signRecallPetition", petitionId)
+        cb(result or { success = false, error = "NETWORK_ERROR" })
     end)
 end)

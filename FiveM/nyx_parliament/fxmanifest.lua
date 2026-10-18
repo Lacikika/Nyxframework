@@ -14,13 +14,15 @@ dependencies {
 }
 
 shared_scripts {
-    'config.lua'
+    'config.lua',
+    'shared/irv.lua'
 }
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/statutes.lua',
     'server/enactment.lua',
+    'server/elections.lua',
     'server/tabulation.lua',
     'server/voting.lua',
     'server/main.lua',

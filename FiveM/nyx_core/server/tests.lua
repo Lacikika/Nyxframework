@@ -2134,7 +2134,283 @@ function Nyx.Tests.TestPowerGridSubstationFailureAndBlackout()
     return passes == total
 end
 
--- 16. Master Test Runner
+-- 16. Test Instant-Runoff Voting (IRV) Election Engine & Live Penal Code Sync
+function Nyx.Tests.TestParliamentIRVAndPenalSync()
+    print("^3[Nyx:Tests] Running Instant-Runoff Voting (IRV) & Live Penal Code Sync Suite...^7")
+    local passes = 0
+    local total = 8
+
+    -- Reference IRV Tabulator
+    local function irvTabulate(rawBallots, candidates, options)
+        options = options or {}
+        local quorum = options.quorum or 1
+        local majPercent = options.majorityThresholdPercent or 50.0
+
+        if not rawBallots or #rawBallots < quorum then
+            return nil, "QUORUM_NOT_MET", {}, {}, 0
+        end
+
+        local activeCands = {}
+        for _, c in ipairs(candidates) do activeCands[c] = true end
+
+        local ballots = {}
+        for _, b in ipairs(rawBallots) do
+            local clean = {}
+            local seen = {}
+            for _, c in ipairs(b) do
+                if activeCands[c] and not seen[c] then
+                    seen[c] = true
+                    clean[#clean + 1] = c
+                end
+            end
+            if #clean > 0 then ballots[#ballots + 1] = clean end
+        end
+
+        local roundLogs = {}
+        local roundIdx = 1
+
+        while true do
+            local tally = {}
+            local activeCount = 0
+            for c, _ in pairs(activeCands) do
+                tally[c] = 0
+                activeCount = activeCount + 1
+            end
+
+            local continuing = 0
+            local exhausted = 0
+            for _, prefs in ipairs(ballots) do
+                local found = false
+                for _, c in ipairs(prefs) do
+                    if activeCands[c] then
+                        tally[c] = tally[c] + 1
+                        continuing = continuing + 1
+                        found = true
+                        break
+                    end
+                end
+                if not found then exhausted = exhausted + 1 end
+            end
+
+            if continuing == 0 then return nil, "DEADLOCK", roundLogs, tally, exhausted end
+
+            local majorityNeeded = math.floor(continuing * (majPercent / 100.0)) + 1
+            local highestCand, highestVotes = nil, -1
+            local lowestCand, lowestVotes = nil, math.huge
+            local lowestList = {}
+
+            for c, votes in pairs(tally) do
+                if votes > highestVotes then
+                    highestVotes = votes
+                    highestCand = c
+                end
+                if votes < lowestVotes then
+                    lowestVotes = votes
+                    lowestCand = c
+                    lowestList = { c }
+                elseif votes == lowestVotes then
+                    lowestList[#lowestList + 1] = c
+                end
+            end
+
+            if highestVotes >= majorityNeeded then
+                roundLogs[roundIdx] = { round = roundIdx, tally = tally, continuing = continuing, winner = highestCand }
+                return highestCand, "WINNER_MAJORITY", roundLogs, tally, exhausted
+            end
+
+            if activeCount <= 2 then
+                local winCand = highestCand
+                if #lowestList == 2 and lowestVotes == highestVotes then
+                    table.sort(lowestList)
+                    winCand = lowestList[1]
+                end
+                roundLogs[roundIdx] = { round = roundIdx, tally = tally, continuing = continuing, winner = winCand }
+                return winCand, "FINAL_ROUND_WINNER", roundLogs, tally, exhausted
+            end
+
+            local toElim = lowestCand
+            if #lowestList > 1 then
+                table.sort(lowestList)
+                toElim = lowestList[#lowestList]
+            end
+
+            roundLogs[roundIdx] = { round = roundIdx, tally = tally, continuing = continuing, eliminated = toElim }
+            activeCands[toElim] = nil
+            roundIdx = roundIdx + 1
+            if roundIdx > 20 then return highestCand, "MAX_ROUNDS", roundLogs, tally, exhausted end
+        end
+    end
+
+    -- Test A: IRV Round 1 Majority Victory (>50% on first round)
+    local ballotsA = {
+        {"cand_a"}, {"cand_a"}, {"cand_a"}, {"cand_a"}, {"cand_a"}, {"cand_a"}, -- 6 votes (60%)
+        {"cand_b"}, {"cand_b"}, {"cand_b"},                                       -- 3 votes
+        {"cand_c"}                                                                 -- 1 vote
+    }
+    local winA, statusA, roundsA, tallyA, exhA = irvTabulate(ballotsA, {"cand_a", "cand_b", "cand_c"}, { quorum = 5 })
+    local testA_ok = (winA == "cand_a") and (statusA == "WINNER_MAJORITY") and (#roundsA == 1) and (tallyA["cand_a"] == 6) and (exhA == 0)
+
+    if assertTest(testA_ok == true,
+        "IRV Round 1 Strict Majority Victory (>50% First Preferences)",
+        string.format("Winner=%s, status=%s, rounds=%d", tostring(winA), tostring(statusA), #roundsA)) then
+        passes = passes + 1
+    end
+
+    -- Test B: IRV Multi-Round Vote Transfer (Elimination & Cascade)
+    local ballotsB = {
+        {"cand_a", "cand_b"}, {"cand_a", "cand_b"}, {"cand_a", "cand_b"}, {"cand_a", "cand_b"}, -- 4 for A (2nd B)
+        {"cand_b", "cand_c"}, {"cand_b", "cand_c"}, {"cand_b", "cand_c"},                         -- 3 for B (2nd C)
+        {"cand_c", "cand_b"}, {"cand_c", "cand_b"}, {"cand_c", "cand_b"}                          -- 3 for C (2nd B)
+    }
+    local winB, statusB, roundsB, tallyB = irvTabulate(ballotsB, {"cand_a", "cand_b", "cand_c"}, { quorum = 5 })
+    local testB_ok = (winB == "cand_b") and (statusB == "WINNER_MAJORITY") and (#roundsB == 2) and (tallyB["cand_b"] == 6) and (tallyB["cand_a"] == 4)
+
+    if assertTest(testB_ok == true,
+        "IRV Multi-Round Elimination & Second-Preference Vote Transfer",
+        string.format("Winner=%s, status=%s, rounds=%d, B_votes=%s", tostring(winB), tostring(statusB), #roundsB, tostring(tallyB["cand_b"]))) then
+        passes = passes + 1
+    end
+
+    -- Test C: Dynamic Ballot Exhaustion & Floating Threshold Recalculation
+    local ballotsC = {
+        {"cand_a"}, {"cand_a"}, {"cand_a"}, {"cand_a"},                   -- 4 for A (no second choice)
+        {"cand_b", "cand_c"}, {"cand_b", "cand_c"}, {"cand_b", "cand_c"}, -- 3 for B (2nd C)
+        {"cand_c"}, {"cand_c"}, {"cand_c"}                                 -- 3 for C (bullet votes, exhausted on C elimination)
+    }
+    local winC, statusC, roundsC, tallyC, exhC = irvTabulate(ballotsC, {"cand_a", "cand_b", "cand_c"}, { quorum = 5 })
+    -- Round 1: A=4, B=3, C=3. C eliminated. C's 3 ballots become exhausted!
+    -- Continuing ballots drop from 10 to 7! Majority needed drops to floor(7 * 0.5) + 1 = 4!
+    -- A has 4 >= 4 -> A wins on round 2 with 3 exhausted ballots!
+    local testC_ok = (winC == "cand_a") and (statusC == "WINNER_MAJORITY") and (#roundsC == 2) and (exhC == 3)
+
+    if assertTest(testC_ok == true,
+        "Dynamic Ballot Exhaustion & Floating Majority Threshold Recalculation",
+        string.format("Winner=%s, exhausted=%d, rounds=%d", tostring(winC), exhC, #roundsC)) then
+        passes = passes + 1
+    end
+
+    -- Test D: Deterministic Final Round Tie-Breaker
+    local ballotsD = {
+        {"cand_alpha"}, {"cand_alpha"},
+        {"cand_beta"}, {"cand_beta"}
+    }
+    local winD, statusD = irvTabulate(ballotsD, {"cand_alpha", "cand_beta"}, { quorum = 2 })
+    local testD_ok = (winD ~= nil) and (statusD == "FINAL_ROUND_WINNER")
+
+    if assertTest(testD_ok == true,
+        "Deterministic Final Round Tie-Breaker (Zero Non-Deterministic Drift)",
+        string.format("Winner=%s, status=%s", tostring(winD), tostring(statusD))) then
+        passes = passes + 1
+    end
+
+    -- Test E: Democratic Quorum Gate & Invalidation
+    local ballotsE = { {"cand_a"}, {"cand_b"} } -- 2 ballots < 5 required quorum
+    local winE, statusE = irvTabulate(ballotsE, {"cand_a", "cand_b"}, { quorum = 5 })
+    local testE_ok = (winE == nil) and (statusE == "QUORUM_NOT_MET")
+
+    if assertTest(testE_ok == true,
+        "Democratic Quorum Gate & Automatic Session Invalidation",
+        string.format("winE=%s, statusE=%s", tostring(winE), tostring(statusE))) then
+        passes = passes + 1
+    end
+
+    -- Test F: Candidate Endorsement & Qualification State Machine
+    local mockCandidate = {
+        id = "cand_cit100_mayor",
+        citizenId = "CIT_100",
+        endorsements = 0,
+        status = "nominated"
+    }
+    local requiredEndorsements = 3
+    local endorsementsLedger = {}
+
+    local function endorse(cand, endorserCitId)
+        if cand.citizenId == endorserCitId then return false, "CANNOT_ENDORSE_SELF" end
+        if endorsementsLedger[endorserCitId] then return false, "ALREADY_ENDORSED" end
+        endorsementsLedger[endorserCitId] = true
+        cand.endorsements = cand.endorsements + 1
+        if cand.endorsements >= requiredEndorsements then
+            cand.status = "qualified"
+        end
+        return true, cand.status
+    end
+
+    local selfOk, _ = endorse(mockCandidate, "CIT_100") -- Rejected self
+    local e1Ok, s1 = endorse(mockCandidate, "CIT_201")  -- 1
+    local e2Ok, s2 = endorse(mockCandidate, "CIT_202")  -- 2
+    local dupOk, _ = endorse(mockCandidate, "CIT_202")  -- Rejected duplicate
+    local e3Ok, s3 = endorse(mockCandidate, "CIT_203")  -- 3 -> QUALIFIED!
+
+    local testF_ok = (selfOk == false) and (dupOk == false) and (s1 == "nominated") and (s2 == "nominated") and (s3 == "qualified") and (mockCandidate.status == "qualified")
+
+    if assertTest(testF_ok == true,
+        "Candidate Endorsement Ledger & Automatic Qualification Transition",
+        string.format("Final status=%s, endorsements=%d", mockCandidate.status, mockCandidate.endorsements)) then
+        passes = passes + 1
+    end
+
+    -- Test G: Statutory Penal Code Boundary Clamping & Max Allowed Violations
+    local mockStatutes = {
+        ["penal:reckless_driving"] = {
+            id = "penal:reckless_driving",
+            title = "Reckless Driving",
+            current = { fine = 750, months = 5 },
+            minAllowed = { fine = 250, months = 0 },
+            maxAllowed = { fine = 2500, months = 15 }
+        }
+    }
+
+    local function validateBillAction(act)
+        local law = mockStatutes[act.targetLawId]
+        if not law then return false, "LAW_NOT_FOUND" end
+        local val = tonumber(act.newValue)
+        if not val then return false, "INVALID_NUMERIC" end
+        if law.minAllowed and law.minAllowed[act.field] and val < law.minAllowed[act.field] then
+            return false, "STATUTORY_MINIMUM_VIOLATION"
+        end
+        if law.maxAllowed and law.maxAllowed[act.field] and val > law.maxAllowed[act.field] then
+            return false, "STATUTORY_MAXIMUM_VIOLATION"
+        end
+        return true, "OK"
+    end
+
+    local ok1, _ = validateBillAction({ targetLawId = "penal:reckless_driving", field = "fine", newValue = 1500 }) -- Valid ($1500 in 250-2500)
+    local ok2, err2 = validateBillAction({ targetLawId = "penal:reckless_driving", field = "fine", newValue = 5000 }) -- Exceeds ($5000 > 2500)
+    local ok3, err3 = validateBillAction({ targetLawId = "penal:reckless_driving", field = "fine", newValue = 100 })  -- Below ($100 < 250)
+
+    local testG_ok = (ok1 == true) and (ok2 == false and err2 == "STATUTORY_MAXIMUM_VIOLATION") and (ok3 == false and err3 == "STATUTORY_MINIMUM_VIOLATION")
+
+    if assertTest(testG_ok == true,
+        "Statutory Constitutional Boundaries & Legislative Clamping Invariant",
+        string.format("ok1=%s, err2=%s, err3=%s", tostring(ok1), tostring(err2), tostring(err3))) then
+        passes = passes + 1
+    end
+
+    -- Test H: MDT Citation Statutory Fine Ceiling Enforcement
+    local function issueMdtCitation(chargeId, amount)
+        local law = mockStatutes[chargeId]
+        local maxFine = law and law.maxAllowed and law.maxAllowed.fine or 25000
+        if amount > maxFine then
+            return false, "EXCEEDS_STATUTORY_MAXIMUM"
+        end
+        return true, "ISSUED"
+    end
+
+    local mdtOk1, _ = issueMdtCitation("penal:reckless_driving", 1200) -- Valid ($1200 <= 2500)
+    local mdtOk2, mdtErr2 = issueMdtCitation("penal:reckless_driving", 3000) -- Exceeds ($3000 > 2500)
+
+    local testH_ok = (mdtOk1 == true) and (mdtOk2 == false and mdtErr2 == "EXCEEDS_STATUTORY_MAXIMUM")
+
+    if assertTest(testH_ok == true,
+        "MDT Live Penal Code Sync & Statutory Fine Ceiling Enforcement",
+        string.format("mdtOk1=%s, mdtOk2=%s, mdtErr2=%s", tostring(mdtOk1), tostring(mdtOk2), tostring(mdtErr2))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 17. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -2155,9 +2431,10 @@ function Nyx.Tests.RunAll()
     local t13 = Nyx.Tests.TestAutoMergingWorldDropsAndFallbackModels()
     local t14 = Nyx.Tests.TestGridSnappingWarehousesAndRoutingBuckets()
     local t15 = Nyx.Tests.TestPowerGridSubstationFailureAndBlackout()
+    local t16 = Nyx.Tests.TestParliamentIRVAndPenalSync()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

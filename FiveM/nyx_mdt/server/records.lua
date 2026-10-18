@@ -139,6 +139,42 @@ exports['nyx_core']:RegisterRPC("mdt:issueFine", function(src, payload)
         return { success = false, error = "INVALID_PARAMETERS" }
     end
 
+    -- Enforce statutory limits from nyx_parliament if registered
+    local chargeId = payload and payload.chargeId
+    local maxAllowedFine = Config.MDT.DefaultFineLimit or 25000.00
+    local minAllowedFine = 0.0
+
+    if exports['nyx_parliament'] then
+        local targetId = chargeId or ("penal:" .. chargeTitle:lower():gsub("[^%w]", "_"))
+        local law = exports['nyx_parliament']:GetLaw(targetId)
+        if law then
+            if law.maxAllowed and law.maxAllowed.fine then
+                maxAllowedFine = tonumber(law.maxAllowed.fine) or maxAllowedFine
+            end
+            if law.minAllowed and law.minAllowed.fine then
+                minAllowedFine = tonumber(law.minAllowed.fine) or 0.0
+            end
+        end
+    end
+
+    if amount > maxAllowedFine then
+        return {
+            success = false,
+            error = "EXCEEDS_STATUTORY_MAXIMUM",
+            maxAllowed = maxAllowedFine,
+            charge = chargeTitle
+        }
+    end
+
+    if amount < minAllowedFine then
+        return {
+            success = false,
+            error = "BELOW_STATUTORY_MINIMUM",
+            minAllowed = minAllowedFine,
+            charge = chargeTitle
+        }
+    end
+
     local officer = exports['nyx_core']:GetPlayer(src)
     local officerCitId = officer and officer.citizenId or "SYSTEM"
 
@@ -210,4 +246,35 @@ exports['nyx_core']:RegisterRPC("mdt:issueFine", function(src, payload)
         amount = amount,
         targetCitizenId = targetCitizenId
     }
+end)
+
+-- 4. RPC: Query Live Penal Code Catalog
+exports['nyx_core']:RegisterRPC("mdt:getPenalCode", function(src)
+    if not Nyx.MDT.IsAuthorized(src) then
+        return { success = false, error = "UNAUTHORIZED" }
+    end
+
+    local penal = nil
+    if exports['nyx_parliament'] then
+        penal = exports['nyx_parliament']:GetPenalCode()
+    elseif GlobalState.penalCode then
+        penal = GlobalState.penalCode
+    end
+
+    return {
+        success = true,
+        penalCode = penal or {}
+    }
+end)
+
+-- 5. Event Listener: Live Penal Code & Statutory Law Sync from nyx_parliament
+RegisterNetEvent("nyx:parliament:lawsUpdated", function(actions)
+    print(string.format("^2[Nyx:MDT] Synchronized %d live statutory amendments from Parliament.^7", #(actions or {})))
+    for src, _ in pairs(Nyx.MDT.OnDutyUnits or {}) do
+        TriggerClientEvent("nyx:ui:notify", src, {
+            type = "info",
+            title = "MDT: JOGSZABÁLY MÓDOSÍTÁS",
+            message = "A Parlament új büntető törvénykönyvi és adózási rendeletet hirdetett ki. Bírsághatárok frissítve."
+        })
+    end
 end)

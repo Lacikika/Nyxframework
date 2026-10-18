@@ -30,3 +30,20 @@ RegisterNetEvent("nyx:parliament:client:newSessionPosted", function(sessionId, t
         "info"
     )
 end)
+
+-- Official Instated Broadcast
+RegisterNetEvent("nyx:parliament:client:officialInstated", function(data)
+    TriggerEvent("nyx:core:client:notify",
+        string.format("ELECTION ANNOUNCEMENT: %s has been sworn in as %s (%d-day term)!",
+            data.displayName or "A citizen", data.title or data.officeId, data.termDays or 30),
+        "success"
+    )
+end)
+
+-- Official Recalled Broadcast
+RegisterNetEvent("nyx:parliament:client:officialRecalled", function(officeId)
+    TriggerEvent("nyx:core:client:notify",
+        string.format("CIVIC NOTICE: Citizens have recalled the official holding office '%s'. Office vacated.", tostring(officeId):upper()),
+        "warning"
+    )
+end)

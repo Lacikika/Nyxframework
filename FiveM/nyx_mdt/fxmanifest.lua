@@ -41,5 +41,6 @@ dependencies {
     'nyx_ui',
     'nyx_treasury',
     'nyx_judiciary',
-    'nyx_vehicles'
+    'nyx_vehicles',
+    'nyx_parliament'
 }
