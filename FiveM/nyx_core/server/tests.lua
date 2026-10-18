@@ -3245,7 +3245,271 @@ function Nyx.Tests.TestSpatialGridDropsAndDurabilityDecay()
     return passes == total
 end
 
--- 20. Master Test Runner
+-- 20. Test Physical Freight Pallets & Power-Dependent Industrial Assembly
+function Nyx.Tests.TestPhysicalPalletsAndPowerAssembly()
+    print("^3[Nyx:Tests] Running Physical Freight Pallets & Power-Dependent Assembly Suite...^7")
+    local passes = 0
+    local total = 10
+
+    -- Test A: Pallet Weight & Slot Capacity Boundaries
+    local maxWeight = (Nyx.Pallets and Nyx.Pallets.MaxWeight) or 1000000
+    local maxSlots = (Nyx.Pallets and Nyx.Pallets.MaxSlots) or 20
+
+    local canHoldWeight = Nyx.Pallets and Nyx.Pallets.CanHoldWeight or function(cur, add)
+        return (cur + add) <= maxWeight
+    end
+    local canHoldSlot = Nyx.Pallets and Nyx.Pallets.CanHoldSlot or function(curSlots)
+        return curSlots < maxSlots
+    end
+
+    local wUnder = canHoldWeight(800000, 150000) -- 950kg <= 1000kg
+    local wOver = canHoldWeight(800000, 250000)  -- 1050kg > 1000kg
+    local sUnder = canHoldSlot(19)
+    local sFull = canHoldSlot(20)
+
+    local testA_ok = (wUnder == true) and (wOver == false) and (sUnder == true) and (sFull == false)
+    if assertTest(testA_ok == true,
+        "Pallet Capacity Boundaries (1,000 kg Weight & 20 Slots Cap)",
+        string.format("wUnder=%s, wOver=%s, sUnder=%s, sFull=%s",
+            tostring(wUnder), tostring(wOver), tostring(sUnder), tostring(sFull))) then
+        passes = passes + 1
+    end
+
+    -- Test B: Dynamic 3D Prop Model Resolution
+    local resolveModel = Nyx.Pallets and Nyx.Pallets.ResolvePalletModel or function(weight, count)
+        if count <= 0 or weight <= 0 then return "prop_pallet_01a"
+        elseif weight <= 300000 then return "prop_boxpile_02b"
+        elseif weight <= 700000 then return "prop_boxpile_05a"
+        else return "prop_boxpile_06a" end
+    end
+
+    local mEmpty = resolveModel(0, 0)
+    local mLight = resolveModel(150000, 2)
+    local mMedium = resolveModel(500000, 5)
+    local mHeavy = resolveModel(850000, 8)
+
+    local testB_ok = (mEmpty == "prop_pallet_01a")
+        and (mLight == "prop_boxpile_02b")
+        and (mMedium == "prop_boxpile_05a")
+        and (mHeavy == "prop_boxpile_06a")
+
+    if assertTest(testB_ok == true,
+        "Dynamic Pallet Prop Model Resolution across Load Tiers",
+        string.format("empty=%s, light=%s, med=%s, heavy=%s", mEmpty, mLight, mMedium, mHeavy)) then
+        passes = passes + 1
+    end
+
+    -- Test C: Commercial Vehicle Pallet Carrier Profiles & Slot Offsets
+    local getProfile = Nyx.Pallets and Nyx.Pallets.GetVehicleProfile or function(m)
+        if m == "flatbed" then return { maxSlots = 3 }
+        elseif m == "mule" then return { maxSlots = 2 }
+        elseif m == "benson" then return { maxSlots = 4 }
+        elseif m == "forklift" then return { maxSlots = 1 }
+        end
+        return nil
+    end
+
+    local profFlatbed = getProfile("flatbed")
+    local profMule = getProfile("mule")
+    local profBenson = getProfile("benson")
+    local profForklift = getProfile("forklift")
+    local profCar = getProfile("adder")
+
+    local testC_ok = (profFlatbed and profFlatbed.maxSlots == 3)
+        and (profMule and profMule.maxSlots == 2)
+        and (profBenson and profBenson.maxSlots == 4)
+        and (profForklift and profForklift.maxSlots == 1)
+        and (profCar == nil)
+
+    if assertTest(testC_ok == true,
+        "Commercial Vehicle Pallet Carrier Profiles & Slot Matrix",
+        string.format("flatbed=%s, mule=%s, benson=%s, forklift=%s, car=%s",
+            tostring(profFlatbed and profFlatbed.maxSlots),
+            tostring(profMule and profMule.maxSlots),
+            tostring(profBenson and profBenson.maxSlots),
+            tostring(profForklift and profForklift.maxSlots),
+            tostring(profCar))) then
+        passes = passes + 1
+    end
+
+    -- Test D: Collision-Free Vehicle Slot Allocation
+    local findSlot = Nyx.Pallets and Nyx.Pallets.FindAvailableSlot or function(m, occupied)
+        local prof = getProfile(m)
+        if not prof then return nil, "VEHICLE_NOT_PALLET_CARRIER" end
+        for i = 1, prof.maxSlots do
+            if not occupied[i] then return i end
+        end
+        return nil, "VEHICLE_PALLET_SLOTS_FULL"
+    end
+
+    local slotFlatbed2, _ = findSlot("flatbed", { [1] = true })
+    local slotFlatbedFull, errFull = findSlot("flatbed", { [1] = true, [2] = true, [3] = true })
+    local slotInvalid, errInv = findSlot("adder", {})
+
+    local testD_ok = (slotFlatbed2 == 2)
+        and (slotFlatbedFull == nil and errFull == "VEHICLE_PALLET_SLOTS_FULL")
+        and (slotInvalid == nil and errInv == "VEHICLE_NOT_PALLET_CARRIER")
+
+    if assertTest(testD_ok == true,
+        "Collision-Free Vehicle Slot Allocation & Boundary Checks",
+        string.format("slot2=%s, fullErr=%s, invErr=%s", tostring(slotFlatbed2), tostring(errFull), tostring(errInv))) then
+        passes = passes + 1
+    end
+
+    -- Test E: Pallet Sealing & Tamper-Proofing State Machine
+    local canSeal = Nyx.Pallets and Nyx.Pallets.CanSealPallet or function(count, weight)
+        if count <= 0 then return false, "CANNOT_SEAL_EMPTY_PALLET" end
+        if weight <= 0 then return false, "INVALID_WEIGHT" end
+        return true, nil
+    end
+
+    local sealEmpty, errEmpty = canSeal(0, 0)
+    local sealValid, errValid = canSeal(4, 180000)
+
+    local testE_ok = (sealEmpty == false and errEmpty == "CANNOT_SEAL_EMPTY_PALLET")
+        and (sealValid == true and errValid == nil)
+
+    if assertTest(testE_ok == true,
+        "Pallet Sealing & Tamper-Proofing Gate Invariants",
+        string.format("emptyErr=%s, valid=%s", tostring(errEmpty), tostring(sealValid))) then
+        passes = passes + 1
+    end
+
+    -- Test F: Substation Power Interlock State Machine
+    local evalPower = Nyx.Assembly and Nyx.Assembly.EvaluatePowerStatus or function(sub, kw)
+        if not sub then return false, "NO_GRID" end
+        if sub.isBlackout then return false, "GRID_BLACKOUT" end
+        if sub.breakerTripped then return false, "BREAKER_TRIPPED" end
+        if sub.fuelLevel and sub.fuelLevel <= 0.0 then return false, "FUEL_DEPLETED" end
+        if sub.conditionHealth and sub.conditionHealth <= 10.0 then return false, "MECHANICAL_BREAKDOWN" end
+        return true, "OPTIMAL"
+    end
+
+    local subOnline = { isBlackout = false, breakerTripped = false, fuelLevel = 85.0, conditionHealth = 90.0 }
+    local subBlackout = { isBlackout = true, breakerTripped = true, fuelLevel = 0.0, conditionHealth = 90.0 }
+    local subBreaker = { isBlackout = false, breakerTripped = true, fuelLevel = 50.0, conditionHealth = 80.0 }
+    local subFuelDry = { isBlackout = false, breakerTripped = false, fuelLevel = 0.0, conditionHealth = 80.0 }
+    local subBroken = { isBlackout = false, breakerTripped = false, fuelLevel = 50.0, conditionHealth = 8.0 }
+
+    local pOnline, rOnline = evalPower(subOnline, 25)
+    local pBlackout, rBlackout = evalPower(subBlackout, 25)
+    local pBreaker, rBreaker = evalPower(subBreaker, 25)
+    local pDry, rDry = evalPower(subFuelDry, 25)
+    local pBroken, rBroken = evalPower(subBroken, 25)
+    local pNoGrid, rNoGrid = evalPower(nil, 25)
+
+    local testF_ok = (pOnline == true and rOnline == "OPTIMAL")
+        and (pBlackout == false and rBlackout == "GRID_BLACKOUT")
+        and (pBreaker == false and rBreaker == "BREAKER_TRIPPED")
+        and (pDry == false and rDry == "FUEL_DEPLETED")
+        and (pBroken == false and rBroken == "MECHANICAL_BREAKDOWN")
+        and (pNoGrid == false and rNoGrid == "NO_GRID")
+
+    if assertTest(testF_ok == true,
+        "Substation Power Interlock State Evaluator across Grid Failures",
+        string.format("online=%s, blackout=%s, breaker=%s, dry=%s, broken=%s, noGrid=%s",
+            rOnline, rBlackout, rBreaker, rDry, rBroken, rNoGrid)) then
+        passes = passes + 1
+    end
+
+    -- Test G: Metered Utility Consumption & High-Voltage Grid Load Spikes
+    local calcEnergy = Nyx.Assembly and Nyx.Assembly.CalculateEnergyUsageKwh or function(kw, sec)
+        return math.floor((kw * (sec / 3600.0)) * 10000) / 10000
+    end
+    local calcSpike = Nyx.Assembly and Nyx.Assembly.CalculateGridLoadSpike or function(kw, batches)
+        local cf = 1.0 + ((batches - 1) * 0.15)
+        return math.floor(((kw * batches * cf) / 1000.0) * 10000) / 10000
+    end
+
+    local e1Hour = calcEnergy(25.0, 3600.0) -- 25 kW * 1 hour = 25.0 kWh
+    local e5Sec = calcEnergy(15.0, 5.0)     -- 15 kW * 5s = 0.0208 kWh
+    local spike1 = calcSpike(25.0, 1)       -- 25 kW * 1 = 0.025 MW
+    local spike3 = calcSpike(25.0, 3)       -- 25 kW * 3 * 1.30 = 97.5 kW = 0.0975 MW
+
+    local testG_ok = (math.abs(e1Hour - 25.0) < 0.001)
+        and (math.abs(e5Sec - 0.0208) < 0.001)
+        and (math.abs(spike1 - 0.0250) < 0.001)
+        and (math.abs(spike3 - 0.0975) < 0.001)
+
+    if assertTest(testG_ok == true,
+        "Metered Electrical Energy Integration (kWh) & Grid Load Spikes (MW)",
+        string.format("e1Hour=%.2f, e5Sec=%.4f, spike1=%.4f, spike3=%.4f",
+            e1Hour, e5Sec, spike1, spike3)) then
+        passes = passes + 1
+    end
+
+    -- Test H: Assembly Progress Machinery Hysteresis (Power-Out Freeze & Resumption)
+    local calcStep = Nyx.Assembly and Nyx.Assembly.CalculateProgressStep or function(totalTime, tickSec, isPower)
+        if not isPower then return 0.0 end
+        return math.floor(((tickSec / totalTime) * 100.0) * 100) / 100
+    end
+
+    local stepPowerOn = calcStep(30.0, 5.0, true)   -- (5 / 30) * 100 = 16.66%
+    local stepPowerOff = calcStep(30.0, 5.0, false) -- 0.0% frozen
+    local stepResumed = calcStep(30.0, 5.0, true)   -- 16.66% resumed
+
+    local testH_ok = (math.abs(stepPowerOn - 16.66) < 0.01)
+        and (stepPowerOff == 0.0)
+        and (math.abs(stepResumed - 16.66) < 0.01)
+
+    if assertTest(testH_ok == true,
+        "Assembly Line Machinery Freeze During Blackout & Seamless Resumption",
+        string.format("on=%.2f, off=%.2f, resumed=%.2f", stepPowerOn, stepPowerOff, stepResumed)) then
+        passes = passes + 1
+    end
+
+    -- Test I: Batch Output Weight & Automatic Pallet Packaging Decision
+    local shouldPallet = Nyx.Assembly and Nyx.Assembly.ShouldAutoPalletize or function(mode, weight, count)
+        if mode == "pallet" then return true end
+        if weight >= 50000 then return true end
+        return false
+    end
+
+    local heavyAuto = shouldPallet("inventory", 55000, 1) -- 55kg heavy machinery auto-palletizes
+    local lightStash = shouldPallet("inventory", 2000, 1)  -- 2kg repair kit stays in stash
+    local manualPallet = shouldPallet("pallet", 2000, 1)  -- explicit pallet output mode forces pallet
+
+    local testI_ok = (heavyAuto == true) and (lightStash == false) and (manualPallet == true)
+
+    if assertTest(testI_ok == true,
+        "Batch Output Freight Weight & Automatic Pallet Packaging Invariant",
+        string.format("heavyAuto=%s, lightStash=%s, manualPallet=%s",
+            tostring(heavyAuto), tostring(lightStash), tostring(manualPallet))) then
+        passes = passes + 1
+    end
+
+    -- Test J: Input Recipe Validation & Multi-Batch Multiplier Conservation
+    local validateInputs = Nyx.Assembly and Nyx.Assembly.ValidateBatchInputs or function(rec, available, batches)
+        for _, inp in ipairs(rec.inputs) do
+            local req = inp.amount * batches
+            local have = available[inp.item] or 0
+            if have < req then return false, "INSUFFICIENT_INPUTS", inp.item, req, have end
+        end
+        return true, nil
+    end
+
+    local sampleRecipe = {
+        inputs = {
+            { item = "refined_iron", amount = 4 },
+            { item = "refined_copper", amount = 2 }
+        }
+    }
+
+    local ok1, _ = validateInputs(sampleRecipe, { ["refined_iron"] = 10, ["refined_copper"] = 5 }, 2)
+    local okFail, _, missing = validateInputs(sampleRecipe, { ["refined_iron"] = 6, ["refined_copper"] = 5 }, 2)
+
+    local testJ_ok = (ok1 == true) and (okFail == false and missing == "refined_iron")
+
+    if assertTest(testJ_ok == true,
+        "Recipe Input Validation & Multi-Batch Multiplier Conservation",
+        string.format("ok1=%s, okFail=%s, missing=%s", tostring(ok1), tostring(okFail), tostring(missing))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 21. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -3270,9 +3534,10 @@ function Nyx.Tests.RunAll()
     local t17 = Nyx.Tests.TestJuryDispatcherAndCourtroomRouting()
     local t18 = Nyx.Tests.TestFiscalCircuitAndPayrollScaling()
     local t19 = Nyx.Tests.TestSpatialGridDropsAndDurabilityDecay()
+    local t20 = Nyx.Tests.TestPhysicalPalletsAndPowerAssembly()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

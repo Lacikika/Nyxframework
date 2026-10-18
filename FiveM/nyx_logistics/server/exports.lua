@@ -2,7 +2,7 @@
     Nyxframework: nyx_logistics
     File: server/exports.lua
     Description: Clean public server exports for logistics queries, localized delivery zones,
-                 elastic price calculations, and regional market indices.
+                 elastic price calculations, physical freight pallets, and industrial facilities.
 ]]
 
 Nyx = Nyx or {}
@@ -58,4 +58,42 @@ exports("TriggerRegeneration", function()
     if Nyx.Logistics.ProcessRegenerationTick then
         Nyx.Logistics.ProcessRegenerationTick()
     end
+end)
+
+-- Physical Freight Pallets
+exports("CreateFreightPallet", function(coords, heading, bucket, initialItems, citizenId, label)
+    return Nyx.Logistics.CreateFreightPallet(coords, heading, bucket, initialItems, citizenId, label)
+end)
+
+exports("AttachPalletToVehicle", function(src, palletId, vehicleNetId, targetSlot)
+    return Nyx.Logistics.AttachPalletToVehicle(src, palletId, vehicleNetId, targetSlot)
+end)
+
+exports("DetachPalletFromVehicle", function(src, palletId, targetCoords, heading)
+    return Nyx.Logistics.DetachPalletFromVehicle(src, palletId, targetCoords, heading)
+end)
+
+exports("SealPallet", function(src, palletId)
+    return Nyx.Logistics.SealPallet(src, palletId)
+end)
+
+exports("UnsealPallet", function(src, palletId)
+    return Nyx.Logistics.UnsealPallet(src, palletId)
+end)
+
+exports("GetPallet", function(palletId)
+    return Nyx.Logistics.GetPallet(palletId)
+end)
+
+exports("GetAllPallets", function()
+    return Nyx.Logistics.GetAllPallets()
+end)
+
+-- Power-Dependent Industrial Facilities
+exports("IsFacilityPowered", function(facilityId)
+    return Nyx.Logistics.IsFacilityPowered(facilityId)
+end)
+
+exports("GetFacility", function(facilityId)
+    return Nyx.Logistics.Facilities and Nyx.Logistics.Facilities[facilityId]
 end)

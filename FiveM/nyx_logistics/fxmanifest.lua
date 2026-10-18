@@ -20,6 +20,8 @@ shared_scripts {
     'shared/zones.lua',
     'shared/nodes.lua',
     'shared/recipes.lua',
+    'shared/pallets.lua',
+    'shared/assembly.lua',
     'shared/contracts.lua',
     'shared/warehouses.lua'
 }
@@ -30,6 +32,7 @@ server_scripts {
     'server/zones.lua',
     'server/nodes.lua',
     'server/facilities.lua',
+    'server/pallets.lua',
     'server/shelves.lua',
     'server/contracts.lua',
     'server/warehouses.lua',

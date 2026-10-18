@@ -83,9 +83,76 @@ Nyx.Logistics.Recipes.Registry = {
                 amount = 50
             }
         }
+    },
+    ['machinery_parts_fabrication'] = {
+        key = 'machinery_parts_fabrication',
+        label = 'Heavy Machinery & Turbine Parts',
+        facilityType = 'assembly',
+        processingTime = 35,
+        powerRequirementKw = 25,
+        inputs = {
+            { item = 'refined_iron', amount = 4 },
+            { item = 'refined_copper', amount = 2 },
+            { item = 'plastic_polymer', amount = 2 }
+        },
+        outputs = {
+            {
+                item = 'crate_machinery_parts',
+                amount = 1,
+                metadata = {
+                    quality = 1.00,
+                    durability = 100.0
+                }
+            }
+        }
+    },
+    ['industrial_fuel_refining'] = {
+        key = 'industrial_fuel_refining',
+        label = 'High-Grade Industrial Generator Fuel',
+        facilityType = 'refinery',
+        processingTime = 40,
+        powerRequirementKw = 30,
+        inputs = {
+            { item = 'crude_oil', amount = 5 },
+            { item = 'refined_iron', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'industrial_fuel',
+                amount = 1,
+                metadata = {
+                    octaneRating = 95,
+                    durability = 100.0
+                }
+            }
+        }
+    },
+    ['steel_freight_pallet'] = {
+        key = 'steel_freight_pallet',
+        label = 'Structural Steel Freight Pallet Casting',
+        facilityType = 'smelter',
+        processingTime = 45,
+        powerRequirementKw = 35,
+        inputs = {
+            { item = 'refined_iron', amount = 8 }
+        },
+        outputs = {
+            {
+                item = 'pallet_freight_steel',
+                amount = 1,
+                metadata = {
+                    reinforced = true,
+                    durability = 100.0
+                }
+            }
+        }
     }
 }
 
 function Nyx.Logistics.GetRecipe(recipeKey)
     return Nyx.Logistics.Recipes.Registry[recipeKey]
+end
+
+function Nyx.Logistics.GetAllRecipes()
+    return Nyx.Logistics.Recipes.Registry
 end
