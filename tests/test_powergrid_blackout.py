@@ -43,6 +43,106 @@ class PowerGridEngine:
     def register_substation(self, sub: MockSubstation):
         self.substations[sub.id] = sub
 
+    @staticmethod
+    def hydrate_substation_record(sub_id, db_row, cfg_sub=None):
+        cfg_sub = cfg_sub or {}
+        coords = db_row.get("coords") if db_row else cfg_sub.get("coords", (0.0, 0.0, 0.0))
+        radius = float(db_row.get("bounding_radius", cfg_sub.get("radius", 1600.0))) if db_row else float(cfg_sub.get("radius", 1600.0))
+        label = db_row.get("label") if (db_row and db_row.get("label")) else cfg_sub.get("label", "Regional Substation")
+
+        fuel_level = 100.0
+        condition_health = 100.0
+        is_blackout = False
+        breaker_tripped = False
+        failure_reason = None
+        needs_db_persist = False
+
+        if not db_row:
+            # Complete database hydration fallback from config
+            needs_db_persist = True
+        else:
+            raw_fuel = db_row.get("fuel_level")
+            raw_health = db_row.get("condition_health")
+            raw_blackout = bool(db_row.get("is_blackout", False))
+            raw_breaker = bool(db_row.get("breaker_tripped", False))
+            raw_reason = db_row.get("failure_reason")
+            if raw_reason == "":
+                raw_reason = None
+
+            is_corrupt_zero_state = (raw_fuel is None or float(raw_fuel) <= 0.0) and (raw_health is None or float(raw_health) <= 0.0) and not raw_reason
+            is_missing_fuel = (raw_fuel is None) or (float(raw_fuel) <= 0.0 and not raw_blackout and not raw_breaker and not raw_reason)
+            is_missing_health = (raw_health is None) or (float(raw_health) <= 0.0 and not raw_blackout and not raw_breaker and not raw_reason)
+
+            if is_corrupt_zero_state:
+                fuel_level = 100.0
+                condition_health = 100.0
+                is_blackout = False
+                breaker_tripped = False
+                failure_reason = None
+                needs_db_persist = True
+            else:
+                if is_missing_fuel:
+                    fuel_level = 100.0
+                    needs_db_persist = True
+                else:
+                    fuel_level = max(0.0, min(100.0, float(raw_fuel)))
+
+                if is_missing_health:
+                    condition_health = 100.0
+                    needs_db_persist = True
+                else:
+                    condition_health = max(0.0, min(100.0, float(raw_health)))
+
+                is_blackout = raw_blackout
+                breaker_tripped = raw_breaker
+                failure_reason = raw_reason
+
+        return {
+            "id": sub_id,
+            "label": label,
+            "fuel_level": fuel_level,
+            "condition_health": condition_health,
+            "is_blackout": is_blackout,
+            "breaker_tripped": breaker_tripped,
+            "failure_reason": failure_reason,
+            "coords": coords,
+            "radius": radius
+        }, needs_db_persist
+
+    def load_substations_with_fallback(self, db_rows, config_substations):
+        loaded_ids = set()
+        persisted_records = []
+
+        if db_rows:
+            for row in db_rows:
+                sub_id = row["substation_id"]
+                cfg = config_substations.get(sub_id, {})
+                rec, needs_persist = self.hydrate_substation_record(sub_id, row, cfg)
+                sub = MockSubstation(
+                    rec["id"], rec["label"], rec["coords"], rec["radius"],
+                    fuel_level=rec["fuel_level"], condition_health=rec["condition_health"],
+                    is_blackout=rec["is_blackout"], failure_reason=rec["failure_reason"],
+                    breaker_tripped=rec["breaker_tripped"]
+                )
+                self.register_substation(sub)
+                loaded_ids.add(sub_id)
+                if needs_persist:
+                    persisted_records.append(rec)
+
+        for sub_id, cfg in config_substations.items():
+            if sub_id not in loaded_ids:
+                rec, needs_persist = self.hydrate_substation_record(sub_id, None, cfg)
+                sub = MockSubstation(
+                    rec["id"], rec["label"], rec["coords"], rec["radius"],
+                    fuel_level=rec["fuel_level"], condition_health=rec["condition_health"],
+                    is_blackout=rec["is_blackout"], failure_reason=rec["failure_reason"],
+                    breaker_tripped=rec["breaker_tripped"]
+                )
+                self.register_substation(sub)
+                persisted_records.append(rec)
+
+        return persisted_records
+
     def evaluate_substation_state(self, s: MockSubstation):
         fuel_thresh = self.config["BlackoutFuelThreshold"]
         health_thresh = self.config["BlackoutHealthThreshold"]
@@ -367,3 +467,112 @@ def test_substation_diagnostics_telemetry():
     assert diag["condition_health"] == 85.0
     assert diag["is_blackout"] is False
     assert diag["estimated_runtime_hours"] == 2.0  # 60 / 0.5 = 120 mins = 2.0 hrs
+
+
+def test_substation_database_hydration_fallback_from_config():
+    """Verify cold server boot with 0 DB rows hydrates all default substations at 100% fuel and health."""
+    engine = PowerGridEngine()
+    config_substations = {
+        "grid_central_ls": {"label": "Central Los Santos Metro Substation", "coords": (711.5, -963.2, 30.4), "radius": 1600.0},
+        "grid_port_ls": {"label": "Port of Los Santos & Cypress Industrial Grid", "coords": (1072.0, -2006.0, 31.5), "radius": 1800.0},
+        "grid_rockford": {"label": "Rockford Hills & Del Perro Power Station", "coords": (-1440.0, -250.0, 48.0), "radius": 2000.0},
+        "grid_sandy_shores": {"label": "Grand Senora Desert Substation", "coords": (2732.0, 1572.0, 24.5), "radius": 2500.0},
+        "grid_paleto": {"label": "Paleto Bay & Mount Chiliad Regional Generator", "coords": (140.0, 6600.0, 31.8), "radius": 2200.0},
+    }
+
+    # Cold boot: 0 rows returned from DB
+    persisted = engine.load_substations_with_fallback([], config_substations)
+
+    assert len(engine.substations) == 5
+    assert len(persisted) == 5
+
+    for sub_id, sub in engine.substations.items():
+        assert sub.fuel_level == 100.0, f"Substation {sub_id} fuel level should be 100.0%"
+        assert sub.condition_health == 100.0, f"Substation {sub_id} health should be 100.0%"
+        assert sub.is_blackout is False, f"Substation {sub_id} should not be in blackout on cold boot"
+        assert sub.breaker_tripped is False, f"Substation {sub_id} breaker should not be tripped"
+        assert sub.failure_reason is None
+
+        powered, _ = engine.is_coords_powered(sub.coords)
+        assert powered is True, f"Substation {sub_id} sector coordinates should be energized"
+
+
+def test_substation_zero_state_blackout_cascade_protection_on_boot():
+    """Verify uninitialized 0.0% fuel/health records in DB are corrected to 100.0% to prevent blackout cascade."""
+    engine = PowerGridEngine()
+    corrupt_db_rows = [
+        {
+            "substation_id": "grid_central_ls",
+            "label": "Central Los Santos Metro Substation",
+            "coords": (711.5, -963.2, 30.4),
+            "bounding_radius": 1600.0,
+            "fuel_level": 0.0,
+            "condition_health": 0.0,
+            "is_blackout": 0,
+            "breaker_tripped": 0,
+            "failure_reason": None
+        }
+    ]
+    config_substations = {
+        "grid_central_ls": {"label": "Central Los Santos Metro Substation", "coords": (711.5, -963.2, 30.4), "radius": 1600.0}
+    }
+
+    persisted = engine.load_substations_with_fallback(corrupt_db_rows, config_substations)
+
+    sub = engine.substations["grid_central_ls"]
+    assert sub.fuel_level == 100.0
+    assert sub.condition_health == 100.0
+    assert sub.is_blackout is False
+    assert sub.breaker_tripped is False
+    assert len(persisted) == 1
+
+    # Verifying that evaluate_substation_state does NOT trigger blackout cascade
+    is_blackout = engine.evaluate_substation_state(sub)
+    assert is_blackout is False
+    assert sub.is_blackout is False
+
+
+def test_substation_genuine_outage_preservation_during_hydration():
+    """Verify intentional in-game outages (with failure reason and blackout flag) are preserved across restarts."""
+    engine = PowerGridEngine()
+    genuine_rows = [
+        {
+            "substation_id": "grid_port_ls",
+            "label": "Port Substation",
+            "coords": (1072.0, -2006.0, 31.5),
+            "bounding_radius": 1800.0,
+            "fuel_level": 0.0,
+            "condition_health": 88.0,
+            "is_blackout": 1,
+            "breaker_tripped": 1,
+            "failure_reason": "fuel_exhaustion"
+        },
+        {
+            "substation_id": "grid_rockford",
+            "label": "Rockford Substation",
+            "coords": (-1440.0, -250.0, 48.0),
+            "bounding_radius": 2000.0,
+            "fuel_level": 75.0,
+            "condition_health": 10.0,
+            "is_blackout": 1,
+            "breaker_tripped": 1,
+            "failure_reason": "mechanical_breakdown"
+        }
+    ]
+
+    persisted = engine.load_substations_with_fallback(genuine_rows, {})
+
+    port_sub = engine.substations["grid_port_ls"]
+    assert port_sub.fuel_level == 0.0
+    assert port_sub.condition_health == 88.0
+    assert port_sub.is_blackout is True
+    assert port_sub.failure_reason == "fuel_exhaustion"
+
+    rockford_sub = engine.substations["grid_rockford"]
+    assert rockford_sub.fuel_level == 75.0
+    assert rockford_sub.condition_health == 10.0
+    assert rockford_sub.is_blackout is True
+    assert rockford_sub.failure_reason == "mechanical_breakdown"
+
+    assert len(persisted) == 0, "Genuine outages should not be flagged for DB persistence/repair"
+

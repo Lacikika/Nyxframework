@@ -2391,7 +2391,7 @@ end
 function Nyx.Tests.TestPowerGridSubstationFailureAndBlackout()
     print("^3[Nyx:Tests] Running Regional Power Grid Substation Failure & Blackout Simulation Suite...^7")
     local passes = 0
-    local total = 6
+    local total = 8
 
     local mockConfig = {
         FuelConsumptionPerMinute = 0.50,
@@ -2633,6 +2633,119 @@ function Nyx.Tests.TestPowerGridSubstationFailureAndBlackout()
     if assertTest(contractDispatched == true and contractFulfilled == true,
         "Emergency Logistics Hauling Contract Dispatching & Replenishment Lifecycle",
         "Substation failure failed to dispatch emergency logistics contract or fulfill on restock") then
+        passes = passes + 1
+    end
+
+    -- Test G: Database Hydration Fallback from Config (100% Default Starting State)
+    local function hydrateSubRecord(subId, dbRow, cfgSub)
+        cfgSub = cfgSub or {}
+        local coords = { x = 0.0, y = 0.0, z = 0.0 }
+        if dbRow and dbRow.coords then
+            coords = dbRow.coords
+        elseif cfgSub and cfgSub.coords then
+            coords = cfgSub.coords
+        end
+        local fuelLevel = 100.00
+        local conditionHealth = 100.00
+        local isBlackout = false
+        local breakerTripped = false
+        local failureReason = nil
+        local needsDbPersist = false
+
+        if not dbRow then
+            needsDbPersist = true
+        else
+            local rawFuel = tonumber(dbRow.fuel_level)
+            local rawHealth = tonumber(dbRow.condition_health)
+            local rawBlackout = (tonumber(dbRow.is_blackout) == 1)
+            local rawBreaker = (tonumber(dbRow.breaker_tripped) == 1)
+            local rawReason = dbRow.failure_reason
+            if rawReason == "" then rawReason = nil end
+
+            local isCorruptZeroState = (rawFuel == nil or rawFuel <= 0.00) and (rawHealth == nil or rawHealth <= 0.00) and (not rawReason)
+            local isMissingFuel = (rawFuel == nil) or (rawFuel <= 0.00 and not rawBlackout and not rawBreaker and not rawReason)
+            local isMissingHealth = (rawHealth == nil) or (rawHealth <= 0.00 and not rawBlackout and not rawBreaker and not rawReason)
+
+            if isCorruptZeroState then
+                fuelLevel = 100.00
+                conditionHealth = 100.00
+                isBlackout = false
+                breakerTripped = false
+                failureReason = nil
+                needsDbPersist = true
+            else
+                if isMissingFuel then
+                    fuelLevel = 100.00
+                    needsDbPersist = true
+                else
+                    fuelLevel = math.max(0.00, math.min(100.00, rawFuel))
+                end
+
+                if isMissingHealth then
+                    conditionHealth = 100.00
+                    needsDbPersist = true
+                else
+                    conditionHealth = math.max(0.00, math.min(100.00, rawHealth))
+                end
+
+                isBlackout = rawBlackout
+                breakerTripped = rawBreaker
+                failureReason = rawReason
+            end
+        end
+
+        return {
+            id = subId,
+            fuelLevel = fuelLevel,
+            conditionHealth = conditionHealth,
+            isBlackout = isBlackout,
+            breakerTripped = breakerTripped,
+            failureReason = failureReason,
+            coords = coords
+        }, needsDbPersist
+    end
+
+    local cfgSample = { label = "Central LS", coords = { x = 711.5, y = -963.2, z = 30.4 }, radius = 1600.0 }
+    local fallbackRec, fallbackNeedsPersist = hydrateSubRecord("grid_central_ls", nil, cfgSample)
+    local testG_ok = (fallbackRec.fuelLevel == 100.00) and (fallbackRec.conditionHealth == 100.00) and
+                     (fallbackRec.isBlackout == false) and (fallbackRec.breakerTripped == false) and
+                     (fallbackNeedsPersist == true)
+
+    if assertTest(testG_ok == true,
+        "Database Hydration Fallback from Config (100% Default Starting State)",
+        "Missing database record did not initialize with 100% fuel/health or omitted persist flag") then
+        passes = passes + 1
+    end
+
+    -- Test H: Zero-State Blackout Cascade Protection on Startup
+    local corruptRow = {
+        substation_id = "grid_port_ls",
+        fuel_level = 0.00,
+        condition_health = 0.00,
+        is_blackout = 0,
+        breaker_tripped = 0,
+        failure_reason = nil
+    }
+    local healedRec, healedNeedsPersist = hydrateSubRecord("grid_port_ls", corruptRow, cfgSample)
+    local testH_healedOk = (healedRec.fuelLevel == 100.00) and (healedRec.conditionHealth == 100.00) and
+                           (healedRec.isBlackout == false) and (healedNeedsPersist == true)
+
+    local genuineOutageRow = {
+        substation_id = "grid_port_ls",
+        fuel_level = 0.00,
+        condition_health = 85.00,
+        is_blackout = 1,
+        breaker_tripped = 1,
+        failure_reason = "fuel_exhaustion"
+    }
+    local outageRec, outageNeedsPersist = hydrateSubRecord("grid_port_ls", genuineOutageRow, cfgSample)
+    local testH_outagePreserved = (outageRec.fuelLevel == 0.00) and (outageRec.conditionHealth == 85.00) and
+                                  (outageRec.isBlackout == true) and (outageRec.failureReason == "fuel_exhaustion") and
+                                  (outageNeedsPersist == false)
+
+    if assertTest(testH_healedOk == true and testH_outagePreserved == true,
+        "Zero-State Blackout Cascade Protection & Genuine Outage Preservation",
+        "Corrupt zero-state failed to heal or genuine failure was improperly overwritten") then
         passes = passes + 1
     end
 

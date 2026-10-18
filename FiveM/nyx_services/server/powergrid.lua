@@ -94,44 +94,187 @@ local function checkEmergencyLogisticsContracts(s)
     end
 end
 
--- 1. Initialize and load all regional substations from database
-function Nyx.Services.LoadSubstations()
-    local rows = MySQL.query.await("SELECT * FROM `nyx_services_substations`")
-    if rows then
-        for _, r in ipairs(rows) do
-            local coords = { x = 0.0, y = 0.0, z = 0.0 }
-            if type(r.coords) == "string" then
-                local ok, parsed = pcall(json.decode, r.coords)
-                if ok and type(parsed) == "table" then coords = parsed end
-            elseif type(r.coords) == "table" then
-                coords = r.coords
+-- 1. Authoritative Pure Substation Hydration Evaluator
+-- Handles DB row decoding and enforces database hydration fallback:
+-- Default / uninitialized substations start at 100.0% fuel and turbine integrity.
+function Nyx.Services.HydrateSubstationRecord(subId, dbRow, cfgSub)
+    cfgSub = cfgSub or (Config.PowerGrid and Config.PowerGrid.Substations and Config.PowerGrid.Substations[subId]) or {}
+
+    local coords = { x = 0.0, y = 0.0, z = 0.0 }
+    if dbRow and dbRow.coords then
+        if type(dbRow.coords) == "string" then
+            local ok, parsed = pcall(json.decode, dbRow.coords)
+            if ok and type(parsed) == "table" then coords = parsed end
+        elseif type(dbRow.coords) == "table" then
+            coords = dbRow.coords
+        end
+    elseif cfgSub and cfgSub.coords then
+        coords = { x = cfgSub.coords.x, y = cfgSub.coords.y, z = cfgSub.coords.z }
+    end
+
+    local vecCoords = vector3(coords.x or 0.0, coords.y or 0.0, coords.z or 0.0)
+    local tCoords = (cfgSub and cfgSub.transformerCoords) or vecCoords
+    local radius = tonumber(dbRow and dbRow.bounding_radius) or (cfgSub and cfgSub.radius) or 1600.00
+    local label = (dbRow and dbRow.label) or (cfgSub and cfgSub.label) or "Regional Substation"
+    local districts = (cfgSub and cfgSub.connectedDistricts) or "Municipal Grid"
+    local peakMw = tonumber(dbRow and dbRow.peak_load_mw) or 45.00
+    local totalBlackouts = tonumber(dbRow and dbRow.total_blackouts_count) or 0
+
+    local fuelLevel = 100.00
+    local conditionHealth = 100.00
+    local isBlackout = false
+    local breakerTripped = false
+    local failureReason = nil
+    local blackoutStartedAt = nil
+    local needsDbPersist = false
+
+    if not dbRow then
+        -- Complete database hydration fallback from Config:
+        -- Default substation starts at 100.0% fuel and turbine integrity.
+        needsDbPersist = true
+    else
+        local rawFuel = tonumber(dbRow.fuel_level)
+        local rawHealth = tonumber(dbRow.condition_health)
+        local rawBlackout = (tonumber(dbRow.is_blackout) == 1)
+        local rawBreaker = (tonumber(dbRow.breaker_tripped) == 1)
+        local rawReason = dbRow.failure_reason
+        if rawReason == "" then rawReason = nil end
+
+        -- Check for zero-state cascade bug on startup:
+        -- Substation initialized with 0.0% fuel and health (or missing/nil values) without an intentional in-game failure reason
+        local isCorruptZeroState = (rawFuel == nil or rawFuel <= 0.00) and (rawHealth == nil or rawHealth <= 0.00) and (not rawReason)
+        local isMissingFuel = (rawFuel == nil) or (rawFuel <= 0.00 and not rawBlackout and not rawBreaker and not rawReason)
+        local isMissingHealth = (rawHealth == nil) or (rawHealth <= 0.00 and not rawBlackout and not rawBreaker and not rawReason)
+
+        if isCorruptZeroState then
+            -- Reset corrupt zero-state to healthy 100% baseline
+            fuelLevel = 100.00
+            conditionHealth = 100.00
+            isBlackout = false
+            breakerTripped = false
+            failureReason = nil
+            needsDbPersist = true
+        else
+            if isMissingFuel then
+                fuelLevel = 100.00
+                needsDbPersist = true
+            else
+                fuelLevel = math.max(0.00, math.min(100.00, rawFuel))
             end
 
-            local cfgSub = Config.PowerGrid.Substations[r.substation_id]
+            if isMissingHealth then
+                conditionHealth = 100.00
+                needsDbPersist = true
+            else
+                conditionHealth = math.max(0.00, math.min(100.00, rawHealth))
+            end
 
-            Nyx.Services.Substations[r.substation_id] = {
-                id = r.substation_id,
-                label = r.label or (cfgSub and cfgSub.label) or "Regional Substation",
-                fuelLevel = tonumber(r.fuel_level) or 100.00,
-                conditionHealth = tonumber(r.condition_health) or 100.00,
-                isBlackout = (tonumber(r.is_blackout) == 1),
-                failureReason = r.failure_reason,
-                blackoutStartedAt = r.blackout_started_at,
-                peakLoadMw = tonumber(r.peak_load_mw) or 45.00,
-                breakerTripped = (tonumber(r.breaker_tripped) == 1),
-                totalBlackoutsCount = tonumber(r.total_blackouts_count) or 0,
-                coords = vector3(coords.x, coords.y, coords.z),
-                radius = tonumber(r.bounding_radius) or (cfgSub and cfgSub.radius) or 1600.00,
-                transformerCoords = (cfgSub and cfgSub.transformerCoords) or vector3(coords.x, coords.y, coords.z),
-                connectedDistricts = (cfgSub and cfgSub.connectedDistricts) or "Municipal Grid"
-            }
+            isBlackout = rawBlackout
+            breakerTripped = rawBreaker
+            failureReason = rawReason
+            blackoutStartedAt = dbRow.blackout_started_at
         end
+    end
 
-        syncGlobalGridState()
+    local record = {
+        id = subId,
+        label = label,
+        fuelLevel = fuelLevel,
+        conditionHealth = conditionHealth,
+        isBlackout = isBlackout,
+        failureReason = failureReason,
+        blackoutStartedAt = blackoutStartedAt,
+        peakLoadMw = peakMw,
+        breakerTripped = breakerTripped,
+        totalBlackoutsCount = totalBlackouts,
+        coords = vecCoords,
+        radius = radius,
+        transformerCoords = tCoords,
+        connectedDistricts = districts
+    }
 
-        if Config.Debug then
-            print(string.format("^2[Nyx:Services]^7 Loaded %d regional substations from database.^7", #rows))
+    return record, needsDbPersist
+end
+
+-- 2. Initialize and load all regional substations from database with config fallback
+function Nyx.Services.LoadSubstations()
+    local rows = MySQL.query.await("SELECT * FROM `nyx_services_substations`")
+    local loadedFromDb = {}
+
+    if rows and #rows > 0 then
+        for _, r in ipairs(rows) do
+            local cfgSub = Config.PowerGrid.Substations and Config.PowerGrid.Substations[r.substation_id]
+            local record, needsDbPersist = Nyx.Services.HydrateSubstationRecord(r.substation_id, r, cfgSub)
+
+            Nyx.Services.Substations[r.substation_id] = record
+            loadedFromDb[r.substation_id] = true
+
+            if needsDbPersist then
+                MySQL.prepare.await([[
+                    UPDATE `nyx_services_substations`
+                    SET `fuel_level` = ?,
+                        `condition_health` = ?,
+                        `is_blackout` = ?,
+                        `breaker_tripped` = ?,
+                        `failure_reason` = ?
+                    WHERE `substation_id` = ?
+                ]], {
+                    record.fuelLevel,
+                    record.conditionHealth,
+                    record.isBlackout and 1 or 0,
+                    record.breakerTripped and 1 or 0,
+                    record.failureReason,
+                    r.substation_id
+                })
+            end
         end
+    end
+
+    -- Database Hydration Fallback: ensure all default substations from Config exist and start at 100%
+    if Config.PowerGrid and Config.PowerGrid.Substations then
+        for subId, cfgSub in pairs(Config.PowerGrid.Substations) do
+            if not loadedFromDb[subId] then
+                local record, _ = Nyx.Services.HydrateSubstationRecord(subId, nil, cfgSub)
+                Nyx.Services.Substations[subId] = record
+
+                local coordsJson = json.encode({ x = record.coords.x, y = record.coords.y, z = record.coords.z })
+
+                MySQL.prepare.await([[
+                    INSERT INTO `nyx_services_substations`
+                        (`substation_id`, `label`, `fuel_level`, `condition_health`, `is_blackout`, `coords`, `bounding_radius`, `peak_load_mw`, `breaker_tripped`, `total_blackouts_count`)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        `fuel_level` = VALUES(`fuel_level`),
+                        `condition_health` = VALUES(`condition_health`),
+                        `is_blackout` = VALUES(`is_blackout`),
+                        `breaker_tripped` = VALUES(`breaker_tripped`)
+                ]], {
+                    subId,
+                    record.label,
+                    record.fuelLevel,
+                    record.conditionHealth,
+                    record.isBlackout and 1 or 0,
+                    coordsJson,
+                    record.radius,
+                    record.peakLoadMw,
+                    record.breakerTripped and 1 or 0,
+                    record.totalBlackoutsCount
+                })
+
+                if Config.Debug then
+                    print(string.format("^3[Nyx:Services] Hydrated missing default substation '%s' (100.0%% fuel, 100.0%% integrity).^7", subId))
+                end
+            end
+        end
+    end
+
+    syncGlobalGridState()
+
+    local count = 0
+    for _ in pairs(Nyx.Services.Substations) do count = count + 1 end
+
+    if Config.Debug then
+        print(string.format("^2[Nyx:Services]^7 Loaded %d regional substations from database / config fallback.^7", count))
     end
 end
 

@@ -30,7 +30,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
   - **Issue:** Server boot throws `attempt to index a nil value (field 'RPC')` at `inactivity.lua:295` and `inactivity.lua:329`.
   - **Fix:** Replace direct uninitialized `Nyx.RPC` calls with `exports['nyx_core']:RegisterRPC` or ensure kernel RPC table reference is hydrated before event listeners bind.
 
-- [ ] **Hotfix: Substation Zero-State Blackout Cascade on Startup (`nyx_services`)**
+- [x] **Hotfix: Substation Zero-State Blackout Cascade on Startup (`nyx_services`)**
   - **Issue:** Power grid substations initialize with `0.0%` fuel and health on server boot, triggering a city-wide blackout cascade immediately.
   - **Fix:** Update database hydration fallback in `server/powergrid.lua` to ensure default substations start at `100.0%` fuel and turbine integrity.
 
@@ -107,6 +107,17 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Hotfix: Substation Zero-State Blackout Cascade on Startup (`nyx_services`)**
+  - **Authoritative Hydration Evaluator & Database Fallback (`nyx_services/server/powergrid.lua`, `nyx_services/server/exports.lua`)**:
+    - Created pure hydration evaluator `Nyx.Services.HydrateSubstationRecord(subId, dbRow, cfgSub)` implementing resilient decoding of spatial coordinates, bounding radii, and transformer connection metadata.
+    - Added automated database hydration fallback: on cold boot with empty or missing database records, automatically hydrates default substations from `Config.PowerGrid.Substations` initialized at `100.0%` fuel level and `100.0%` turbine condition health, persisting records to `nyx_services_substations` via `INSERT INTO ... ON DUPLICATE KEY UPDATE`.
+    - Added zero-state corruption protection: detects uninitialized database records (`fuel_level <= 0.0` and `condition_health <= 0.0` without an active in-game failure reason) and heals them to `100.0%` baseline, preventing premature blackout cascades across the municipal grid on server boot while strictly preserving genuine in-game outages (`fuel_exhaustion`, `mechanical_breakdown`, `sabotage`, `overload_trip`).
+    - Added clean public server export `HydrateSubstationRecord` in `nyx_services/server/exports.lua`.
+  - **Testing & In-Engine Verification**:
+    - Expanded in-engine integration test suite `Nyx.Tests.TestPowerGridSubstationFailureAndBlackout()` (Test 15) in `FiveM/nyx_core/server/tests.lua` with Test G (Config hydration fallback ensuring 100% initial levels and DB persist flag) and Test H (Zero-state blackout cascade healing vs. genuine outage preservation), increasing passing assertions from 6 to 8.
+    - Updated standalone Python test suite `tests/test_powergrid_blackout.py` with `hydrate_substation_record`, `load_substations_with_fallback`, and 3 new dedicated test cases: `test_substation_database_hydration_fallback_from_config`, `test_substation_zero_state_blackout_cascade_protection_on_boot`, and `test_substation_genuine_outage_preservation_during_hydration`.
+    - Full pytest suite: 223/223 tests passing (100% pass rate).
+    - Verified clean passes across all 14 resources, 204 Lua files, and all 32 SQL migrations via `scripts/validator.py` and `scripts/verify.ps1`.
 - **[2026-10-18] Hotfix: Resolve Nil RPC Reference in Inactivity Handlers (`nyx_factions` & `nyx_properties`)**
   - **Kernel RPC Bridge & Handler Initialization (`nyx_factions/server/inactivity.lua`, `nyx_factions/server/permissions.lua`, `nyx_properties/server/inactivity.lua`, `nyx_properties/server/main.lua`)**:
     - Replaced direct uninitialized `Nyx.RPC.Register` calls in `nyx_factions/server/inactivity.lua` (`factions:setFactionStewardDelegate`, `factions:getFactionInactivityStatus`) and `nyx_properties/server/inactivity.lua` (`properties:registerStewardDelegate`, `properties:revokeStewardDelegate`, `properties:assignPropertySteward`, `properties:getMyStewardship`, `properties:getInactivityAuditLogs`) with direct `exports['nyx_core']:RegisterRPC` calls.

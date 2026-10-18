@@ -48,6 +48,10 @@ exports("GetSubstationDiagnostics", function(substationId)
     return Nyx.Services.GetSubstationDiagnostics(substationId)
 end)
 
+exports("HydrateSubstationRecord", function(subId, dbRow, cfgSub)
+    return Nyx.Services.HydrateSubstationRecord(subId, dbRow, cfgSub)
+end)
+
 -- Metered Utility Billing
 exports("RegisterUtilityMeter", function(meterId, ownerCitId, substationId, propertyType)
     return Nyx.Services.RegisterMeter(meterId, ownerCitId, substationId, propertyType)
