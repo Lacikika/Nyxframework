@@ -16,8 +16,12 @@ function Nyx.Buckets.SetLimbo(src)
 
     -- Isolate network traffic and disable NPC/traffic population
     SetPlayerRoutingBucket(tostring(sourceNum), virtualBucket)
-    SetRoutingBucketPopulationEnabled(virtualBucket, false)
-    SetRoutingBucketEntityWipe(virtualBucket, true)
+    if SetRoutingBucketPopulationEnabled then
+        SetRoutingBucketPopulationEnabled(virtualBucket, false)
+    end
+    if SetRoutingBucketEntityLockdownMode then
+        SetRoutingBucketEntityLockdownMode(virtualBucket, "strict")
+    end
     if Player and Player(sourceNum) and Player(sourceNum).state then
         Player(sourceNum).state.routingBucket = virtualBucket
     end
@@ -80,7 +84,11 @@ end
 function Nyx.Buckets.ConfigureBucket(bucketId, populationEnabled, entityWipe)
     local bucketNum = tonumber(bucketId)
     if not bucketNum then return end
-    SetRoutingBucketPopulationEnabled(bucketNum, populationEnabled == true)
-    SetRoutingBucketEntityWipe(bucketNum, entityWipe == true)
+    if SetRoutingBucketPopulationEnabled then
+        SetRoutingBucketPopulationEnabled(bucketNum, populationEnabled == true)
+    end
+    if SetRoutingBucketEntityLockdownMode then
+        SetRoutingBucketEntityLockdownMode(bucketNum, entityWipe == true and "strict" or "relaxed")
+    end
 end
 

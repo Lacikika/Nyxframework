@@ -122,9 +122,11 @@ CreateThread(function()
             Nyx.Warehouses.Buckets[bucket] = row.warehouse_id
 
             -- Configure Virtual Routing Bucket (zero ambient population, preserve manual entities)
-            if exports['nyx_core'] and exports['nyx_core'].SetRoutingBucket then
+            if SetRoutingBucketPopulationEnabled then
                 SetRoutingBucketPopulationEnabled(bucket, false)
-                SetRoutingBucketEntityWipe(bucket, false)
+            end
+            if SetRoutingBucketEntityLockdownMode then
+                SetRoutingBucketEntityLockdownMode(bucket, "relaxed")
             end
         end
     end
