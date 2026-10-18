@@ -168,34 +168,50 @@ function Container:getSnapshot()
 end
 
 -- Apply time-based item degradation
-function Container:applyDecay(deltaSeconds)
+function Container:applyDecay(deltaSeconds, envFactor)
     local hasDecayed = false
     local now = os.time()
+    deltaSeconds = tonumber(deltaSeconds) or 0
+    if deltaSeconds <= 0 then return end
 
     for slot, item in pairs(self.items) do
-        if item and type(item.metadata) == "table" and item.metadata.durability then
-            local decayRate = tonumber(item.metadata.decayRate) or 0.0
-            if decayRate > 0 and item.metadata.durability > 0 then
-                local loss = (deltaSeconds / 3600.0) * decayRate * 100.0
-                local newDurability = math.max(0.0, math.floor((item.metadata.durability - loss) * 10) / 10)
-
-                if newDurability ~= item.metadata.durability then
-                    item.metadata.durability = newDurability
-                    hasDecayed = true
-
-                    -- Check spoilage for food/drink
-                    local itemDef = Nyx.Items.Get(item.item_id)
-                    if itemDef and (itemDef.type == "food" or itemDef.type == "drink") and newDurability <= 0.0 then
-                        item.metadata.isSpoiled = true
+        if item and type(item.metadata) == "table" then
+            local decayed, prevDur, newDur, statusChanged, status = false, 0, 0, false, nil
+            if Nyx.Decay and Nyx.Decay.ApplyDecayToItem then
+                decayed, prevDur, newDur, statusChanged, status = Nyx.Decay.ApplyDecayToItem(item, deltaSeconds, self.type, envFactor)
+            else
+                local decayRate = tonumber(item.metadata.decayRate) or 0.0
+                local curDur = tonumber(item.metadata.durability) or 100.0
+                if decayRate > 0 and curDur > 0 then
+                    local loss = (deltaSeconds / 3600.0) * decayRate * 100.0
+                    newDur = math.max(0.0, math.floor((curDur - loss) * 10) / 10)
+                    if newDur ~= curDur then
+                        item.metadata.durability = newDur
+                        decayed = true
+                        local itemDef = Nyx.Items.Get(item.item_id)
+                        if itemDef and (itemDef.type == "food" or itemDef.type == "drink") and newDur <= 0.0 then
+                            item.metadata.isSpoiled = true
+                        end
                     end
                 end
+            end
+
+            if decayed then
+                hasDecayed = true
             end
         end
     end
 
+    self.lastDecayAt = now
+
     if hasDecayed then
         self:markDirty()
         self:broadcastDelta("DECAY_UPDATE", self:getSnapshot())
+
+        -- Check ground drop dissolution if all items in the world drop decayed to 0
+        if self.type == "drop" and Nyx.Drops and Nyx.Drops.CheckDecayDissolution then
+            Nyx.Drops.CheckDecayDissolution(self.id)
+        end
     end
 end
 
@@ -206,16 +222,18 @@ function Container:save()
     -- 1. Update container header
     queries[#queries + 1] = {
         query = [[
-            INSERT INTO `nyx_inventories` (`id`, `type`, `max_weight`, `max_slots`, `coords`)
-            VALUES (?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE `max_weight` = VALUES(`max_weight`), `max_slots` = VALUES(`max_slots`), `coords` = VALUES(`coords`)
+            INSERT INTO `nyx_inventories` (`id`, `type`, `max_weight`, `max_slots`, `coords`, `grid_cell`, `last_decay_at`)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE `max_weight` = VALUES(`max_weight`), `max_slots` = VALUES(`max_slots`), `coords` = VALUES(`coords`), `grid_cell` = VALUES(`grid_cell`), `last_decay_at` = VALUES(`last_decay_at`)
         ]],
         values = {
             self.id,
             self.type,
             self.maxWeight,
             self.maxSlots,
-            self.coords and json.encode(self.coords) or nil
+            self.coords and json.encode(self.coords) or nil,
+            self.gridCell,
+            self.lastDecayAt or os.time()
         }
     }
 
@@ -289,6 +307,8 @@ function Nyx.Inventory.Get(invId, autoCreateType, defaultCoords)
     end
 
     local container = Nyx.Inventory.NewContainer(record.id, record.type, record.max_weight, record.max_slots, coords)
+    container.gridCell = record.grid_cell
+    container.lastDecayAt = tonumber(record.last_decay_at) or 0
 
     -- Load Items
     local itemRows = MySQL.query.await("SELECT * FROM `nyx_inventory_items` WHERE `inventory_id` = ? ORDER BY `slot` ASC", { invId })
@@ -309,6 +329,15 @@ function Nyx.Inventory.Get(invId, autoCreateType, defaultCoords)
                 metadata = meta
             }
         end
+    end
+
+    -- Real-time offline catch-up decay
+    local lastDecay = tonumber(record.last_decay_at) or 0
+    local now = os.time()
+    if lastDecay > 0 and (now - lastDecay) >= 60 then
+        container:applyDecay(now - lastDecay)
+    else
+        container.lastDecayAt = now
     end
 
     if container.type == "player" then

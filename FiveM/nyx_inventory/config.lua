@@ -93,8 +93,25 @@ Config.DropFallbackModels = {
     }
 }
 
+-- Spatial Partitioning Grid Engine
+Config.SpatialGridCellSize = 64.0 -- 64x64 meter spatial grid partition cells
+
 -- Degradation & Decay Engine
 Config.DecayInterval = 300 -- 5 minutes per decay evaluation tick
+Config.GroundDropLifetime = 7200 -- 2 hours before unattended fully degraded world drops dissolve
+Config.DecayMultipliers = {
+    ['drop']     = 2.0,  -- Open world terrain, rain, weathering (2.0x faster)
+    ['player']   = 1.0,  -- Carried in personal pockets/backpack (1.0x baseline)
+    ['trunk']    = 0.75, -- Vehicle trunk (0.75x sheltered)
+    ['glovebox'] = 0.75, -- Vehicle glovebox (0.75x sheltered)
+    ['stash']    = 0.50  -- Climate-controlled indoor safe/warehouse (0.50x preserved)
+}
+
+-- Item Repair & Maintenance Configuration
+Config.RepairConfig = {
+    baseGain = 35.0,    -- Base durability restored per repair action (+35.0%)
+    wearPenalty = 2.0   -- Fatigue reduction on maxDurability per repair cycle (-2.0%)
+}
 
 -- World Item Hologram Placement
 Config.Placement = {

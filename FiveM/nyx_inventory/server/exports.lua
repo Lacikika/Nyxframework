@@ -254,3 +254,53 @@ exports("SyncPlayerWeight", function(src)
     return true
 end)
 
+-- Query nearby ground drops using spatial grid partitioning
+exports("GetNearbyGroundDrops", function(coords, radius, bucket)
+    if Nyx.Drops and Nyx.Drops.GetDropsInRadius then
+        return Nyx.Drops.GetDropsInRadius(coords, radius, bucket)
+    end
+    return {}
+end)
+
+-- Query spatial partitioning grid statistics
+exports("GetSpatialGridStats", function()
+    if Nyx.SpatialGrid and Nyx.SpatialGrid.GetStats then
+        return Nyx.SpatialGrid.GetStats()
+    end
+    return { totalCells = 0, totalDrops = 0 }
+end)
+
+-- Programmatic item repair export
+exports("RepairItem", function(invId, targetSlot, toolSlot)
+    local container = Nyx.Inventory.Get(invId)
+    if not container then return false, "CONTAINER_NOT_FOUND" end
+
+    local targetItem = container:getItem(targetSlot)
+    local toolItem = container:getItem(toolSlot)
+    if not targetItem or not toolItem then return false, "ITEM_NOT_FOUND" end
+
+    if not Nyx.Decay or not Nyx.Decay.CanRepairItem(targetItem) then
+        return false, "NOT_REPAIRABLE"
+    end
+
+    local gain, newDur, newMaxDur = Nyx.Decay.CalculateRepairGain(targetItem, toolItem)
+    if gain <= 0 then return false, "ALREADY_MAX_DURABILITY" end
+
+    targetItem.metadata.durability = newDur
+    targetItem.metadata.maxDurability = newMaxDur
+    targetItem.metadata.isBroken = false
+    targetItem.metadata.lastDecay = os.time()
+    container:setItem(targetSlot, targetItem)
+
+    if toolItem.amount <= 1 then
+        container:removeItem(toolSlot)
+    else
+        toolItem.amount = toolItem.amount - 1
+        container:setItem(toolSlot, toolItem)
+    end
+
+    container:save()
+    return true, newDur, gain
+end)
+
+

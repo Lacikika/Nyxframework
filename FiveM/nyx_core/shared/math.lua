@@ -490,7 +490,108 @@ function Nyx.Math.IsPointInPolygon(point, polygonPoints)
 end
 
 --------------------------------------------------------------------------------
--- 7. PUBLIC RUNTIME EXPORTS
+-- 7. SPATIAL GRID PARTITIONING & HASHING
+--------------------------------------------------------------------------------
+
+--- Converts 2D world coordinates to spatial grid integer cell indices.
+--- @param x number X coordinate.
+--- @param y number Y coordinate.
+--- @param cellSize number? Size of grid cell in meters (default 64.0).
+--- @return integer cellX, integer cellY
+function Nyx.Math.CoordsToCell(x, y, cellSize)
+    cellSize = tonumber(cellSize) or 64.0
+    if cellSize <= 0.0 then cellSize = 64.0 end
+    return math_floor((tonumber(x) or 0.0) / cellSize), math_floor((tonumber(y) or 0.0) / cellSize)
+end
+
+--- Generates a deterministic string key for a spatial cell and virtual routing bucket.
+--- @param cellX integer Cell X index.
+--- @param cellY integer Cell Y index.
+--- @param bucket integer? Routing bucket ID (default 0).
+--- @return string Formatted cell key "cellX:cellY:bucket".
+function Nyx.Math.GetCellKey(cellX, cellY, bucket)
+    return string.format("%d:%d:%d", math_floor(tonumber(cellX) or 0), math_floor(tonumber(cellY) or 0), math_floor(tonumber(bucket) or 0))
+end
+
+--- Resolves the cell key directly from coordinate table or vector.
+--- @param coords any {x, y, z} or vector3.
+--- @param cellSize number?
+--- @param bucket integer?
+--- @return string cellKey, integer cellX, integer cellY
+function Nyx.Math.GetCellKeyFromCoords(coords, cellSize, bucket)
+    local v = Nyx.Math.ToVector2(coords)
+    local cx, cy = Nyx.Math.CoordsToCell(v.x, v.y, cellSize)
+    return Nyx.Math.GetCellKey(cx, cy, bucket), cx, cy
+end
+
+--- Retrieves an array of neighbor cell keys within a given cell radius (Moore neighborhood).
+--- For radiusCells = 1, returns 9 cell keys (center + 8 surrounding cells).
+--- @param cellX integer Center cell X.
+--- @param cellY integer Center cell Y.
+--- @param bucket integer? Routing bucket.
+--- @param radiusCells integer? Radius in cells (default 1).
+--- @return table Array of string cell keys.
+function Nyx.Math.GetNeighborCellKeys(cellX, cellY, bucket, radiusCells)
+    local cx = math_floor(tonumber(cellX) or 0)
+    local cy = math_floor(tonumber(cellY) or 0)
+    bucket = math_floor(tonumber(bucket) or 0)
+    radiusCells = math_max(0, math_floor(tonumber(radiusCells) or 1))
+
+    local keys = {}
+    for dx = -radiusCells, radiusCells do
+        for dy = -radiusCells, radiusCells do
+            keys[#keys + 1] = Nyx.Math.GetCellKey(cx + dx, cy + dy, bucket)
+        end
+    end
+    return keys
+end
+
+--- Computes all cell keys covering a circular area of given radius around center coordinates.
+--- @param centerX number Center X.
+--- @param centerY number Center Y.
+--- @param radius number Radius in meters.
+--- @param cellSize number? Cell size (default 64.0).
+--- @param bucket integer? Routing bucket (default 0).
+--- @return table Array of string cell keys.
+function Nyx.Math.GetCellsInRadius(centerX, centerY, radius, cellSize, bucket)
+    cellSize = tonumber(cellSize) or 64.0
+    if cellSize <= 0.0 then cellSize = 64.0 end
+    radius = math_max(0.0, tonumber(radius) or 0.0)
+    bucket = math_floor(tonumber(bucket) or 0)
+
+    local minCx = math_floor((centerX - radius) / cellSize)
+    local maxCx = math_floor((centerX + radius) / cellSize)
+    local minCy = math_floor((centerY - radius) / cellSize)
+    local maxCy = math_floor((centerY + radius) / cellSize)
+
+    local keys = {}
+    for cx = minCx, maxCx do
+        for cy = minCy, maxCy do
+            keys[#keys + 1] = Nyx.Math.GetCellKey(cx, cy, bucket)
+        end
+    end
+    return keys
+end
+
+--- Returns world coordinate boundaries for a spatial grid cell.
+--- @param cellX integer Cell X index.
+--- @param cellY integer Cell Y index.
+--- @param cellSize number? Cell size (default 64.0).
+--- @return number minX, number maxX, number minY, number maxY
+function Nyx.Math.GetCellBounds(cellX, cellY, cellSize)
+    cellSize = tonumber(cellSize) or 64.0
+    if cellSize <= 0.0 then cellSize = 64.0 end
+    local cx = math_floor(tonumber(cellX) or 0)
+    local cy = math_floor(tonumber(cellY) or 0)
+    local minX = cx * cellSize
+    local maxX = minX + cellSize
+    local minY = cy * cellSize
+    local maxY = minY + cellSize
+    return minX, maxX, minY, maxY
+end
+
+--------------------------------------------------------------------------------
+-- 8. PUBLIC RUNTIME EXPORTS
 --------------------------------------------------------------------------------
 
 exports("GetMath", function()
@@ -548,3 +649,24 @@ end)
 exports("IsPointInBox", function(pt, center, dim, heading)
     return Nyx.Math.IsPointInBox(pt, center, dim, heading)
 end)
+
+exports("CoordsToCell", function(x, y, cellSize)
+    return Nyx.Math.CoordsToCell(x, y, cellSize)
+end)
+
+exports("GetCellKey", function(cx, cy, bucket)
+    return Nyx.Math.GetCellKey(cx, cy, bucket)
+end)
+
+exports("GetNeighborCellKeys", function(cx, cy, bucket, radius)
+    return Nyx.Math.GetNeighborCellKeys(cx, cy, bucket, radius)
+end)
+
+exports("GetCellsInRadius", function(cx, cy, rad, cellSize, bucket)
+    return Nyx.Math.GetCellsInRadius(cx, cy, rad, cellSize, bucket)
+end)
+
+exports("GetCellBounds", function(cx, cy, cellSize)
+    return Nyx.Math.GetCellBounds(cx, cy, cellSize)
+end)
+

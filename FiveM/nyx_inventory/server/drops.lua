@@ -74,12 +74,21 @@ function Nyx.Drops.Create(coords, itemData, rotation, modelOverride, routingBuck
 
     container:save()
 
-    -- Persist rotation, model, routing_bucket, and shelf_node_id to database
-    MySQL.query("UPDATE `nyx_inventories` SET `rotation` = ?, `model` = ?, `routing_bucket` = ?, `shelf_node_id` = ? WHERE `id` = ?", {
+    -- Index into authoritative spatial partitioning grid
+    local cellKey = nil
+    if Nyx.SpatialGrid and Nyx.SpatialGrid.Insert then
+        cellKey = Nyx.SpatialGrid.Insert(dropId, safeCoords, safeBucket)
+    end
+
+    local now = os.time()
+    -- Persist rotation, model, routing_bucket, shelf_node_id, grid_cell, and last_decay_at to database
+    MySQL.query("UPDATE `nyx_inventories` SET `rotation` = ?, `model` = ?, `routing_bucket` = ?, `shelf_node_id` = ?, `grid_cell` = ?, `last_decay_at` = ? WHERE `id` = ?", {
         json.encode(safeRotation),
         model,
         safeBucket,
         safeShelfNode,
+        cellKey,
+        now,
         dropId
     })
 
@@ -89,15 +98,17 @@ function Nyx.Drops.Create(coords, itemData, rotation, modelOverride, routingBuck
         rotation = safeRotation,
         model = model,
         routingBucket = safeBucket,
-        shelfNodeId = safeShelfNode
+        shelfNodeId = safeShelfNode,
+        gridCell = cellKey,
+        lastDecayAt = now
     }
 
     -- Broadcast to clients within streaming range
-    TriggerClientEvent("nyx:inventory:client:dropCreated", -1, dropId, safeCoords, safeRotation, model, safeBucket, safeShelfNode)
+    TriggerClientEvent("nyx:inventory:client:dropCreated", -1, dropId, safeCoords, safeRotation, model, safeBucket, safeShelfNode, cellKey)
 
     if Config.Debug then
-        print(string.format("^2[Nyx:Drops] Created world drop '%s' [%s] at (%.2f, %.2f, %.2f) h:%.1f bucket:%d shelf:%s^7",
-            dropId, model, safeCoords.x, safeCoords.y, safeCoords.z, safeRotation.heading, safeBucket, tostring(safeShelfNode)))
+        print(string.format("^2[Nyx:Drops] Created world drop '%s' [%s] at (%.2f, %.2f, %.2f) h:%.1f bucket:%d cell:%s shelf:%s^7",
+            dropId, model, safeCoords.x, safeCoords.y, safeCoords.z, safeRotation.heading, safeBucket, tostring(cellKey), tostring(safeShelfNode)))
     end
 
     return dropId
@@ -126,25 +137,34 @@ function Nyx.Drops.Update(dropId, coords, rotation, shelfNodeId)
     drop.coords = safeCoords
     drop.rotation = safeRotation
 
+    -- Update spatial grid position and cell index
+    local cellKey = nil
+    if Nyx.SpatialGrid and Nyx.SpatialGrid.Update then
+        cellKey = Nyx.SpatialGrid.Update(dropId, safeCoords, drop.routingBucket or 0)
+    end
+    drop.gridCell = cellKey
+
     local container = Nyx.Inventories[dropId]
     if container then
         container.coords = safeCoords
+        container.gridCell = cellKey
     end
 
     -- Update database record
-    MySQL.query("UPDATE `nyx_inventories` SET `coords` = ?, `rotation` = ?, `shelf_node_id` = ? WHERE `id` = ?", {
+    MySQL.query("UPDATE `nyx_inventories` SET `coords` = ?, `rotation` = ?, `shelf_node_id` = ?, `grid_cell` = ? WHERE `id` = ?", {
         json.encode(safeCoords),
         json.encode(safeRotation),
         drop.shelfNodeId,
+        cellKey,
         dropId
     })
 
     -- Broadcast position update to all clients
-    TriggerClientEvent("nyx:inventory:client:dropMoved", -1, dropId, safeCoords, safeRotation, drop.shelfNodeId)
+    TriggerClientEvent("nyx:inventory:client:dropMoved", -1, dropId, safeCoords, safeRotation, drop.shelfNodeId, cellKey)
 
     if Config.Debug then
-        print(string.format("^2[Nyx:Drops] Moved world drop '%s' to (%.2f, %.2f, %.2f) h:%.1f shelf:%s^7",
-            dropId, safeCoords.x, safeCoords.y, safeCoords.z, safeRotation.heading, tostring(drop.shelfNodeId)))
+        print(string.format("^2[Nyx:Drops] Moved world drop '%s' to (%.2f, %.2f, %.2f) h:%.1f cell:%s shelf:%s^7",
+            dropId, safeCoords.x, safeCoords.y, safeCoords.z, safeRotation.heading, tostring(cellKey), tostring(drop.shelfNodeId)))
     end
 
     return true
@@ -198,51 +218,76 @@ function Nyx.Drops.FindAutoMergeTarget(coords, itemData, maxDist, excludeDropId)
     local bestIdenticalDropId, bestIdenticalDist = nil, 999.0
     local bestCompatibleDropId, bestCompatibleDist = nil, 999.0
 
-    for dropId, drop in pairs(Nyx.Drops) do
-        if dropId ~= excludeDropId and drop.coords then
-            local dx = drop.coords.x - cx
-            local dy = drop.coords.y - cy
-            local dz = drop.coords.z - cz
-            local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+    local candidates = {}
+    local bucket = (coords.routingBucket or coords.bucket or 0)
 
-            if dist <= maxDist then
-                local container = Nyx.Inventory.Get(dropId)
-                if container and container.type == "drop" and container:canHoldWeight(neededWeight) then
-                    local hasSlotSpace = false
-                    local hasIdenticalItem = false
+    if Nyx.SpatialGrid and Nyx.SpatialGrid.GetNearbyDrops then
+        local nearby = Nyx.SpatialGrid.GetNearbyDrops(coords, maxDist, bucket)
+        for _, n in ipairs(nearby) do
+            if n.dropId ~= excludeDropId and Nyx.Drops[n.dropId] then
+                candidates[#candidates + 1] = {
+                    dropId = n.dropId,
+                    drop = Nyx.Drops[n.dropId],
+                    dist = n.distance
+                }
+            end
+        end
+    else
+        for dropId, drop in pairs(Nyx.Drops) do
+            if dropId ~= excludeDropId and drop.coords then
+                local dx = drop.coords.x - cx
+                local dy = drop.coords.y - cy
+                local dz = drop.coords.z - cz
+                local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+                if dist <= maxDist then
+                    candidates[#candidates + 1] = {
+                        dropId = dropId,
+                        drop = drop,
+                        dist = dist
+                    }
+                end
+            end
+        end
+    end
 
-                    if itemData and itemData.item_id then
-                        local itemDef = Nyx.Items and Nyx.Items.Get and Nyx.Items.Get(itemData.item_id)
-                        local isStackable = itemDef and itemDef.stackable
-                        local maxStack = itemDef and itemDef.maxStack or 100
+    for _, cand in ipairs(candidates) do
+        local dropId = cand.dropId
+        local dist = cand.dist
+        local container = Nyx.Inventory.Get(dropId)
+        if container and container.type == "drop" and container:canHoldWeight(neededWeight) then
+            local hasSlotSpace = false
+            local hasIdenticalItem = false
 
-                        for slot = 1, container.maxSlots do
-                            local it = container.items[slot]
-                            if it and it.item_id == itemData.item_id then
-                                hasIdenticalItem = true
-                                if isStackable and (tonumber(it.amount) or 0) < maxStack then
-                                    hasSlotSpace = true
-                                    break
-                                end
-                            end
-                        end
+            if itemData and itemData.item_id then
+                local itemDef = Nyx.Items and Nyx.Items.Get and Nyx.Items.Get(itemData.item_id)
+                local isStackable = itemDef and itemDef.stackable
+                local maxStack = itemDef and itemDef.maxStack or 100
 
-                        if not hasSlotSpace and container:findFirstEmptySlot() ~= nil then
+                for slot = 1, container.maxSlots do
+                    local it = container.items[slot]
+                    if it and it.item_id == itemData.item_id then
+                        hasIdenticalItem = true
+                        if isStackable and (tonumber(it.amount) or 0) < maxStack then
                             hasSlotSpace = true
+                            break
                         end
-                    else
-                        hasSlotSpace = (container:findFirstEmptySlot() ~= nil)
                     end
+                end
 
-                    if hasSlotSpace then
-                        if hasIdenticalItem and dist < bestIdenticalDist then
-                            bestIdenticalDropId = dropId
-                            bestIdenticalDist = dist
-                        elseif not hasIdenticalItem and dist < bestCompatibleDist then
-                            bestCompatibleDropId = dropId
-                            bestCompatibleDist = dist
-                        end
-                    end
+                if not hasSlotSpace and container:findFirstEmptySlot() ~= nil then
+                    hasSlotSpace = true
+                end
+            else
+                hasSlotSpace = (container:findFirstEmptySlot() ~= nil)
+            end
+
+            if hasSlotSpace then
+                if hasIdenticalItem and dist < bestIdenticalDist then
+                    bestIdenticalDropId = dropId
+                    bestIdenticalDist = dist
+                elseif not hasIdenticalItem and dist < bestCompatibleDist then
+                    bestCompatibleDropId = dropId
+                    bestCompatibleDist = dist
                 end
             end
         end
@@ -373,6 +418,11 @@ function Nyx.Drops.Remove(dropId)
         end)
     end
 
+    -- Remove from authoritative spatial grid
+    if Nyx.SpatialGrid and Nyx.SpatialGrid.Remove then
+        Nyx.SpatialGrid.Remove(dropId)
+    end
+
     Nyx.Drops[dropId] = nil
     Nyx.Inventories[dropId] = nil
     Nyx.DirtyInventories[dropId] = nil
@@ -382,7 +432,7 @@ function Nyx.Drops.Remove(dropId)
     TriggerClientEvent("nyx:inventory:client:dropRemoved", -1, dropId)
 
     if Config.Debug then
-        print(string.format("^3[Nyx:Drops] Removed empty ground drop '%s'^7", dropId))
+        print(string.format("^3[Nyx:Drops] Removed ground drop '%s'^7", dropId))
     end
 end
 
@@ -407,6 +457,68 @@ function Nyx.Drops.CheckCleanup(dropId)
     end
 end
 
+-- Check and dissolve ground drop if all items are fully degraded/broken/spoiled or empty
+function Nyx.Drops.CheckDecayDissolution(dropId)
+    local drop = Nyx.Drops[dropId]
+    local container = Nyx.Inventories[dropId]
+    if not drop or not container or container.type ~= "drop" then return false end
+
+    local itemCount = 0
+    local nonDecayedCount = 0
+
+    for _, item in pairs(container.items) do
+        if item then
+            itemCount = itemCount + 1
+            local dur = item.metadata and tonumber(item.metadata.durability)
+            if dur and dur > 0.0 and not item.metadata.isSpoiled and not item.metadata.isBroken and not item.metadata.isExpired then
+                nonDecayedCount = nonDecayedCount + 1
+            end
+        end
+    end
+
+    -- If drop has items and ALL of them have reached 0% durability (or container is completely empty)
+    if itemCount == 0 or nonDecayedCount == 0 then
+        if Config.Debug then
+            print(string.format("^3[Nyx:Drops] Dissolving fully degraded ground drop '%s' (items: %d, non-decayed: %d)^7",
+                dropId, itemCount, nonDecayedCount))
+        end
+
+        -- Log dissolution event
+        MySQL.query("INSERT INTO `nyx_inventory_decay_logs` (`inventory_id`, `item_id`, `event_type`, `previous_durability`, `new_durability`, `delta_seconds`, `container_type`) VALUES (?, ?, ?, ?, ?, ?, ?)", {
+            dropId, "all", "dissolve", 0.0, 0.0, 0, "drop"
+        })
+
+        Nyx.Drops.Remove(dropId)
+        return true
+    end
+
+    return false
+end
+
+-- Query drops within radius using spatial grid partitioning
+function Nyx.Drops.GetDropsInRadius(coords, radius, bucket)
+    if Nyx.SpatialGrid and Nyx.SpatialGrid.GetNearbyDrops then
+        return Nyx.SpatialGrid.GetNearbyDrops(coords, radius, bucket)
+    end
+
+    local results = {}
+    local cx, cy, cz = tonumber(coords.x) or 0.0, tonumber(coords.y) or 0.0, tonumber(coords.z) or 0.0
+    radius = tonumber(radius) or 10.0
+    bucket = tonumber(bucket) or 0
+    for id, drop in pairs(Nyx.Drops) do
+        if (drop.routingBucket or 0) == bucket and drop.coords then
+            local dx = drop.coords.x - cx
+            local dy = drop.coords.y - cy
+            local dz = drop.coords.z - cz
+            local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+            if dist <= radius then
+                results[#results + 1] = { dropId = id, distance = dist, coords = drop.coords }
+            end
+        end
+    end
+    return results
+end
+
 -- Synchronize active drops to connecting or streaming clients, strictly isolated by Routing Bucket
 RegisterNetEvent("nyx:inventory:server:requestDrops", function()
     local src = source
@@ -424,13 +536,41 @@ RegisterNetEvent("nyx:inventory:server:requestDrops", function()
     TriggerClientEvent("nyx:inventory:client:syncDrops", src, dropList)
 end)
 
+-- Request drops residing in specific spatial grid cells (Interest Management)
+RegisterNetEvent("nyx:inventory:server:requestCellDrops", function(cellKeys)
+    local src = source
+    if type(cellKeys) ~= "table" then return end
+
+    local playerBucket = 0
+    if exports['nyx_core'] and exports['nyx_core'].GetRoutingBucket then
+        playerBucket = exports['nyx_core']:GetRoutingBucket(src) or 0
+    end
+
+    local dropList = {}
+    local seen = {}
+    for _, cellKey in ipairs(cellKeys) do
+        local dropIds = Nyx.SpatialGrid.GetDropsInCell(cellKey)
+        for _, id in ipairs(dropIds) do
+            if not seen[id] then
+                seen[id] = true
+                local d = Nyx.Drops[id]
+                if d and (d.routingBucket or 0) == playerBucket then
+                    dropList[#dropList + 1] = d
+                end
+            end
+        end
+    end
+
+    TriggerClientEvent("nyx:inventory:client:syncCellDrops", src, dropList)
+end)
+
 -- Bootstrap and recover existing world drops from database on resource boot
 CreateThread(function()
     while GetResourceState("oxmysql") ~= "started" do
         Wait(100)
     end
 
-    local rows = MySQL.query.await("SELECT `id`, `coords`, `rotation`, `model`, `routing_bucket`, `shelf_node_id` FROM `nyx_inventories` WHERE `type` = 'drop'")
+    local rows = MySQL.query.await("SELECT `id`, `coords`, `rotation`, `model`, `routing_bucket`, `shelf_node_id`, `grid_cell`, `last_decay_at` FROM `nyx_inventories` WHERE `type` = 'drop'")
     if rows then
         for _, row in ipairs(rows) do
             if row.coords then
@@ -447,20 +587,29 @@ CreateThread(function()
                     local bucket = tonumber(row.routing_bucket) or 0
                     local shelfNode = (row.shelf_node_id and row.shelf_node_id ~= "") and row.shelf_node_id or nil
 
+                    -- Index into spatial grid
+                    local cellKey = row.grid_cell
+                    if Nyx.SpatialGrid and Nyx.SpatialGrid.Insert then
+                        cellKey = Nyx.SpatialGrid.Insert(row.id, parsedCoords, bucket)
+                    end
+
                     Nyx.Drops[row.id] = {
                         id = row.id,
                         coords = parsedCoords,
                         rotation = (okRot and parsedRot and parsedRot.heading) and parsedRot or { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 },
                         model = dropModel or Config.DropModel or "prop_paper_bag_small",
                         routingBucket = bucket,
-                        shelfNodeId = shelfNode
+                        shelfNodeId = shelfNode,
+                        gridCell = cellKey,
+                        lastDecayAt = tonumber(row.last_decay_at) or 0
                     }
                     -- Preload container
                     Nyx.Inventory.Get(row.id)
                 end
             end
         end
-        print(string.format("^2[Nyx:Drops] Recovered %d persistent world drops from database.^7", #rows))
+        print(string.format("^2[Nyx:Drops] Recovered %d persistent world drops from database into spatial grid.^7", #rows))
     end
 end)
+
 

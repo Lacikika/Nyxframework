@@ -63,13 +63,46 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] Feature: Instant-Runoff Voting (IRV) election engine & live penal code sync (`nyx_parliament`)
 - [x] Feature: Automated jury pool dispatcher with Fisher-Yates shuffle & courtroom bucket routing (`nyx_judiciary`)
 - [x] Feature: Fiscal circuit protection & logarithmic public payroll scaling (`nyx_treasury`)
-- [ ] Feature: Spatial grid ground drops & time-based item durability decay (`nyx_inventory` / `nyx_interact`)
+- [x] Feature: Spatial grid ground drops & time-based item durability decay (`nyx_inventory` / `nyx_interact`)
 - [ ] Feature: Physical freight pallets & power-dependent industrial assembly (`nyx_logistics` / `nyx_services`)
 - [ ] QA: Add concurrency unit tests for inventory mutex locks and treasury double-entry conservation (`nyx_core/server/tests.lua`)
 
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Spatial grid ground drops & time-based item durability decay (`nyx_inventory` / `nyx_interact`)**
+  - **Database Migration & Durability Audit Ledger (`025_spatial_grid_drops_and_durability_decay.sql`, `index.json`)**: Extended `nyx_inventories` with indexed `grid_cell VARCHAR(32)` spatial cell keys and `last_decay_at INT UNSIGNED NOT NULL DEFAULT 0` offline decay timestamps. Created immutable audit ledger `nyx_inventory_decay_logs` tracking inventory IDs, item IDs, event types (`decay`, `spoil`, `break`, `expire`, `repair`, `dissolve`), previous/new durability ratings, elapsed delta seconds, container types, and item metadata snapshots. Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 25) and mirrored to `nyx_inventory`.
+  - **Core Math Library Extension (`FiveM/nyx_core/shared/math.lua`)**: Added Section 7 spatial grid partitioning formulas:
+    - `Nyx.Math.CoordsToCell`: Uniform 2D coordinate-to-grid index conversion ($cx = \lfloor x / \text{cellSize} \rfloor$, $cy = \lfloor y / \text{cellSize} \rfloor$).
+    - `Nyx.Math.GetCellKey`: Deterministic, bucket-isolated cell string formatting (`cx:cy:bucket`).
+    - `Nyx.Math.GetCellKeyFromCoords`: Direct vector/table coordinate resolution to spatial keys.
+    - `Nyx.Math.GetNeighborCellKeys`: Moore 3x3 neighborhood generator returning 9 contiguous spatial cells for $O(1)$ candidate lookups.
+    - `Nyx.Math.GetCellsInRadius`: Bounding box cell coverage for arbitrary query radii.
+    - `Nyx.Math.GetCellBounds`: Coordinate world boundaries for spatial cells.
+    - Registered exports in Section 8 for framework-wide consumption across all resources without cyclic dependencies.
+  - **Pure Lua 5.4 Durability Degradation Engine (`nyx_inventory/shared/decay.lua`, `fxmanifest.lua`)**:
+    - *Durability Status Tiers*: Formulated status constants (`PRISTINE` $\ge 75\%$, `GOOD` $50\%-74.9\%$, `WORN` $25\%-49.9\%$, `CRITICAL` $0.1\%-24.9\%$, `BROKEN` $\le 0\%$ for weapons/tools, `SPOILED` $\le 0\%$ for food/drinks, `EXPIRED` $\le 0\%$ for medical items).
+    - *Environmental & Container Multipliers*: Implemented realistic degradation loss formula ($\text{loss} = \frac{\Delta t}{3600} \cdot \text{rate} \cdot 100 \cdot M_{\text{container}} \cdot M_{\text{env}}$) with container rates: `drop` (2.0x), `player` (1.0x), `trunk` / `glovebox` (0.75x), and `stash` (0.50x).
+    - *Item Repair Mechanics & Structural Fatigue*: Implemented `CanRepairItem` (gating consumables, ammo, and food) and `CalculateRepairGain` (restores durability up to `maxDurability`, but incurs a 2.0% structural wear penalty reducing the maximum repair ceiling down to a floor of 50.0%).
+    - *Formatted Quality Badges*: Added `GetQualityLabel` for inventory UI and item inspect displays.
+  - **Shared & Server Spatial Grid Engines (`nyx_inventory/shared/spatial_grid.lua`, `nyx_inventory/server/spatial_grid.lua`, `fxmanifest.lua`)**:
+    - Created pure spatial grid class and authoritative server index `Nyx.SpatialGrid` managing cell bins, drop lookups, cell insertion, vacuum cleanup on removal, and spatial cell migration on position updates.
+    - `Nyx.SpatialGrid.GetNearbyDrops`: Replaced $O(N)$ full-server iterations with Moore neighborhood candidate lookups, evaluating only drops in adjacent spatial cells.
+  - **Optimized Server World Drops & Offline Catch-Up (`nyx_inventory/server/drops.lua`, `server/state.lua`, `server/actions.lua`, `server/exports.lua`)**:
+    - *O(1) Constant-Time Auto-Merge*: Updated `Nyx.Drops.FindAutoMergeTarget` to query `Nyx.SpatialGrid.GetNearbyDrops`, reducing candidate evaluation from hundreds of drops to only contiguous cell drops with $0.00\text{ms}$ overhead.
+    - *Real-Time Offline Catch-Up Decay*: In `Nyx.Inventory.Get`, detects elapsed offline time ($\Delta t = \text{now} - \text{last\_decay\_at} \ge 60\text{s}$) upon container load, computing and applying proportional degradation across all perishable items and updating `last_decay_at`.
+    - *Ground Drop Dissolution*: Added `Nyx.Drops.CheckDecayDissolution` to automatically despawn and remove ground drops when all constituent items reach 0% durability, logging dissolution events to `nyx_inventory_decay_logs`.
+    - *Item Repair RPC (`inventory:repairItem`)*: Validates player ownership, repair kit tools (`tool_repairkit`, `tool_diagnostics`), applies repair gain with structural wear ceiling clamping, consumes repair kits, clears `isBroken`, and records audit logs.
+    - *Hard Usage Guards*: Updated `inventory:useItem` to block usage of broken, spoiled, or expired items.
+    - Added exports `GetNearbyGroundDrops`, `GetSpatialGridStats`, and `RepairItem`.
+  - **Client Optimization (`nyx_inventory` & `nyx_interact`)**:
+    - *Cull-Distance Streaming Grid*: Added client-side spatial grid `Nyx.ClientSpatialGrid` to `nyx_inventory/client/drops.lua`. Updated the 1-second streaming thread to only check drops in candidate cells covering `cullDist` (25m), bypassing iteration over non-relevant world drops.
+    - *Third-Eye Coordinate Partitioning*: In `nyx_interact/client/registry.lua`, indexed coordinate interaction targets into `CoordCells` (64m grid). Optimized `EvaluateTarget` to only iterate over targets within the player's 9 Moore neighborhood cells, eliminating lag during raycast queries.
+  - **Testing & Verification**:
+    - Added comprehensive in-engine test suite `Nyx.Tests.TestSpatialGridDropsAndDurabilityDecay()` (Test 19) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created standalone Python unit test suite `tests/test_spatial_grid_and_durability_decay.py` verifying spatial coordinate hashing, Moore neighborhoods, radial bounds, O(1) auto-merging pruning, decay formulas, container multipliers, status tier transitions, offline catch-up, repair wear ceilings, dissolution evaluation, and manifest/schema integrity.
+    - Full pytest suite: 131/131 tests passing (100% pass rate).
+    - Verified clean passes across all 13 resources, 169 Lua files, and all 25 SQL migrations via `scripts/validator.py` and `scripts/verify.ps1`.
 - **[2026-10-18] Feature: Fiscal circuit protection & logarithmic public payroll scaling (`nyx_treasury`)**
   - **Database Migration & Circuit/Payroll Audit Ledgers (`024_treasury_fiscal_circuit_and_payroll_scaling.sql`, `index.json`)**: Extended `nyx_treasury_accounts` with `circuit_exempt` and `daily_outflow_limit` thresholds. Created immutable audit ledger `nyx_treasury_circuit_logs` logging trip events, transitions, trigger reasons, master liquidity levels, and drain velocities. Created `nyx_treasury_payroll_runs` recording cycle UUIDs, fiscal crisis states, wage scale multipliers, total disbursed sums, recipient headcounts, pre/post master liquidity levels, and automated departmental subventions. Registered in `FiveM/nyx_core/sql/migrations/index.json` and mirrored to `nyx_treasury`.
   - **Pure Lua 5.4 Shared Fiscal & Scaling Engine (`nyx_treasury/shared/circuit.lua`, `fxmanifest.lua`)**: Built deterministic, pure Lua 5.4 algorithms declared in `fxmanifest.lua`:

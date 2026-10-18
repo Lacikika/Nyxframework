@@ -130,6 +130,47 @@ RegisterNetEvent("nyx:inventory:client:grabTargetDrop", function(args, entity, n
     end
 end)
 
+-- Client-Side Spatial Partitioning Grid Index
+Nyx.ClientSpatialGrid = {
+    cells = {},      -- [cellKey] = { [dropId] = true }
+    dropCells = {}   -- [dropId] = cellKey
+}
+
+function Nyx.ClientSpatialGrid.Insert(dropId, coords, bucket)
+    if not dropId or not coords then return end
+    bucket = tonumber(bucket) or 0
+    local cellKey = nil
+    if Nyx.SpatialGrid and Nyx.SpatialGrid.GetCellKeyFromCoords then
+        cellKey = Nyx.SpatialGrid.GetCellKeyFromCoords(coords, bucket)
+    else
+        cellKey = string.format("%d:%d:%d", math.floor(coords.x / 64.0), math.floor(coords.y / 64.0), bucket)
+    end
+
+    local oldKey = Nyx.ClientSpatialGrid.dropCells[dropId]
+    if oldKey and oldKey ~= cellKey and Nyx.ClientSpatialGrid.cells[oldKey] then
+        Nyx.ClientSpatialGrid.cells[oldKey][dropId] = nil
+        if next(Nyx.ClientSpatialGrid.cells[oldKey]) == nil then
+            Nyx.ClientSpatialGrid.cells[oldKey] = nil
+        end
+    end
+
+    Nyx.ClientSpatialGrid.cells[cellKey] = Nyx.ClientSpatialGrid.cells[cellKey] or {}
+    Nyx.ClientSpatialGrid.cells[cellKey][dropId] = true
+    Nyx.ClientSpatialGrid.dropCells[dropId] = cellKey
+    return cellKey
+end
+
+function Nyx.ClientSpatialGrid.Remove(dropId)
+    local cellKey = Nyx.ClientSpatialGrid.dropCells[dropId]
+    if cellKey and Nyx.ClientSpatialGrid.cells[cellKey] then
+        Nyx.ClientSpatialGrid.cells[cellKey][dropId] = nil
+        if next(Nyx.ClientSpatialGrid.cells[cellKey]) == nil then
+            Nyx.ClientSpatialGrid.cells[cellKey] = nil
+        end
+    end
+    Nyx.ClientSpatialGrid.dropCells[dropId] = nil
+end
+
 -- Sync entire drop table from server
 RegisterNetEvent("nyx:inventory:client:syncDrops", function(dropList)
     -- Despawn any drops not in new list or mismatched bucket
@@ -138,13 +179,18 @@ RegisterNetEvent("nyx:inventory:client:syncDrops", function(dropList)
         if d and d.id and d.coords then
             newIds[d.id] = true
             local existing = Nyx.Drops[d.id]
+            local cVec = vector3(d.coords.x, d.coords.y, d.coords.z)
+            local bucket = tonumber(d.routingBucket) or 0
+            local cellKey = Nyx.ClientSpatialGrid.Insert(d.id, cVec, bucket)
+
             Nyx.Drops[d.id] = {
                 id = d.id,
-                coords = vector3(d.coords.x, d.coords.y, d.coords.z),
+                coords = cVec,
                 rotation = d.rotation or { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 },
                 model = d.model or Config.DropModel or "prop_paper_bag_small",
-                routingBucket = tonumber(d.routingBucket) or 0,
+                routingBucket = bucket,
                 shelfNodeId = d.shelfNodeId,
+                gridCell = cellKey,
                 entity = existing and existing.entity or nil
             }
         end
@@ -153,6 +199,7 @@ RegisterNetEvent("nyx:inventory:client:syncDrops", function(dropList)
     -- Clean up removed drops
     for dropId, drop in pairs(Nyx.Drops) do
         if not newIds[dropId] then
+            Nyx.ClientSpatialGrid.Remove(dropId)
             if drop.entity and DoesEntityExist(drop.entity) then
                 if exports['nyx_interact'] and exports['nyx_interact'].RemoveTargetEntity then
                     exports['nyx_interact']:RemoveTargetEntity(drop.entity)
@@ -164,25 +211,59 @@ RegisterNetEvent("nyx:inventory:client:syncDrops", function(dropList)
     end
 end)
 
+-- Sync cell-specific drops from interest management dispatcher
+RegisterNetEvent("nyx:inventory:client:syncCellDrops", function(dropList)
+    if type(dropList) ~= "table" then return end
+    for _, d in ipairs(dropList) do
+        if d and d.id and d.coords then
+            local existing = Nyx.Drops[d.id]
+            local cVec = vector3(d.coords.x, d.coords.y, d.coords.z)
+            local bucket = tonumber(d.routingBucket) or 0
+            local cellKey = Nyx.ClientSpatialGrid.Insert(d.id, cVec, bucket)
+
+            Nyx.Drops[d.id] = {
+                id = d.id,
+                coords = cVec,
+                rotation = d.rotation or { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 },
+                model = d.model or Config.DropModel or "prop_paper_bag_small",
+                routingBucket = bucket,
+                shelfNodeId = d.shelfNodeId,
+                gridCell = cellKey,
+                entity = existing and existing.entity or nil
+            }
+        end
+    end
+end)
+
 -- Receive single newly created drop
-RegisterNetEvent("nyx:inventory:client:dropCreated", function(dropId, coords, rotation, model, routingBucket, shelfNodeId)
+RegisterNetEvent("nyx:inventory:client:dropCreated", function(dropId, coords, rotation, model, routingBucket, shelfNodeId, cellKey)
+    local cVec = vector3(coords.x, coords.y, coords.z)
+    local bucket = tonumber(routingBucket) or 0
+    cellKey = cellKey or Nyx.ClientSpatialGrid.Insert(dropId, cVec, bucket)
+
     Nyx.Drops[dropId] = {
         id = dropId,
-        coords = vector3(coords.x, coords.y, coords.z),
+        coords = cVec,
         rotation = rotation or { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 },
         model = model or Config.DropModel or "prop_paper_bag_small",
-        routingBucket = tonumber(routingBucket) or 0,
+        routingBucket = bucket,
         shelfNodeId = shelfNodeId,
+        gridCell = cellKey,
         entity = nil
     }
 end)
 
 -- Receive position and rotation update when drop is moved/repositioned
-RegisterNetEvent("nyx:inventory:client:dropMoved", function(dropId, coords, rotation, shelfNodeId)
+RegisterNetEvent("nyx:inventory:client:dropMoved", function(dropId, coords, rotation, shelfNodeId, cellKey)
     local drop = Nyx.Drops[dropId]
+    local cVec = vector3(coords.x, coords.y, coords.z)
+    local bucket = drop and drop.routingBucket or 0
+    cellKey = cellKey or Nyx.ClientSpatialGrid.Insert(dropId, cVec, bucket)
+
     if drop then
-        drop.coords = vector3(coords.x, coords.y, coords.z)
+        drop.coords = cVec
         drop.rotation = rotation or drop.rotation
+        drop.gridCell = cellKey
         if shelfNodeId ~= nil then
             drop.shelfNodeId = (shelfNodeId and shelfNodeId ~= "") and shelfNodeId or nil
         end
@@ -194,11 +275,12 @@ RegisterNetEvent("nyx:inventory:client:dropMoved", function(dropId, coords, rota
     else
         Nyx.Drops[dropId] = {
             id = dropId,
-            coords = vector3(coords.x, coords.y, coords.z),
+            coords = cVec,
             rotation = rotation or { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 },
             model = Config.DropModel or "prop_paper_bag_small",
             routingBucket = 0,
             shelfNodeId = shelfNodeId,
+            gridCell = cellKey,
             entity = nil
         }
     end
@@ -222,6 +304,7 @@ end)
 
 -- Remove deleted drop
 RegisterNetEvent("nyx:inventory:client:dropRemoved", function(dropId)
+    Nyx.ClientSpatialGrid.Remove(dropId)
     local d = Nyx.Drops[dropId]
     if d then
         if d.entity and DoesEntityExist(d.entity) then
@@ -282,11 +365,29 @@ CreateThread(function()
         local cullDist = Config.DropCullDistance or 25.0
         local currentBucket = (LocalPlayer and LocalPlayer.state and LocalPlayer.state.routingBucket) or 0
 
+        -- Query candidates only from adjacent spatial grid cells
+        local candidateDropIds = {}
+        if Nyx.SpatialGrid and Nyx.SpatialGrid.GetCellsInRadius then
+            local cellKeys = Nyx.SpatialGrid.GetCellsInRadius(playerCoords.x, playerCoords.y, cullDist + 10.0, currentBucket)
+            for _, cKey in ipairs(cellKeys) do
+                local c = Nyx.ClientSpatialGrid.cells[cKey]
+                if c then
+                    for id, _ in pairs(c) do
+                        candidateDropIds[id] = true
+                    end
+                end
+            end
+        else
+            for id, _ in pairs(Nyx.Drops) do
+                candidateDropIds[id] = true
+            end
+        end
+
         for dropId, drop in pairs(Nyx.Drops) do
             local dropBucket = tonumber(drop.routingBucket) or 0
 
-            if dropBucket ~= currentBucket then
-                -- Despawn if in mismatched virtual routing bucket
+            if dropBucket ~= currentBucket or not candidateDropIds[dropId] then
+                -- Despawn if in mismatched virtual routing bucket or outside active cell neighborhood
                 if drop.entity and DoesEntityExist(drop.entity) then
                     if exports['nyx_interact'] and exports['nyx_interact'].RemoveTargetEntity then
                         exports['nyx_interact']:RemoveTargetEntity(drop.entity)
@@ -311,47 +412,89 @@ CreateThread(function()
                         drop.entity = nil
                     end
 
-                if not drop.entity or not DoesEntityExist(drop.entity) then
-                    RequestModel(modelHash)
-                    local loadTimeout = 0
-                    while not HasModelLoaded(modelHash) and loadTimeout < 25 do
-                        Wait(20)
-                        loadTimeout = loadTimeout + 1
-                    end
+                    if not drop.entity or not DoesEntityExist(drop.entity) then
+                        RequestModel(modelHash)
+                        local loadTimeout = 0
+                        while not HasModelLoaded(modelHash) and loadTimeout < 25 do
+                            Wait(20)
+                            loadTimeout = loadTimeout + 1
+                        end
 
-                    if HasModelLoaded(modelHash) then
-                        local obj = CreateObject(modelHash, drop.coords.x, drop.coords.y, drop.coords.z, false, false, false)
-                        SetEntityAsMissionEntity(obj, true, true)
-                        FreezeEntityPosition(obj, true)
-                        SetEntityCollision(obj, true, true)
-                        SetEntityCoords(obj, drop.coords.x, drop.coords.y, drop.coords.z, false, false, false, true)
-                        SetEntityHeading(obj, drop.rotation and drop.rotation.heading or 0.0)
-                        drop.entity = obj
+                        if HasModelLoaded(modelHash) then
+                            local obj = CreateObject(modelHash, drop.coords.x, drop.coords.y, drop.coords.z, false, false, false)
+                            SetEntityAsMissionEntity(obj, true, true)
+                            FreezeEntityPosition(obj, true)
+                            SetEntityCollision(obj, true, true)
+                            SetEntityCoords(obj, drop.coords.x, drop.coords.y, drop.coords.z, false, false, false, true)
+                            SetEntityHeading(obj, drop.rotation and drop.rotation.heading or 0.0)
+                            drop.entity = obj
 
-                        -- Register entity with Third-Eye interact
-                        if exports['nyx_interact'] and exports['nyx_interact'].AddTargetEntity then
-                            exports['nyx_interact']:AddTargetEntity(obj, {
-                                options = Nyx.Drops.GetTargetOptions(dropId),
-                                distance = Config.DropInteractDistance or 2.5
-                            })
+                            -- Register entity with Third-Eye interact
+                            if exports['nyx_interact'] and exports['nyx_interact'].AddTargetEntity then
+                                exports['nyx_interact']:AddTargetEntity(obj, {
+                                    options = Nyx.Drops.GetTargetOptions(dropId),
+                                    distance = Config.DropInteractDistance or 2.5
+                                })
+                            end
                         end
                     end
-                end
-            -- Out of range: despawn prop
-            elseif dist > (cullDist + 5.0) then
-                if drop.entity and DoesEntityExist(drop.entity) then
-                    if exports['nyx_interact'] and exports['nyx_interact'].RemoveTargetEntity then
-                        exports['nyx_interact']:RemoveTargetEntity(drop.entity)
+                -- Out of range: despawn prop
+                elseif dist > (cullDist + 5.0) then
+                    if drop.entity and DoesEntityExist(drop.entity) then
+                        if exports['nyx_interact'] and exports['nyx_interact'].RemoveTargetEntity then
+                            exports['nyx_interact']:RemoveTargetEntity(drop.entity)
+                        end
+                        DeleteEntity(drop.entity)
+                        drop.entity = nil
                     end
-                    DeleteEntity(drop.entity)
-                    drop.entity = nil
                 end
-            end
             end
         end
 
         Wait(1000)
     end
+end)
+
+-- Public client export to query nearby ground drops
+exports("GetNearbyGroundDrops", function(radius)
+    radius = tonumber(radius) or (Config.DropInteractDistance or 2.5)
+    local ped = PlayerPedId()
+    local playerCoords = GetEntityCoords(ped)
+    local currentBucket = (LocalPlayer and LocalPlayer.state and LocalPlayer.state.routingBucket) or 0
+    local results = {}
+
+    local candidateDropIds = {}
+    if Nyx.SpatialGrid and Nyx.SpatialGrid.GetCellsInRadius then
+        local cellKeys = Nyx.SpatialGrid.GetCellsInRadius(playerCoords.x, playerCoords.y, radius, currentBucket)
+        for _, cKey in ipairs(cellKeys) do
+            local c = Nyx.ClientSpatialGrid.cells[cKey]
+            if c then
+                for id, _ in pairs(c) do candidateDropIds[id] = true end
+            end
+        end
+    else
+        for id, _ in pairs(Nyx.Drops) do candidateDropIds[id] = true end
+    end
+
+    for dropId, _ in pairs(candidateDropIds) do
+        local drop = Nyx.Drops[dropId]
+        if drop and (drop.routingBucket or 0) == currentBucket and drop.coords then
+            local dist = #(playerCoords - drop.coords)
+            if dist <= radius then
+                results[#results + 1] = {
+                    id = dropId,
+                    dropId = dropId,
+                    distance = dist,
+                    coords = drop.coords,
+                    model = drop.model,
+                    shelfNodeId = drop.shelfNodeId
+                }
+            end
+        end
+    end
+
+    table.sort(results, function(a, b) return a.distance < b.distance end)
+    return results
 end)
 
 -- Cleanup on resource stop
@@ -366,3 +509,4 @@ AddEventHandler("onResourceStop", function(resourceName)
         end
     end
 end)
+

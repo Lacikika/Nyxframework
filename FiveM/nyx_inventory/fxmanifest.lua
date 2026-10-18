@@ -16,12 +16,15 @@ shared_scripts {
     '@nyx_core/shared/math.lua',
     '@nyx_core/shared/weights.lua',
     'config.lua',
+    'shared/spatial_grid.lua',
+    'shared/decay.lua',
     'shared/items.lua',
     'shared/drops.lua'
 }
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
+    'server/spatial_grid.lua',
     'server/mutex.lua',
     'server/state.lua',
     'server/drops.lua',

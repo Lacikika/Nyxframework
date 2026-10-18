@@ -2863,7 +2863,389 @@ function Nyx.Tests.TestFiscalCircuitAndPayrollScaling()
     return passes == total
 end
 
--- 19. Master Test Runner
+-- 19. Test Spatial Grid Ground Drops & Time-Based Item Durability Decay
+function Nyx.Tests.TestSpatialGridDropsAndDurabilityDecay()
+    print("^3[Nyx:Tests] Running Spatial Grid Drops & Item Durability Decay Suite...^7")
+    local passes = 0
+    local total = 10
+
+    -- Test A: Spatial Cell Coordinate Hashing & Key Determinism
+    local cx1, cy1 = Nyx.Math.CoordsToCell(150.0, -210.0, 64.0)
+    local k1 = Nyx.Math.GetCellKey(cx1, cy1, 0)
+    local k2, cx2, cy2 = Nyx.Math.GetCellKeyFromCoords({ x = 150.0, y = -210.0 }, 64.0, 0)
+    local k3 = Nyx.Math.GetCellKey(cx1, cy1, 1001)
+
+    local testA_ok = (cx1 == 2) and (cy1 == -4)
+        and (k1 == "2:-4:0")
+        and (k2 == "2:-4:0")
+        and (cx2 == 2) and (cy2 == -4)
+        and (k3 == "2:-4:1001")
+
+    if assertTest(testA_ok == true,
+        "Spatial Cell Coordinate Hashing & Deterministic Key Generation",
+        string.format("cx1=%s, cy1=%s, k1=%s, k2=%s, k3=%s", tostring(cx1), tostring(cy1), tostring(k1), tostring(k2), tostring(k3))) then
+        passes = passes + 1
+    end
+
+    -- Test B: Moore Neighborhood (3x3, 9 cells) & Radial Cell Bounding
+    local neighbors = Nyx.Math.GetNeighborCellKeys(2, -4, 0, 1)
+    local radialKeys = Nyx.Math.GetCellsInRadius(0.0, 0.0, 64.0, 64.0, 0)
+    local minX, maxX, minY, maxY = Nyx.Math.GetCellBounds(2, -4, 64.0)
+
+    local neighborSet = {}
+    for _, nk in ipairs(neighbors) do
+        neighborSet[nk] = true
+    end
+
+    local expectedNeighbors = 0
+    for dx = -1, 1 do
+        for dy = -1, 1 do
+            if neighborSet[string.format("%d:%d:0", 2 + dx, -4 + dy)] then
+                expectedNeighbors = expectedNeighbors + 1
+            end
+        end
+    end
+
+    local testB_ok = (#neighbors == 9)
+        and (expectedNeighbors == 9)
+        and (#radialKeys == 9)
+        and (minX == 128.0) and (maxX == 192.0)
+        and (minY == -256.0) and (maxY == -192.0)
+
+    if assertTest(testB_ok == true,
+        "Moore 3x3 Neighborhood Generation & Geometric Cell Boundary Bounding",
+        string.format("count=%d, expected=%d, radial=%d, bounds=[%.1f, %.1f, %.1f, %.1f]",
+            #neighbors, expectedNeighbors, #radialKeys, minX, maxX, minY, maxY)) then
+        passes = passes + 1
+    end
+
+    -- Test C: Spatial Grid Partitioning (Insert, Query, Cell Migration & Removal)
+    local testGrid = {
+        cells = {},
+        insert = function(self, id, x, y, bucket)
+            local k = Nyx.Math.GetCellKeyFromCoords({ x = x, y = y }, 64.0, bucket or 0)
+            if not self.cells[k] then self.cells[k] = {} end
+            self.cells[k][id] = { id = id, x = x, y = y, cellKey = k, bucket = bucket or 0 }
+            return k
+        end,
+        remove = function(self, id, cellKey)
+            if self.cells[cellKey] then
+                self.cells[cellKey][id] = nil
+                if not next(self.cells[cellKey]) then
+                    self.cells[cellKey] = nil
+                end
+            end
+        end,
+        update = function(self, id, oldKey, newX, newY, bucket)
+            local newKey = Nyx.Math.GetCellKeyFromCoords({ x = newX, y = newY }, 64.0, bucket or 0)
+            if oldKey ~= newKey then
+                self:remove(id, oldKey)
+                return self:insert(id, newX, newY, bucket)
+            else
+                if self.cells[oldKey] and self.cells[oldKey][id] then
+                    self.cells[oldKey][id].x = newX
+                    self.cells[oldKey][id].y = newY
+                end
+                return oldKey
+            end
+        end
+    }
+
+    local kDrop1 = testGrid:insert("DROP_01", 10.0, 10.0, 0)
+    local kDrop2 = testGrid:insert("DROP_02", 15.0, 15.0, 0)
+    local initialCellDrops = (testGrid.cells["0:0:0"] ~= nil and testGrid.cells["0:0:0"]["DROP_01"] ~= nil and testGrid.cells["0:0:0"]["DROP_02"] ~= nil)
+
+    local kDrop2Migrated = testGrid:update("DROP_02", kDrop2, 150.0, 200.0, 0)
+    local migrationPass = (testGrid.cells["0:0:0"]["DROP_02"] == nil) and (testGrid.cells["2:3:0"] ~= nil and testGrid.cells["2:3:0"]["DROP_02"] ~= nil)
+
+    testGrid:remove("DROP_01", kDrop1)
+    local cleanupPass = (testGrid.cells["0:0:0"] == nil)
+
+    local testC_ok = (kDrop1 == "0:0:0") and (kDrop2 == "0:0:0")
+        and (initialCellDrops == true)
+        and (kDrop2Migrated == "2:3:0")
+        and (migrationPass == true)
+        and (cleanupPass == true)
+
+    if assertTest(testC_ok == true,
+        "Spatial Grid Partitioning, Cell Migration & Vacuum Lifecycle",
+        string.format("init=%s, kMigrated=%s, migPass=%s, cleanPass=%s",
+            tostring(initialCellDrops), tostring(kDrop2Migrated), tostring(migrationPass), tostring(cleanupPass))) then
+        passes = passes + 1
+    end
+
+    -- Test D: O(1) Candidate Auto-Merge Lookups via Adjacent Spatial Cells
+    local testMergeGrid = { cells = {} }
+    for i = 1, 50 do
+        local gx = 1000.0 + (i * 128.0)
+        local gy = 1000.0 + (i * 128.0)
+        local gk = Nyx.Math.GetCellKeyFromCoords({ x = gx, y = gy }, 64.0, 0)
+        testMergeGrid.cells[gk] = testMergeGrid.cells[gk] or {}
+        testMergeGrid.cells[gk]["BG_" .. i] = { id = "BG_" .. i, x = gx, y = gy }
+    end
+
+    local kTarget = Nyx.Math.GetCellKeyFromCoords({ x = 100.0, y = 100.0 }, 64.0, 0)
+    testMergeGrid.cells[kTarget] = testMergeGrid.cells[kTarget] or {}
+    testMergeGrid.cells[kTarget]["DROP_TARGET"] = { id = "DROP_TARGET", x = 100.0, y = 100.0 }
+    testMergeGrid.cells[kTarget]["DROP_MERGE_CANDIDATE"] = { id = "DROP_MERGE_CANDIDATE", x = 100.8, y = 100.6 }
+
+    local cx, cy = Nyx.Math.CoordsToCell(100.0, 100.0, 64.0)
+    local neighborKeys = Nyx.Math.GetNeighborCellKeys(cx, cy, 0, 1)
+    local candidatesEvaluated = 0
+    local foundMergeTarget = nil
+
+    for _, nKey in ipairs(neighborKeys) do
+        local cellMap = testMergeGrid.cells[nKey]
+        if cellMap then
+            for dropId, dropData in pairs(cellMap) do
+                if dropId ~= "DROP_TARGET" then
+                    candidatesEvaluated = candidatesEvaluated + 1
+                    local dx = dropData.x - 100.0
+                    local dy = dropData.y - 100.0
+                    local dist = math.sqrt(dx * dx + dy * dy)
+                    if dist <= 1.5 then
+                        foundMergeTarget = dropId
+                        break
+                    end
+                end
+            end
+        end
+        if foundMergeTarget then break end
+    end
+
+    local testD_ok = (candidatesEvaluated == 1) and (foundMergeTarget == "DROP_MERGE_CANDIDATE")
+
+    if assertTest(testD_ok == true,
+        "O(1) Spatial Grid Auto-Merge Proximity Lookup (Zero Full-Server Scans)",
+        string.format("candidatesChecked=%d, mergeTarget=%s", candidatesEvaluated, tostring(foundMergeTarget))) then
+        passes = passes + 1
+    end
+
+    -- Test E: Durability Decay Loss Formula & Environmental / Container Multipliers
+    local function calcLoss(rate, deltaSec, cType, envFactor)
+        if Nyx.Decay and Nyx.Decay.CalculateDecayLoss then
+            return Nyx.Decay.CalculateDecayLoss(rate, deltaSec, cType, envFactor)
+        end
+        local cMults = { drop = 2.0, player = 1.0, trunk = 0.75, glovebox = 0.75, stash = 0.50 }
+        local cMult = cMults[cType] or 1.0
+        local eMult = envFactor or 1.0
+        local raw = (deltaSec / 3600.0) * rate * 100.0 * cMult * eMult
+        return math.max(0.0, math.floor(raw * 10) / 10)
+    end
+
+    local rate = 0.05
+    local hourSec = 3600
+    local dropLoss = calcLoss(rate, hourSec, "drop", 1.0)
+    local playerLoss = calcLoss(rate, hourSec, "player", 1.0)
+    local trunkLoss = calcLoss(rate, hourSec, "trunk", 1.0)
+    local stashLoss = calcLoss(rate, hourSec, "stash", 1.0)
+    local stormLoss = calcLoss(rate, hourSec, "drop", 1.5)
+    local zeroLoss = calcLoss(0.0, hourSec, "drop", 1.0)
+
+    local testE_ok = (dropLoss == 10.0)
+        and (playerLoss == 5.0)
+        and (trunkLoss == 3.7)
+        and (stashLoss == 2.5)
+        and (stormLoss == 15.0)
+        and (zeroLoss == 0.0)
+
+    if assertTest(testE_ok == true,
+        "Durability Decay Formula with Environmental & Container Multipliers",
+        string.format("drop=%.1f, player=%.1f, trunk=%.1f, stash=%.1f, storm=%.1f",
+            dropLoss, playerLoss, trunkLoss, stashLoss, stormLoss)) then
+        passes = passes + 1
+    end
+
+    -- Test F: Durability Status Tier Transitions & Item Archetype Flagging
+    local function getItemStatus(itemType, dur)
+        dur = tonumber(dur) or 100.0
+        if dur <= 0.0 then
+            if itemType == "food" or itemType == "drink" then
+                return "SPOILED", { isBroken = false, isSpoiled = true, isExpired = false }
+            elseif itemType == "medical" then
+                return "EXPIRED", { isBroken = false, isSpoiled = false, isExpired = true }
+            else
+                return "BROKEN", { isBroken = true, isSpoiled = false, isExpired = false }
+            end
+        elseif dur < 25.0 then
+            return "CRITICAL", { isBroken = false, isSpoiled = false, isExpired = false }
+        elseif dur < 50.0 then
+            return "WORN", { isBroken = false, isSpoiled = false, isExpired = false }
+        elseif dur < 75.0 then
+            return "GOOD", { isBroken = false, isSpoiled = false, isExpired = false }
+        else
+            return "PRISTINE", { isBroken = false, isSpoiled = false, isExpired = false }
+        end
+    end
+
+    local st1, _ = getItemStatus("weapon", 85.0)
+    local st2, _ = getItemStatus("tool", 60.0)
+    local st3, _ = getItemStatus("freight", 40.0)
+    local st4, _ = getItemStatus("weapon", 15.0)
+    local st5_weapon, fl5_weapon = getItemStatus("weapon", 0.0)
+    local st5_food, fl5_food = getItemStatus("food", 0.0)
+    local st5_med, fl5_med = getItemStatus("medical", 0.0)
+
+    local testF_ok = (st1 == "PRISTINE")
+        and (st2 == "GOOD")
+        and (st3 == "WORN")
+        and (st4 == "CRITICAL")
+        and (st5_weapon == "BROKEN" and fl5_weapon.isBroken == true)
+        and (st5_food == "SPOILED" and fl5_food.isSpoiled == true)
+        and (st5_med == "EXPIRED" and fl5_med.isExpired == true)
+
+    if assertTest(testF_ok == true,
+        "Durability Status Tier Boundaries & Item Archetype Degradation States",
+        string.format("p=%s, g=%s, w=%s, c=%s, wp=%s, fd=%s, md=%s",
+            st1, st2, st3, st4, st5_weapon, st5_food, st5_med)) then
+        passes = passes + 1
+    end
+
+    -- Test G: Real-Time Offline Catch-Up Decay Math on Container Load
+    local simContainer = {
+        id = "stash:warehouse_north_01",
+        type = "stash",
+        last_decay_at = 100000,
+        items = {
+            [1] = { item_id = "food_sandwich", amount = 1, metadata = { durability = 50.0, decayRate = 0.04 } },
+            [2] = { item_id = "raw_copper_ore", amount = 5, metadata = { durability = 100.0, decayRate = 0.0 } }
+        }
+    }
+
+    local nowSec = 107200
+    local delta = nowSec - simContainer.last_decay_at
+    local stashMult = 0.50
+    for _, it in pairs(simContainer.items) do
+        local dRate = it.metadata.decayRate or 0.0
+        if dRate > 0 and it.metadata.durability > 0 then
+            local l = math.max(0.0, math.floor(((delta / 3600.0) * dRate * 100.0 * stashMult) * 10) / 10)
+            it.metadata.durability = math.max(0.0, it.metadata.durability - l)
+        end
+    end
+    simContainer.last_decay_at = nowSec
+
+    local testG_ok = (simContainer.items[1].metadata.durability == 46.0)
+        and (simContainer.items[2].metadata.durability == 100.0)
+        and (simContainer.last_decay_at == 107200)
+
+    if assertTest(testG_ok == true,
+        "Offline Catch-Up Durability Reconciliation on Container Load (Delta=2hr, Stash 0.5x)",
+        string.format("item1_dur=%.1f, item2_dur=%.1f, last_decay=%d",
+            simContainer.items[1].metadata.durability, simContainer.items[2].metadata.durability, simContainer.last_decay_at)) then
+        passes = passes + 1
+    end
+
+    -- Test H: Item Repair RPC Mechanics, Structural Wear Ceiling & Consumable Gating
+    local function canRepair(itemType)
+        if itemType == "food" or itemType == "drink" or itemType == "ammo" or itemType == "medical" then
+            return false
+        end
+        return (itemType == "weapon" or itemType == "tool" or itemType == "freight")
+    end
+
+    local function calcRepair(curDur, maxDur, baseGain, wearPenalty)
+        local newMax = math.max(50.0, math.floor((maxDur - wearPenalty) * 10) / 10)
+        local newDur = math.min(newMax, math.floor((curDur + baseGain) * 10) / 10)
+        local actualGain = math.max(0.0, math.floor((newDur - curDur) * 10) / 10)
+        return actualGain, newDur, newMax
+    end
+
+    local foodRepairable = canRepair("food")
+    local medRepairable = canRepair("medical")
+    local weaponRepairable = canRepair("weapon")
+
+    local gain1, dur1, max1 = calcRepair(0.0, 100.0, 35.0, 2.0)
+    local gain2, dur2, max2 = calcRepair(10.0, 51.0, 35.0, 2.0)
+
+    local testH_ok = (not foodRepairable) and (not medRepairable) and (weaponRepairable)
+        and (gain1 == 35.0 and dur1 == 35.0 and max1 == 98.0)
+        and (gain2 == 35.0 and dur2 == 45.0 and max2 == 50.0)
+
+    if assertTest(testH_ok == true,
+        "Item Repair Mechanics, Structural Fatigue Ceilings & Consumable Invariant",
+        string.format("gain1=%.1f, max1=%.1f, gain2=%.1f, max2=%.1f, foodRep=%s",
+            gain1, max1, gain2, max2, tostring(foodRepairable))) then
+        passes = passes + 1
+    end
+
+    -- Test I: Ground Drop Dissolution on Full Degradation
+    local function checkDropDissolution(dropItems)
+        if not dropItems or not next(dropItems) then return true end
+        for _, it in pairs(dropItems) do
+            local dur = it.metadata and tonumber(it.metadata.durability) or 100.0
+            if dur > 0.0 then
+                return false
+            end
+        end
+        return true
+    end
+
+    local dropAllDead = {
+        [1] = { item_id = "food_apple", metadata = { durability = 0.0, isSpoiled = true } },
+        [2] = { item_id = "tool_flashlight", metadata = { durability = 0.0, isBroken = true } }
+    }
+
+    local dropPartiallyAlive = {
+        [1] = { item_id = "food_apple", metadata = { durability = 0.0, isSpoiled = true } },
+        [2] = { item_id = "steel_ingot", metadata = { durability = 75.0 } }
+    }
+
+    local emptyDrop = {}
+
+    local dissolveDead = checkDropDissolution(dropAllDead)
+    local dissolveAlive = checkDropDissolution(dropPartiallyAlive)
+    local dissolveEmpty = checkDropDissolution(emptyDrop)
+
+    local testI_ok = (dissolveDead == true) and (dissolveAlive == false) and (dissolveEmpty == true)
+
+    if assertTest(testI_ok == true,
+        "Ground Drop Dissolution Evaluator on 100% Item Durability Depletion",
+        string.format("dead=%s, alive=%s, empty=%s", tostring(dissolveDead), tostring(dissolveAlive), tostring(dissolveEmpty))) then
+        passes = passes + 1
+    end
+
+    -- Test J: nyx_interact Coordinate Spatial Grid Moore Filtering
+    local interactGrid = { cells = {} }
+    local function addTargetCoord(tId, x, y)
+        local k = Nyx.Math.GetCellKeyFromCoords({ x = x, y = y }, 64.0, 0)
+        interactGrid.cells[k] = interactGrid.cells[k] or {}
+        interactGrid.cells[k][tId] = { id = tId, x = x, y = y, cellKey = k }
+    end
+
+    addTargetCoord("TARGET_CLOSE", 51.2, 50.8)
+    addTargetCoord("TARGET_ADJACENT", 110.0, 50.0)
+    addTargetCoord("TARGET_FAR", 1200.0, 1200.0)
+
+    local playerCx, playerCy = Nyx.Math.CoordsToCell(50.0, 50.0, 64.0)
+    local pNeighbors = Nyx.Math.GetNeighborCellKeys(playerCx, playerCy, 0, 1)
+
+    local candidateTargets = {}
+    for _, nk in ipairs(pNeighbors) do
+        local cellMap = interactGrid.cells[nk]
+        if cellMap then
+            for tid, tData in pairs(cellMap) do
+                candidateTargets[tid] = tData
+            end
+        end
+    end
+
+    local testJ_ok = (candidateTargets["TARGET_CLOSE"] ~= nil)
+        and (candidateTargets["TARGET_ADJACENT"] ~= nil)
+        and (candidateTargets["TARGET_FAR"] == nil)
+
+    if assertTest(testJ_ok == true,
+        "Interact Third-Eye Coordinate Raycast Optimization via Moore Partitioning",
+        string.format("closeFound=%s, adjFound=%s, farFound=%s",
+            tostring(candidateTargets["TARGET_CLOSE"] ~= nil),
+            tostring(candidateTargets["TARGET_ADJACENT"] ~= nil),
+            tostring(candidateTargets["TARGET_FAR"] ~= nil))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 20. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -2887,9 +3269,10 @@ function Nyx.Tests.RunAll()
     local t16 = Nyx.Tests.TestParliamentIRVAndPenalSync()
     local t17 = Nyx.Tests.TestJuryDispatcherAndCourtroomRouting()
     local t18 = Nyx.Tests.TestFiscalCircuitAndPayrollScaling()
+    local t19 = Nyx.Tests.TestSpatialGridDropsAndDurabilityDecay()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

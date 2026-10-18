@@ -639,23 +639,31 @@ Nyx.RPC.Register("inventory:useItem", function(src, payload)
         return { success = false, error = "UNKNOWN_ITEM" }
     end
 
-    -- Check Durability
-    if item.metadata and item.metadata.durability and item.metadata.durability <= 0 then
+    -- Check Durability & Spoilage / Breakage
+    if item.metadata and (item.metadata.isBroken or (item.metadata.durability and item.metadata.durability <= 0)) then
         Nyx.Inventory.ReleaseLock(invId)
         return { success = false, error = "ITEM_BROKEN" }
+    end
+
+    if item.metadata and item.metadata.isSpoiled then
+        Nyx.Inventory.ReleaseLock(invId)
+        TriggerClientEvent("nyx:core:client:notify", src, "This food is spoiled and inedible!", "error")
+        return { success = false, error = "ITEM_SPOILED" }
+    end
+
+    if item.metadata and item.metadata.isExpired then
+        Nyx.Inventory.ReleaseLock(invId)
+        TriggerClientEvent("nyx:core:client:notify", src, "These medical supplies are expired and ineffective!", "error")
+        return { success = false, error = "ITEM_EXPIRED" }
     end
 
     local usedSuccessfully = false
 
     -- Handle Consumption by Type
     if itemDef.type == "food" then
-        if item.metadata and item.metadata.isSpoiled then
-            TriggerClientEvent("nyx:core:client:notify", src, "This food is spoiled and inedible!", "error")
-        else
-            local curHunger = player:getMetadata("hunger") or 100
-            player:setMetadata("hunger", math.min(100, curHunger + (itemDef.nutrition or 25)))
-            usedSuccessfully = true
-        end
+        local curHunger = player:getMetadata("hunger") or 100
+        player:setMetadata("hunger", math.min(100, curHunger + (itemDef.nutrition or 25)))
+        usedSuccessfully = true
     elseif itemDef.type == "drink" then
         local curThirst = player:getMetadata("thirst") or 100
         player:setMetadata("thirst", math.min(100, curThirst + (itemDef.hydration or 30)))
@@ -686,3 +694,103 @@ Nyx.RPC.Register("inventory:useItem", function(src, payload)
     Nyx.Inventory.ReleaseLock(invId)
     return { success = usedSuccessfully }
 end)
+
+-- Authoritative Item Repair & Durability Restoration RPC
+Nyx.RPC.Register("inventory:repairItem", function(src, payload)
+    if type(payload) ~= "table" then return { success = false, error = "INVALID_PAYLOAD" } end
+
+    local invId = payload.invId
+    local targetSlot = tonumber(payload.targetSlot)
+    local toolSlot = tonumber(payload.toolSlot)
+
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return { success = false, error = "UNAUTHORIZED" } end
+
+    local playerInvId = string.format("char:%s:main", player.citizenId)
+    if invId ~= playerInvId then
+        if not Nyx.Inventory.ValidateAccess(src, invId) then
+            return { success = false, error = "ACCESS_DENIED" }
+        end
+    end
+
+    if not targetSlot or not toolSlot or targetSlot == toolSlot then
+        return { success = false, error = "INVALID_SLOTS" }
+    end
+
+    if not Nyx.Inventory.AcquireLock(invId) then
+        return { success = false, error = "CONTAINER_BUSY" }
+    end
+
+    local container = Nyx.Inventory.Get(invId)
+    if not container then
+        Nyx.Inventory.ReleaseLock(invId)
+        return { success = false, error = "CONTAINER_NOT_FOUND" }
+    end
+
+    local targetItem = container:getItem(targetSlot)
+    local toolItem = container:getItem(toolSlot)
+
+    if not targetItem or not toolItem then
+        Nyx.Inventory.ReleaseLock(invId)
+        return { success = false, error = "ITEM_NOT_FOUND" }
+    end
+
+    -- Verify target item is repairable
+    if not Nyx.Decay or not Nyx.Decay.CanRepairItem(targetItem) then
+        Nyx.Inventory.ReleaseLock(invId)
+        return { success = false, error = "ITEM_NOT_REPAIRABLE" }
+    end
+
+    -- Verify tool item is a valid repair instrument
+    local toolDef = Nyx.Items.Get(toolItem.item_id)
+    local isRepairKit = (toolItem.item_id == "tool_repairkit" or toolItem.item_id == "tool_diagnostics" or (toolDef and toolDef.isRepairTool == true))
+    if not isRepairKit then
+        Nyx.Inventory.ReleaseLock(invId)
+        return { success = false, error = "INVALID_REPAIR_TOOL" }
+    end
+
+    -- Calculate repair gain and fatigue
+    local gain, newDur, newMaxDur = Nyx.Decay.CalculateRepairGain(targetItem, toolItem)
+    if gain <= 0 then
+        Nyx.Inventory.ReleaseLock(invId)
+        return { success = false, error = "ALREADY_MAX_DURABILITY" }
+    end
+
+    local prevDur = tonumber(targetItem.metadata.durability) or 0.0
+    targetItem.metadata.durability = newDur
+    targetItem.metadata.maxDurability = newMaxDur
+    targetItem.metadata.isBroken = false
+    targetItem.metadata.lastDecay = os.time()
+    container:setItem(targetSlot, targetItem)
+
+    -- Consume 1 repair tool or reduce tool durability
+    if toolItem.amount <= 1 then
+        container:removeItem(toolSlot)
+    else
+        toolItem.amount = toolItem.amount - 1
+        container:setItem(toolSlot, toolItem)
+    end
+
+    container:save()
+
+    -- Log repair event to audit ledger
+    MySQL.query("INSERT INTO `nyx_inventory_decay_logs` (`inventory_id`, `item_id`, `event_type`, `previous_durability`, `new_durability`, `delta_seconds`, `container_type`) VALUES (?, ?, ?, ?, ?, ?, ?)", {
+        invId, targetItem.item_id, "repair", prevDur, newDur, 0, container.type or "player"
+    })
+
+    Nyx.Inventory.ReleaseLock(invId)
+
+    if Config.Debug then
+        print(string.format("^2[Nyx:Inventory] Repaired '%s' in container '%s': %.1f -> %.1f (max: %.1f)^7",
+            targetItem.item_id, invId, prevDur, newDur, newMaxDur))
+    end
+
+    return {
+        success = true,
+        gain = gain,
+        durability = newDur,
+        maxDurability = newMaxDur,
+        targetSlot = targetSlot
+    }
+end)
+

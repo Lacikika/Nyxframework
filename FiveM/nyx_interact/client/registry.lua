@@ -90,20 +90,47 @@ function Nyx.Interact.RemoveTargetBone(bones)
     end
 end
 
--- 4. Register Coordinate Spheres (terminals, desks, voting booths)
+-- 4. Register Coordinate Spheres (terminals, desks, voting booths) with Spatial Cell Indexing
+Nyx.Interact.Registry.CoordCells = {} -- [cellKey] = { [id] = true }
+
 function Nyx.Interact.AddTargetCoords(id, coords, radius, data)
     if not id or not coords or not data or not data.options then return end
 
+    local cVec = vector3(coords.x, coords.y, coords.z)
+    local cellKey = nil
+    if Nyx.Math and Nyx.Math.GetCellKeyFromCoords then
+        cellKey = Nyx.Math.GetCellKeyFromCoords(cVec, 64.0, 0)
+    else
+        cellKey = string.format("%d:%d:0", math.floor(coords.x / 64.0), math.floor(coords.y / 64.0))
+    end
+
+    -- If re-registering existing id in different cell
+    local existing = Nyx.Interact.Registry.Coords[id]
+    if existing and existing.cellKey and existing.cellKey ~= cellKey and Nyx.Interact.Registry.CoordCells[existing.cellKey] then
+        Nyx.Interact.Registry.CoordCells[existing.cellKey][id] = nil
+    end
+
     Nyx.Interact.Registry.Coords[id] = {
-        coords = vector3(coords.x, coords.y, coords.z),
+        coords = cVec,
         radius = radius or 2.0,
         options = data.options,
-        distance = data.distance or (radius or 2.0)
+        distance = data.distance or (radius or 2.0),
+        cellKey = cellKey
     }
+
+    Nyx.Interact.Registry.CoordCells[cellKey] = Nyx.Interact.Registry.CoordCells[cellKey] or {}
+    Nyx.Interact.Registry.CoordCells[cellKey][id] = true
 end
 
 function Nyx.Interact.RemoveTargetCoords(id)
     if not id then return end
+    local entry = Nyx.Interact.Registry.Coords[id]
+    if entry and entry.cellKey and Nyx.Interact.Registry.CoordCells[entry.cellKey] then
+        Nyx.Interact.Registry.CoordCells[entry.cellKey][id] = nil
+        if next(Nyx.Interact.Registry.CoordCells[entry.cellKey]) == nil then
+            Nyx.Interact.Registry.CoordCells[entry.cellKey] = nil
+        end
+    end
     Nyx.Interact.Registry.Coords[id] = nil
 end
 
@@ -203,26 +230,47 @@ function Nyx.Interact.EvaluateTarget(hitEntity, hitCoords)
         end
     end
 
-    -- B. Evaluate Spatial Coordinate Spheres
-    for id, coordEntry in pairs(Nyx.Interact.Registry.Coords) do
-        local dist = #(playerCoords - coordEntry.coords)
-        if dist <= coordEntry.distance then
-            matchedCategory = "coords"
-            for idx, opt in ipairs(coordEntry.options) do
-                local allowed = true
-                if opt.canInteract then
-                    allowed = opt.canInteract(nil, dist, coordEntry.coords)
+    -- B. Evaluate Spatial Coordinate Spheres via Spatial Partitioning Grid
+    local candidateCoordIds = {}
+    if Nyx.Math and Nyx.Math.GetCellKeyFromCoords and Nyx.Math.GetNeighborCellKeys then
+        local pCellKey, pcx, pcy = Nyx.Math.GetCellKeyFromCoords(playerCoords, 64.0, 0)
+        local neighborKeys = Nyx.Math.GetNeighborCellKeys(pcx, pcy, 0, 1)
+        for _, nKey in ipairs(neighborKeys) do
+            local cell = Nyx.Interact.Registry.CoordCells[nKey]
+            if cell then
+                for id, _ in pairs(cell) do
+                    candidateCoordIds[id] = true
                 end
-                if allowed then
-                    table.insert(results, {
-                        id = "coord_" .. id .. "_" .. idx,
-                        icon = opt.icon or "fa-solid fa-location-dot",
-                        label = opt.label or "Interact",
-                        event = opt.event,
-                        action = opt.action,
-                        args = opt.args or {},
-                        coordId = id
-                    })
+            end
+        end
+    else
+        for id, _ in pairs(Nyx.Interact.Registry.Coords) do
+            candidateCoordIds[id] = true
+        end
+    end
+
+    for id, _ in pairs(candidateCoordIds) do
+        local coordEntry = Nyx.Interact.Registry.Coords[id]
+        if coordEntry then
+            local dist = #(playerCoords - coordEntry.coords)
+            if dist <= coordEntry.distance then
+                matchedCategory = "coords"
+                for idx, opt in ipairs(coordEntry.options) do
+                    local allowed = true
+                    if opt.canInteract then
+                        allowed = opt.canInteract(nil, dist, coordEntry.coords)
+                    end
+                    if allowed then
+                        table.insert(results, {
+                            id = "coord_" .. id .. "_" .. idx,
+                            icon = opt.icon or "fa-solid fa-location-dot",
+                            label = opt.label or "Interact",
+                            event = opt.event,
+                            action = opt.action,
+                            args = opt.args or {},
+                            coordId = id
+                        })
+                    end
                 end
             end
         end

@@ -43,3 +43,42 @@ end)
 exports('IsActive', function()
     return Nyx.Interact.IsActive
 end)
+
+exports('GetNearbyTargetCoords', function(radius)
+    radius = tonumber(radius) or 10.0
+    local playerCoords = GetEntityCoords(PlayerPedId())
+    local results = {}
+
+    local candidateCoordIds = {}
+    if Nyx.Math and Nyx.Math.GetCellsInRadius then
+        local cellKeys = Nyx.Math.GetCellsInRadius(playerCoords.x, playerCoords.y, radius, 64.0, 0)
+        for _, nKey in ipairs(cellKeys) do
+            local cell = Nyx.Interact.Registry.CoordCells[nKey]
+            if cell then
+                for id, _ in pairs(cell) do candidateCoordIds[id] = true end
+            end
+        end
+    else
+        for id, _ in pairs(Nyx.Interact.Registry.Coords) do candidateCoordIds[id] = true end
+    end
+
+    for id, _ in pairs(candidateCoordIds) do
+        local entry = Nyx.Interact.Registry.Coords[id]
+        if entry and entry.coords then
+            local dist = #(playerCoords - entry.coords)
+            if dist <= radius then
+                results[#results + 1] = {
+                    id = id,
+                    coords = entry.coords,
+                    distance = dist,
+                    radius = entry.radius,
+                    options = entry.options
+                }
+            end
+        end
+    end
+
+    table.sort(results, function(a, b) return a.distance < b.distance end)
+    return results
+end)
+
