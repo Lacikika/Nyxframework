@@ -117,8 +117,43 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Commercial Real Estate Leasing & Public Storefront Lease Cycles (`nyx_properties` & `nyx_factions`)**
   - **Implementation:** Structured commercial lease contracts for businesses and storefronts, security deposit escrow held in municipal pools, statutory rental tax splits (5%), 4-tier delinquency interlocks (grace notice, doorlock lockouts, register suspension), and automated eviction sweeps relisting defaulted storefronts into public lease cycles.
 
+- [x] **Feature: Dynamic Speed Limits, Statutory Law Formulation & MDT Enforcement Overlays (`nyx_parliament`, `nyx_mdt` & `nyx_vehicles`)**
+  - **Implementation:** Officials author structured legislation (penal code fine maximums, speed limits per zone, legal sales tax caps, zoning classifications). Passing a bill instantly updates MDT maximum citation values and jail times, in-game sales tax calculators across registered points of sale, and real-time dispatch warning overlays for law enforcement with ANPR camera telemetry.
+
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Dynamic Speed Limits, Statutory Law Formulation & MDT Enforcement Overlays (`nyx_parliament`, `nyx_mdt` & `nyx_vehicles`)**
+  - **Database Migration (`059_dynamic_speed_limits_statutory_laws_and_mdt_overlays.sql`)**:
+    - Created migration file and registered Step 59 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Mirrored migration to `FiveM/nyx_parliament/sql/migrations/059_dynamic_speed_limits_statutory_laws_and_mdt_overlays.sql` and `FiveM/nyx_mdt/sql/migrations/059_dynamic_speed_limits_statutory_laws_and_mdt_overlays.sql`.
+    - Extended `nyx_parliament_laws` with `subsystem_target` ENUM('penal_code','tax_code','traffic_code','zoning_regulation','constitutional_charter') and `description` text.
+    - Seeded statutory laws: `speed:urban` (45 mph, bounds [25, 65]), `speed:highway` (75 mph, bounds [55, 100]), `speed:industrial` (35 mph, bounds [20, 50]), `speed:school_residential` (25 mph, bounds [15, 35]), `penal:speeding_minor` ($250, bounds [$50, $1000]), `penal:speeding_major` ($750 / 5 mo, bounds [$250, $3000] / [0, 15] mo), `tax:sales_cap` (12%, bounds [5%, 20%]), `zoning:commercial_tax_rebate` (-2%), and `zoning:industrial_environmental_surcharge` (+3%).
+    - Created tables `nyx_mdt_dispatch_warnings` (priority dispatch warning queue with GPS coordinates, acknowledgement state, and auto-expiration), `nyx_mdt_traffic_radar_zones` (automated radar/ANPR trap detection volumes), and `nyx_mdt_statutory_overrides` (audit log of enacted legal adjustments).
+  - **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_parliament/shared/statutory_enforcement.lua`)**:
+    - Implemented `ResolveSpeedLimit`, `GetSalesTaxCap`, and 4-tier speeding evaluation (`TIER_0_COMPLIANT`, `TIER_1_MINOR`, `TIER_2_MAJOR`, `TIER_3_RECKLESS`) with 5 mph buffer margins, penalty scaling, severity ratings, and impound recommendations.
+    - Implemented `CalculateSalesTax` with exact-cent closed-loop economic conservation ($\text{GrossTotal} - \text{Subtotal} \equiv \text{TaxAmount}$, $\Delta \equiv 0.00$) and statutory cap enforcement.
+    - Implemented `EvaluateZoningPolicy` supporting commercial rebates and industrial environmental surcharges.
+    - Implemented `ValidateStatutoryBillActions` enforcing constitutional bounds, immutable field protection, and numeric type assertions.
+    - Implemented `IsPointInRadarZone` (3D Euclidean spatial calculation) and `FormatWarningOverlay` with badge styling and UUID generator.
+  - **Server Subsystems & RPCs (`nyx_parliament` & `nyx_mdt`)**:
+    - `FiveM/nyx_parliament/server/statutes.lua`: Hydrated statutory laws on boot (`GlobalState.speedLimits`, `GlobalState.salesTaxCap`, `GlobalState.zoningPolicies`), registered RPCs `parliament:getSpeedLimits` and `parliament:getStatutoryLimits`.
+    - `FiveM/nyx_parliament/server/enactment.lua`: Extended `EnactBill` to record overrides in `nyx_mdt_statutory_overrides`, update GlobalState bags, and emit `nyx_mdt` dispatch warnings when laws take effect.
+    - `FiveM/nyx_parliament/server/exports.lua`: Exported `GetSpeedLimit`, `GetSpeedLimits`, `GetSalesTaxCap`, `EvaluateSpeeding`, `CalculateSalesTax`.
+    - `FiveM/nyx_mdt/server/records.lua`: Updated `mdt:issueFine` to enforce statutory fine AND sentence months caps (`minAllowedMonths`, `maxAllowedMonths`), registered RPCs `mdt:getStatutoryLimits` and `mdt:getStatutoryOverrides`.
+    - `FiveM/nyx_mdt/server/dispatch.lua`: Hydrated radar zones, added `CreateDispatchWarning`, ANPR/radar violation detection `RecordRadarDetection`, event `nyx:mdt:server:reportRadarDetection`, and RPCs `mdt:getDispatchWarnings`, `mdt:acknowledgeDispatchWarning`, `mdt:clearDispatchWarning`, `mdt:getRadarZones`, `mdt:recordRadarDetection`.
+    - `FiveM/nyx_mdt/server/exports.lua`: Exported `CreateDispatchWarning`, `RecordRadarDetection`, `GetActiveWarnings`, `GetRadarZones`.
+  - **Client Subsystems & Telemetry (`nyx_mdt` & `nyx_vehicles`)**:
+    - `FiveM/nyx_mdt/client/dispatch.lua`: Handled `nyx:mdt:client:dispatchWarning` HUD notification and flashing radar blip, auto-cleanup, update/clear listeners, player commands `/speedlimit` and `/mdtwarnings`.
+    - `FiveM/nyx_vehicles/client/speedometer.lua`: Telemetry loop detecting vehicle speed and active radar zones, debounce-reporting speeding violations, command `/checkspeed`, client exports `GetCurrentSpeedAndLimit`, `GetActiveSpeedLimit`.
+  - **Manifest Declarations**:
+    - `FiveM/nyx_parliament/fxmanifest.lua`: Added `shared/statutory_enforcement.lua`.
+    - `FiveM/nyx_mdt/fxmanifest.lua`: Added `@nyx_parliament/shared/statutory_enforcement.lua`.
+    - `FiveM/nyx_vehicles/fxmanifest.lua`: Added `@nyx_parliament/shared/statutory_enforcement.lua`, `client/speedometer.lua`, and dependency `'nyx_parliament'`.
+  - **Verification & Test Coverage**:
+    - Added in-engine integration test Test 54 (`Nyx.Tests.TestDynamicSpeedLimitsStatutoryLawsAndMDTOverlays`) in `FiveM/nyx_core/server/tests.lua` (7 sub-tests) and wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_dynamic_speed_limits_and_mdt_enforcement_sync.py` (10/10 tests passing).
+    - Full test suite: 508/508 tests passing; `scripts/validator.py` and `scripts/verify.ps1` clean across all 14 resources, 274 Lua files, and 59 migrations.
+
 - **[2026-10-18] Feature: Commercial Real Estate Leasing & Public Storefront Lease Cycles (`nyx_properties` & `nyx_factions`)**
   - **Database Migration (`058_commercial_real_estate_leasing_and_storefront_cycles.sql`)**:
     - Created migration file and registered Step 58 in `FiveM/nyx_core/sql/migrations/index.json`.

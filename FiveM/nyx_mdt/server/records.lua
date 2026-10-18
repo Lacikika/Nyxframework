@@ -182,6 +182,9 @@ exports['nyx_core']:RegisterRPC("mdt:issueFine", function(src, payload)
     local chargeId = payload and payload.chargeId
     local maxAllowedFine = Config.MDT.DefaultFineLimit or 25000.00
     local minAllowedFine = 0.0
+    local maxAllowedMonths = 120
+    local minAllowedMonths = 0
+    local sentenceMonths = payload and tonumber(payload.months)
 
     if exports['nyx_parliament'] then
         local targetId = chargeId or ("penal:" .. chargeTitle:lower():gsub("[^%w]", "_"))
@@ -192,6 +195,12 @@ exports['nyx_core']:RegisterRPC("mdt:issueFine", function(src, payload)
             end
             if law.minAllowed and law.minAllowed.fine then
                 minAllowedFine = tonumber(law.minAllowed.fine) or 0.0
+            end
+            if law.maxAllowed and law.maxAllowed.months then
+                maxAllowedMonths = tonumber(law.maxAllowed.months) or maxAllowedMonths
+            end
+            if law.minAllowed and law.minAllowed.months then
+                minAllowedMonths = tonumber(law.minAllowed.months) or 0
             end
         end
     end
@@ -210,6 +219,24 @@ exports['nyx_core']:RegisterRPC("mdt:issueFine", function(src, payload)
             success = false,
             error = "BELOW_STATUTORY_MINIMUM",
             minAllowed = minAllowedFine,
+            charge = chargeTitle
+        }
+    end
+
+    if sentenceMonths and sentenceMonths > maxAllowedMonths then
+        return {
+            success = false,
+            error = "EXCEEDS_STATUTORY_MAXIMUM_SENTENCE",
+            maxAllowed = maxAllowedMonths,
+            charge = chargeTitle
+        }
+    end
+
+    if sentenceMonths and sentenceMonths < minAllowedMonths then
+        return {
+            success = false,
+            error = "BELOW_STATUTORY_MINIMUM_SENTENCE",
+            minAllowed = minAllowedMonths,
             charge = chargeTitle
         }
     end
@@ -391,3 +418,51 @@ exports['nyx_core']:RegisterRPC("mdt:reviewWarrantPetition", function(src, paylo
 
     return { success = false, error = "JUDICIARY_SUBSYSTEM_UNAVAILABLE" }
 end)
+
+-- 9. RPC: Query Active Statutory Limits & Speed Matrix for MDT
+exports['nyx_core']:RegisterRPC("mdt:getStatutoryLimits", function(src)
+    if not Nyx.MDT.IsAuthorized(src) then
+        return { success = false, error = "UNAUTHORIZED" }
+    end
+
+    local limits = {}
+    if exports['nyx_parliament'] and exports['nyx_parliament'].GetSpeedLimits then
+        limits.speedLimits = exports['nyx_parliament']:GetSpeedLimits()
+        limits.salesTaxCap = exports['nyx_parliament']:GetSalesTaxCap()
+        limits.penalCode = exports['nyx_parliament']:GetPenalCode()
+    elseif GlobalState.speedLimits then
+        limits.speedLimits = GlobalState.speedLimits
+        limits.salesTaxCap = GlobalState.salesTaxCap or 0.12
+        limits.penalCode = GlobalState.penalCode or {}
+    else
+        limits.speedLimits = { urban = 45.0, highway = 75.0, industrial = 35.0, school_residential = 25.0 }
+        limits.salesTaxCap = 0.12
+        limits.penalCode = {}
+    end
+
+    return {
+        success = true,
+        data = limits
+    }
+end)
+
+-- 10. RPC: Query Recent Statutory Overrides Enacted by Parliament
+exports['nyx_core']:RegisterRPC("mdt:getStatutoryOverrides", function(src)
+    if not Nyx.MDT.IsAuthorized(src) then
+        return { success = false, error = "UNAUTHORIZED" }
+    end
+
+    local rows = MySQL.query.await([[
+        SELECT `override_id`, `law_id`, `enacted_session_id`, `statutory_field`,
+               `previous_value`, `new_value`, `synced_to_mdt`, `created_at`
+        FROM `nyx_mdt_statutory_overrides`
+        ORDER BY `created_at` DESC
+        LIMIT 25
+    ]]) or {}
+
+    return {
+        success = true,
+        overrides = rows
+    }
+end)
+

@@ -11,3 +11,20 @@ end)
 exports('GetActiveCalls', function()
     return Nyx.MDT.ActiveCalls
 end)
+
+exports('CreateDispatchWarning', function(payload)
+    return Nyx.MDT.CreateDispatchWarning(payload)
+end)
+
+exports('RecordRadarDetection', function(plate, model, speedMph, coords, citizenId)
+    return Nyx.MDT.RecordRadarDetection(plate, model, speedMph, coords, citizenId)
+end)
+
+exports('GetActiveWarnings', function()
+    return Nyx.MDT.ActiveWarnings
+end)
+
+exports('GetRadarZones', function()
+    return Nyx.MDT.RadarZones
+end)
+

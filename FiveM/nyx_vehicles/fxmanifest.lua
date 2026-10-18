@@ -16,6 +16,7 @@ version '1.0.0'
 shared_scripts {
     '@nyx_core/shared/math.lua',
     '@nyx_treasury/shared/degradation.lua',
+    '@nyx_parliament/shared/statutory_enforcement.lua',
     'config.lua',
     'shared/registration.lua',
     'shared/diagnostics.lua',
@@ -45,6 +46,7 @@ client_scripts {
     'client/impound.lua',
     'client/diagnostics.lua',
     'client/fuel.lua',
+    'client/speedometer.lua',
     'client/main.lua',
     'client/exports.lua'
 }
@@ -53,5 +55,6 @@ dependencies {
     'oxmysql',
     'nyx_core',
     'nyx_inventory',
-    'nyx_treasury'
+    'nyx_treasury',
+    'nyx_parliament'
 }

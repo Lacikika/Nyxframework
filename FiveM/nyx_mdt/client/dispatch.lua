@@ -138,12 +138,138 @@ RegisterNetEvent("nyx:mdt:client:clearTrackingBlip", function(data)
     end
 end)
 
+-- ----------------------------------------------------------------------------
+-- Dispatch Warning Overlays & ANPR Radar Trapping Listeners
+-- ----------------------------------------------------------------------------
+local activeWarningBlips = {} -- [warningId] = blipHandle
+
+local function clearWarningBlip(warningId)
+    local blip = activeWarningBlips[warningId]
+    if blip and DoesBlipExist(blip) then
+        RemoveBlip(blip)
+        activeWarningBlips[warningId] = nil
+    end
+end
+
+-- New Dispatch Warning Overlay Received (Server Push)
+RegisterNetEvent("nyx:mdt:client:dispatchWarning", function(warningData)
+    if not warningData then return end
+
+    local isCritical = (warningData.severity == "critical")
+    if isCritical then
+        PlaySoundFrontend(-1, "Beep_Red", "DLC_HEIST_HACKING_SNAKE_SOUNDS", true)
+    else
+        PlaySoundFrontend(-1, "Event_Message_Purple", "GTAO_FM_Events_Soundset", true)
+    end
+
+    TriggerEvent("nyx:ui:notify", {
+        type = isCritical and "error" or "warning",
+        title = warningData.title or "MDT RIASZTÁS",
+        message = warningData.description or (warningData.location or "Helyszín ismeretlen"),
+        duration = isCritical and 10000 or 7000
+    })
+
+    -- Create flashing radar alert blip if valid coordinates exist
+    if warningData.coords and warningData.coords.x and warningData.id then
+        clearWarningBlip(warningData.id)
+
+        local blip = AddBlipForCoord(warningData.coords.x, warningData.coords.y, warningData.coords.z or 0.0)
+        SetBlipSprite(blip, 184) -- Radar / camera hazard icon
+        SetBlipColour(blip, isCritical and 1 or 6) -- Red or Orange
+        SetBlipScale(blip, 1.15)
+        SetBlipFlashes(blip, true)
+        SetBlipAsShortRange(blip, false)
+        BeginTextCommandSetBlipName("STRING")
+        AddTextComponentSubstringPlayerName(string.format("Traffipax: %s", warningData.plate or "Jármű"))
+        EndTextCommandSetBlipName(blip)
+
+        activeWarningBlips[warningData.id] = blip
+
+        -- Auto-remove blip after 45 seconds to keep minimap uncluttered
+        SetTimeout(45000, function()
+            clearWarningBlip(warningData.id)
+        end)
+    end
+end)
+
+-- Dispatch Warning Updated (e.g. Acknowledged)
+RegisterNetEvent("nyx:mdt:client:updateWarning", function(warningData)
+    if not warningData or not warningData.id then return end
+    if activeWarningBlips[warningData.id] and DoesBlipExist(activeWarningBlips[warningData.id]) then
+        SetBlipFlashes(activeWarningBlips[warningData.id], false)
+        SetBlipColour(activeWarningBlips[warningData.id], 5) -- Yellow (acknowledged)
+    end
+end)
+
+-- Dispatch Warning Cleared
+RegisterNetEvent("nyx:mdt:client:clearWarning", function(warningId)
+    clearWarningBlip(tonumber(warningId))
+end)
+
+-- Command: Check Active Statutory Speed Limit in Current Zone
+RegisterCommand("speedlimit", function()
+    local limits = GlobalState.speedLimits or {
+        urban = 45.0,
+        highway = 75.0,
+        industrial = 35.0,
+        school_residential = 25.0
+    }
+
+    local ped = PlayerPedId()
+    local veh = GetVehiclePedIsIn(ped, false)
+    local curMph = 0.0
+    if veh ~= 0 then
+        curMph = math.floor((GetEntitySpeed(veh) * 2.236936) + 0.5)
+    end
+
+    TriggerEvent("nyx:ui:notify", {
+        type = "info",
+        title = "TÖRVÉNYES SEBESSÉGHATÁROK",
+        message = string.format("Városi: %d mph | Autópálya: %d mph | Ipari: %d mph | Lakóövezeti: %d mph%s",
+            math.floor(limits.urban or 45),
+            math.floor(limits.highway or 75),
+            math.floor(limits.industrial or 35),
+            math.floor(limits.school_residential or 25),
+            veh ~= 0 and string.format(" (Jelenlegi sebesség: %d mph)", curMph) or ""),
+        duration = 8000
+    })
+end, false)
+
+-- Command: Review Active MDT Dispatch Warnings
+RegisterCommand("mdtwarnings", function()
+    if not exports['nyx_core'] or not exports['nyx_core'].TriggerRPCAwait then return end
+    local res = exports['nyx_core']:TriggerRPCAwait("mdt:getDispatchWarnings")
+    if res and res.success and res.warnings then
+        local count = #res.warnings
+        if count == 0 then
+            TriggerEvent("nyx:ui:notify", {
+                type = "info",
+                title = "MDT RIASZTÁSOK",
+                message = "Nincsenek aktív figyelmeztető riasztások az egység számára."
+            })
+        else
+            for i = 1, math.min(3, count) do
+                local w = res.warnings[i]
+                TriggerEvent("nyx:ui:notify", {
+                    type = (w.severity == "critical") and "error" or "warning",
+                    title = string.format("[%d/%d] %s", i, count, w.title),
+                    message = w.description,
+                    duration = 6000
+                })
+            end
+        end
+    end
+end, false)
+
 -- Resource Cleanup
 AddEventHandler("onResourceStop", function(resName)
     if resName == GetCurrentResourceName() then
         clearCallBlip()
         for wid, _ in pairs(activeTrackingBlips) do
             clearWarrantTracking(wid)
+        end
+        for warnId, _ in pairs(activeWarningBlips) do
+            clearWarningBlip(warnId)
         end
     end
 end)

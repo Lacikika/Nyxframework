@@ -125,3 +125,23 @@ exports("GetBoothTerminals", function()
     return MySQL.query.await("SELECT * FROM `nyx_parliament_booth_terminals` WHERE `is_active` = 1") or {}
 end)
 
+exports("GetSpeedLimit", function(zoneType)
+    return Nyx.Parliament.GetSpeedLimit(zoneType)
+end)
+
+exports("GetSpeedLimits", function()
+    return Nyx.Parliament.GetSpeedLimits()
+end)
+
+exports("GetSalesTaxCap", function()
+    return Nyx.Parliament.GetSalesTaxCap()
+end)
+
+exports("EvaluateSpeeding", function(speedMph, zoneType)
+    return Nyx.Parliament.EvaluateSpeeding(speedMph, zoneType)
+end)
+
+exports("CalculateSalesTax", function(subtotal, proposedRate)
+    return Nyx.Parliament.CalculateSalesTax(subtotal, proposedRate)
+end)
+

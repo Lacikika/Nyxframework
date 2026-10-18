@@ -17,7 +17,8 @@ shared_scripts {
     'config.lua',
     'shared/irv.lua',
     'shared/legislation_ui.lua',
-    'shared/elections.lua'
+    'shared/elections.lua',
+    'shared/statutory_enforcement.lua'
 }
 
 server_scripts {

@@ -57,6 +57,15 @@ function Nyx.Parliament.EnactBill(session)
                 ]], { session.session_id, act.targetLawId, act.field, oldVal, numVal, session.title or session.session_id })
             end)
 
+            -- Persist statutory override to MDT audit ledger if targeting MDT, speed, or penal
+            pcall(function()
+                MySQL.prepare.await([[
+                    INSERT INTO `nyx_mdt_statutory_overrides`
+                        (`law_id`, `enacted_session_id`, `statutory_field`, `previous_value`, `new_value`, `synced_to_mdt`)
+                    VALUES (?, ?, ?, ?, ?, 1)
+                ]], { act.targetLawId, session.session_id, act.field, oldVal or 0.0, numVal })
+            end)
+
             -- Real-time downstream propagation: Intercept nyx_treasury tax rates
             if act.targetLawId == "tax:sales_rate" and act.field == "rate" then
                 pcall(function()
@@ -65,6 +74,25 @@ function Nyx.Parliament.EnactBill(session)
             elseif act.targetLawId == "tax:transfer_rate" and act.field == "rate" then
                 pcall(function()
                     exports['nyx_treasury']:SetTaxRate("transfer", numVal, session.title)
+                end)
+            end
+
+            -- MDT Real-Time Dispatch Warning Overlay for Statutory Amendments
+            if act.targetLawId:sub(1, 6) == "speed:" or act.targetLawId:sub(1, 6) == "penal:" or act.targetLawId == "tax:sales_cap" then
+                pcall(function()
+                    if exports['nyx_mdt'] and exports['nyx_mdt'].CreateDispatchWarning then
+                        local warnTitle = string.format("JOGSZABÁLY MÓDOSÍTÁS: %s", law.title or act.targetLawId)
+                        local warnDesc = string.format("A Parlament módosította a(z) %s törvényt (%s: %s -> %s). Hatályba lépett.",
+                            act.targetLawId, act.field, tostring(oldVal or "N/A"), tostring(numVal))
+                        exports['nyx_mdt']:CreateDispatchWarning({
+                            category = "statutory_amendment",
+                            severity = "medium",
+                            title = warnTitle,
+                            description = warnDesc,
+                            locationLabel = "San Andreas Törvényhozás",
+                            coords = { x = -545.0, y = -204.0, z = 38.2 }
+                        })
+                    end
                 end)
             end
         end

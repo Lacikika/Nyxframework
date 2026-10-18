@@ -11245,7 +11245,192 @@ function Nyx.Tests.TestCommercialRealEstateLeasingAndStorefrontCycles()
     return passes == total
 end
 
--- 45. Master Test Runner (Suite 1 - Suite 53)
+-- 54. Integration Test: Dynamic Speed Limits, Statutory Law Formulation & MDT Enforcement Overlays
+function Nyx.Tests.TestDynamicSpeedLimitsStatutoryLawsAndMDTOverlays()
+    print("^3--- Running Integration Test Suite 54: Dynamic Speed Limits & MDT Enforcement Overlays ---^7")
+    local passes = 0
+    local total = 7
+
+    local StatutoryEnforcement = Nyx.StatutoryEnforcement
+    if not StatutoryEnforcement then
+        local chunk = nil
+        if LoadResourceFile then
+            chunk = LoadResourceFile("nyx_parliament", "shared/statutory_enforcement.lua")
+        end
+        if not chunk and io and io.open then
+            local f = io.open("FiveM/nyx_parliament/shared/statutory_enforcement.lua", "r")
+            if f then
+                chunk = f:read("*a")
+                f:close()
+            end
+        end
+        if chunk then
+            local fn = load(chunk, "nyx_parliament/shared/statutory_enforcement.lua")
+            if fn then fn() end
+        end
+        StatutoryEnforcement = Nyx.StatutoryEnforcement
+    end
+
+    if not StatutoryEnforcement then
+        print("^1[Nyx:Test:FAIL] Could not load nyx_parliament/shared/statutory_enforcement.lua^7")
+        return false
+    end
+
+    local mockLaws = {
+        ['speed:urban'] = { id = 'speed:urban', currentValue = { mph = 45 }, minAllowed = { mph = 25 }, maxAllowed = { mph = 65 } },
+        ['speed:highway'] = { id = 'speed:highway', currentValue = { mph = 75 }, minAllowed = { mph = 55 }, maxAllowed = { mph = 100 } },
+        ['speed:industrial'] = { id = 'speed:industrial', currentValue = { mph = 35 }, minAllowed = { mph = 20 }, maxAllowed = { mph = 50 } },
+        ['speed:school_residential'] = { id = 'speed:school_residential', currentValue = { mph = 25 }, minAllowed = { mph = 15 }, maxAllowed = { mph = 35 } },
+        ['penal:speeding_minor'] = { id = 'penal:speeding_minor', currentValue = { fine = 250, months = 0 }, minAllowed = { fine = 50, months = 0 }, maxAllowed = { fine = 1000, months = 0 } },
+        ['penal:speeding_major'] = { id = 'penal:speeding_major', currentValue = { fine = 750, months = 5 }, minAllowed = { fine = 250, months = 0 }, maxAllowed = { fine = 3000, months = 15 } },
+        ['penal:reckless_driving'] = { id = 'penal:reckless_driving', currentValue = { fine = 2500, months = 15 }, minAllowed = { fine = 1000, months = 5 }, maxAllowed = { fine = 10000, months = 60 } },
+        ['tax:sales_cap'] = { id = 'tax:sales_cap', currentValue = { rate = 0.12 }, minAllowed = { rate = 0.05 }, maxAllowed = { rate = 0.20 } },
+        ['zoning:commercial_tax_rebate'] = { id = 'zoning:commercial_tax_rebate', currentValue = { rebate = 0.02 } },
+        ['zoning:industrial_environmental_surcharge'] = { id = 'zoning:industrial_environmental_surcharge', currentValue = { surcharge = 0.03 } }
+    }
+
+    -- Sub-test A: Statutory Speed Limits Resolution & Defaults
+    local uLimit = StatutoryEnforcement.ResolveSpeedLimit("urban", mockLaws)
+    local hLimit = StatutoryEnforcement.ResolveSpeedLimit("highway", mockLaws)
+    local iLimit = StatutoryEnforcement.ResolveSpeedLimit("industrial", mockLaws)
+    local sLimit = StatutoryEnforcement.ResolveSpeedLimit("school_residential", mockLaws)
+    local defLimit = StatutoryEnforcement.ResolveSpeedLimit("unknown_zone", nil)
+
+    local testA_ok = (uLimit == 45.0) and (hLimit == 75.0) and (iLimit == 35.0) and (sLimit == 25.0) and (defLimit == 45.0)
+    if assertTest(testA_ok == true,
+        "Statutory Speed Limits Resolution & Zone Taxonomy Defaults",
+        string.format("urban=%.1f, highway=%.1f, industrial=%.1f, school=%.1f, default=%.1f",
+            uLimit, hLimit, iLimit, sLimit, defLimit)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Speeding Violation Tiers, Buffer Margins & Fine Scaling
+    local resCompliant = StatutoryEnforcement.EvaluateSpeeding(48.0, "urban", mockLaws)
+    local resMinor = StatutoryEnforcement.EvaluateSpeeding(55.0, "urban", mockLaws)
+    local resMajor = StatutoryEnforcement.EvaluateSpeeding(72.0, "urban", mockLaws)
+    local resReckless = StatutoryEnforcement.EvaluateSpeeding(98.0, "urban", mockLaws)
+
+    local testB_ok = (resCompliant.isViolation == false and resCompliant.tier == 0 and resCompliant.triggerDispatchWarning == false) and
+                     (resMinor.isViolation == true and resMinor.tier == 1 and resMinor.recommendedFine >= 250.0 and resMinor.sentenceMonths == 0) and
+                     (resMajor.isViolation == true and resMajor.tier == 2 and resMajor.recommendedFine >= 750.0 and resMajor.sentenceMonths == 5) and
+                     (resReckless.isViolation == true and resReckless.tier == 3 and resReckless.recommendedFine >= 2500.0 and resReckless.sentenceMonths == 15 and resReckless.impoundRecommended == true and resReckless.severity == "critical")
+
+    if assertTest(testB_ok == true,
+        "4-Tier Speeding Violation Calibration, Buffer Margins & Penal Fine Scaling",
+        string.format("compliantTier=%d, minorFine=%.2f, majorFine=%.2f, recklessImpound=%s",
+            resCompliant.tier, resMinor.recommendedFine, resMajor.recommendedFine, tostring(resReckless.impoundRecommended))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Constitutional Sales Tax Cap & Exact Cent Closed-Loop Conservation
+    local taxStandard = StatutoryEnforcement.CalculateSalesTax(2500.00, 0.08, mockLaws)
+    local taxCapped = StatutoryEnforcement.CalculateSalesTax(2500.00, 0.20, mockLaws)
+
+    local testC_ok = (taxStandard.effectiveRate == 0.08 and taxStandard.wasCapped == false and taxStandard.taxAmount == 200.00 and taxStandard.grossTotal == 2700.00 and taxStandard.isConserved == true) and
+                     (taxCapped.effectiveRate == 0.12 and taxCapped.wasCapped == true and taxCapped.taxAmount == 300.00 and taxCapped.grossTotal == 2800.00 and taxCapped.isConserved == true)
+
+    if assertTest(testC_ok == true,
+        "Constitutional Sales Tax Cap & Exact Cent Closed-Loop Conservation Law",
+        string.format("stdGross=%.2f (tax=%.2f), cappedGross=%.2f (rate=%.2f, wasCapped=%s)",
+            taxStandard.grossTotal, taxStandard.taxAmount, taxCapped.grossTotal, taxCapped.effectiveRate, tostring(taxCapped.wasCapped))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Zoning Policy Tax Modifiers & Environmental Adjustments
+    local zoneComm = StatutoryEnforcement.EvaluateZoningPolicy("retail_storefront", 0.08, mockLaws)
+    local zoneInd = StatutoryEnforcement.EvaluateZoningPolicy("industrial_warehouse", 0.08, mockLaws)
+    local zoneGen = StatutoryEnforcement.EvaluateZoningPolicy("general", 0.08, mockLaws)
+
+    local testD_ok = (zoneComm.netRate == 0.06 and zoneComm.adjustmentPct == -0.02) and
+                     (zoneInd.netRate == 0.11 and zoneInd.adjustmentPct == 0.03) and
+                     (zoneGen.netRate == 0.08 and zoneGen.adjustmentPct == 0.0)
+
+    if assertTest(testD_ok == true,
+        "Zoning Policy Commercial Rebate & Industrial Environmental Surcharges",
+        string.format("commRate=%.4f (adj=%.4f), indRate=%.4f (adj=%.4f), genRate=%.4f",
+            zoneComm.netRate, zoneComm.adjustmentPct, zoneInd.netRate, zoneInd.adjustmentPct, zoneGen.netRate)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Structured Bill Actions & Subsystem Constitutional Bounds Validator
+    local validActions = {
+        { targetLawId = "speed:highway", field = "mph", newValue = 80 },
+        { targetLawId = "tax:sales_cap", field = "rate", newValue = 0.15 },
+        { targetLawId = "penal:speeding_minor", field = "fine", newValue = 350 }
+    }
+    local invalidSpeed = {
+        { targetLawId = "speed:urban", field = "mph", newValue = 140 }
+    }
+    local invalidTax = {
+        { targetLawId = "tax:sales_cap", field = "rate", newValue = 0.75 }
+    }
+    local invalidField = {
+        { targetLawId = "speed:urban", field = "invalid_field", newValue = 50 }
+    }
+
+    local okVal, cleanActs = StatutoryEnforcement.ValidateStatutoryBillActions(validActions, mockLaws)
+    local okSpeed, errSpeed = StatutoryEnforcement.ValidateStatutoryBillActions(invalidSpeed, mockLaws)
+    local okTax, errTax = StatutoryEnforcement.ValidateStatutoryBillActions(invalidTax, mockLaws)
+    local okFld, errFld = StatutoryEnforcement.ValidateStatutoryBillActions(invalidField, mockLaws)
+
+    local testE_ok = (okVal == true and #cleanActs == 3) and
+                     (okSpeed == false and errSpeed ~= nil) and
+                     (okTax == false and errTax ~= nil) and
+                     (okFld == false and errFld ~= nil)
+
+    if assertTest(testE_ok == true,
+        "Structured Bill Proposal Actions & Subsystem Constitutional Bounds Validation",
+        string.format("okVal=%s (#acts=%d), speedErr=%s, taxErr=%s, fieldErr=%s",
+            tostring(okVal), #cleanActs, tostring(errSpeed), tostring(errTax), tostring(errFld))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Traffic Radar ANPR 3D Spatial Radius Gating
+    local radarCoords = { x = 312.4, y = 182.5, z = 103.8 }
+    local insidePoint = { x = 320.0, y = 190.0, z = 103.8 }
+    local outsidePoint = { x = 600.0, y = 500.0, z = 103.8 }
+
+    local inZone, distIn = StatutoryEnforcement.IsPointInRadarZone(insidePoint, radarCoords, 150.0)
+    local outZone, distOut = StatutoryEnforcement.IsPointInRadarZone(outsidePoint, radarCoords, 150.0)
+
+    local testF_ok = (inZone == true and distIn <= 150.0) and
+                     (outZone == false and distOut > 150.0)
+
+    if assertTest(testF_ok == true,
+        "Traffic Radar ANPR 3D Euclidean Spatial Detection Radius Gating",
+        string.format("inside=(in=%s, dist=%.1fm), outside=(out=%s, dist=%.1fm)",
+            tostring(inZone), distIn, tostring(outZone), distOut)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: MDT Warning Overlay Formatting & Unique Serial Generators
+    local mockWarning = {
+        category = "speeding_anpr",
+        severity = "critical",
+        title = "TRAFFIPAX: Vinewood Blvd (95.0 / 45.0 mph)",
+        location_label = "Vinewood Boulevard Speed Trap",
+        status = "active"
+    }
+    local formatted = StatutoryEnforcement.FormatWarningOverlay(mockWarning)
+    local warnUuid1 = StatutoryEnforcement.GenerateWarningUuid()
+    local warnUuid2 = StatutoryEnforcement.GenerateWarningUuid()
+
+    local testG_ok = (formatted.badgeClass == "badge-danger") and
+                     (formatted.severity == "critical") and
+                     (warnUuid1:find("^wrn%-") ~= nil) and
+                     (warnUuid1 ~= warnUuid2)
+
+    if assertTest(testG_ok == true,
+        "MDT Real-Time Warning Overlay Formatting & Cryptographic Unique Serial Generation",
+        string.format("badgeClass=%s, sev=%s, uuid1=%s, distinct=%s",
+            formatted.badgeClass, formatted.severity, warnUuid1, tostring(warnUuid1 ~= warnUuid2))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 45. Master Test Runner (Suite 1 - Suite 54)
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -11304,6 +11489,7 @@ function Nyx.Tests.RunAll()
     local t51 = Nyx.Tests.TestDemocraticParliamentaryElectionsAndRecallReferendums()
     local t52 = Nyx.Tests.TestAuditablePublicTreasuryLedgerAndDepartmentMonitor()
     local t53 = Nyx.Tests.TestCommercialRealEstateLeasingAndStorefrontCycles()
+    local t54 = Nyx.Tests.TestDynamicSpeedLimitsStatutoryLawsAndMDTOverlays()
 
     print("^5--------------------------------------------------^7")
     local suites1to50Passed = false
@@ -11311,7 +11497,7 @@ function Nyx.Tests.RunAll()
         suites1to50Passed = true
     end
 
-    if suites1to50Passed and t51 and t52 and t53 then
+    if suites1to50Passed and t51 and t52 and t53 and t54 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

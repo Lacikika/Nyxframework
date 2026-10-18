@@ -14,7 +14,8 @@ description 'Zero-Polling Emergency Dispatch, CAD System, Criminal Records & Cou
 version '1.0.0'
 
 shared_scripts {
-    'config.lua'
+    'config.lua',
+    '@nyx_parliament/shared/statutory_enforcement.lua'
 }
 
 server_scripts {
