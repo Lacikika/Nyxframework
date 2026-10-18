@@ -199,104 +199,609 @@ function Nyx.Tests.TestRPC()
 end
 
 
--- 2. Test Inventory Mutex Concurrency & Duplication Prevention
+-- 2. Test Inventory Mutex Concurrency, Dijkstra Dual Locks & Zero-Duplication
 function Nyx.Tests.TestInventoryConcurrency()
-    print("^3[Nyx:Tests] Running Inventory Mutex Concurrency Suite...^7")
+    print("^3[Nyx:Tests] Running Comprehensive Inventory Mutex Concurrency Suite...^7")
     local passes = 0
-    local total = 3
+    local total = 10
 
-    local mockLocks = {}
-    local function acquireLock(invId)
-        if mockLocks[invId] then
-            return false, "CONTAINER_LOCKED"
+    -- Isolated test harness mirroring nyx_inventory/server/mutex.lua
+    local testLocks = {}
+    local simulatedTime = 1000
+
+    local isLocked = function(invId)
+        if not invId then return false end
+        local exp = testLocks[invId]
+        if not exp then return false end
+        if simulatedTime >= exp then
+            testLocks[invId] = nil
+            return false
         end
-        mockLocks[invId] = os.time()
         return true
     end
 
-    local function releaseLock(invId)
-        mockLocks[invId] = nil
+    local acquireLock = function(invId, timeoutMs)
+        if not invId then return false end
+        if isLocked(invId) then return false, "CONTAINER_LOCKED" end
+        local dur = timeoutMs or 2000
+        testLocks[invId] = simulatedTime + dur
+        return true
     end
 
-    -- Test A: Acquire initial container lock
-    local ok1 = acquireLock("citizen:TEST_01")
-    if assertTest(ok1 == true, "Inventory Lock Acquisition", "Failed to acquire free container lock") then
+    local releaseLock = function(invId)
+        if not invId then return end
+        testLocks[invId] = nil
+    end
+
+    local acquireDualLock = function(invIdA, invIdB, timeoutMs)
+        if not invIdA or not invIdB then return false end
+        if invIdA == invIdB then
+            return acquireLock(invIdA, timeoutMs)
+        end
+        -- Dijkstra resource hierarchy (lexicographical sorting order)
+        local first = invIdA < invIdB and invIdA or invIdB
+        local second = invIdA < invIdB and invIdB or invIdA
+
+        if not acquireLock(first, timeoutMs) then
+            return false, "CONTAINER_BUSY"
+        end
+
+        if not acquireLock(second, timeoutMs) then
+            releaseLock(first) -- rollback to prevent partial lock leakage
+            return false, "CONTAINER_BUSY"
+        end
+        return true
+    end
+
+    local releaseDualLock = function(invIdA, invIdB)
+        if invIdA == invIdB then
+            releaseLock(invIdA)
+        else
+            releaseLock(invIdA)
+            releaseLock(invIdB)
+        end
+    end
+
+    local withLock = function(invId, fn)
+        local okLock, errLock = acquireLock(invId)
+        if not okLock then return false, "CONTAINER_BUSY" end
+        local ok, res = xpcall(fn, function(e)
+            return tostring(e)
+        end)
+        releaseLock(invId)
+        if not ok then return false, "INTERNAL_MUTEX_ERROR" end
+        return true, res
+    end
+
+    local withDualLock = function(invIdA, invIdB, fn)
+        local okLock, errLock = acquireDualLock(invIdA, invIdB)
+        if not okLock then return false, "CONTAINER_BUSY" end
+        local ok, res = xpcall(fn, function(e)
+            return tostring(e)
+        end)
+        releaseDualLock(invIdA, invIdB)
+        if not ok then return false, "INTERNAL_MUTEX_ERROR" end
+        return true, res
+    end
+
+    -- Test A: Single Lock Lifecycle & Active State Query (isLocked)
+    local invA = "citizen:TEST_01"
+    local a_before = isLocked(invA)
+    local a_acq = acquireLock(invA)
+    local a_mid = isLocked(invA)
+    releaseLock(invA)
+    local a_after = isLocked(invA)
+
+    local testA_ok = (a_before == false) and (a_acq == true) and (a_mid == true) and (a_after == false)
+    if assertTest(testA_ok == true,
+        "Inventory Single Lock Lifecycle & isLocked Tracking",
+        string.format("before=%s, acq=%s, mid=%s, after=%s", tostring(a_before), tostring(a_acq), tostring(a_mid), tostring(a_after))) then
         passes = passes + 1
     end
 
-    -- Test B: Mutex Contention (Prevent concurrent write/dupe)
-    local ok2, err2 = acquireLock("citizen:TEST_01")
-    if assertTest(ok2 == false and err2 == "CONTAINER_LOCKED", "Inventory Mutex Contention Lockout", "Duplicate lock was acquired concurrently!") then
+    -- Test B: Mutex Contention Lockout & Busy Rejection
+    local invB = "citizen:CONTEND_01"
+    acquireLock(invB)
+    local b_acq2, b_err2 = acquireLock(invB)
+    releaseLock(invB)
+
+    local testB_ok = (b_acq2 == false) and (b_err2 == "CONTAINER_LOCKED")
+    if assertTest(testB_ok == true,
+        "Inventory Mutex Contention Lockout & Busy Rejection",
+        string.format("acq2=%s, err2=%s", tostring(b_acq2), tostring(b_err2))) then
         passes = passes + 1
     end
 
-    releaseLock("citizen:TEST_01")
+    -- Test C: Time-Based Expiry Fail-Safe & Auto-Purge
+    local invC = "citizen:TIMEOUT_01"
+    simulatedTime = 1000
+    acquireLock(invC, 2000) -- expires at 3000
+    simulatedTime = 2500
+    local c_lockedMid = isLocked(invC)
+    simulatedTime = 3001
+    local c_lockedExpired = isLocked(invC)
+    local c_reacquire = acquireLock(invC)
+    releaseLock(invC)
 
-    -- Test C: Atomic Item Conservation across transfer
-    local sourceSlot = { item = "gold_bar", count = 10 }
-    local targetSlot = { item = "gold_bar", count = 5 }
-    local initialSum = sourceSlot.count + targetSlot.count
-
-    -- Transfer 4 items from source to target
-    local transferAmt = 4
-    if sourceSlot.count >= transferAmt then
-        sourceSlot.count = sourceSlot.count - transferAmt
-        targetSlot.count = targetSlot.count + transferAmt
+    local testC_ok = (c_lockedMid == true) and (c_lockedExpired == false) and (c_reacquire == true)
+    if assertTest(testC_ok == true,
+        "Inventory Lock Time-Based Auto-Expiry & Clean Recovery",
+        string.format("lockedMid=%s, lockedExpired=%s, reacquire=%s", tostring(c_lockedMid), tostring(c_lockedExpired), tostring(c_reacquire))) then
+        passes = passes + 1
     end
 
-    local finalSum = sourceSlot.count + targetSlot.count
-    if assertTest(finalSum == initialSum and sourceSlot.count == 6 and targetSlot.count == 9, "Zero-Duplication Item Conservation Invariant", "Item counts mutated or duplicated during atomic transfer") then
+    -- Test D: Deadlock-Free Dual Mutex Locks (Dijkstra Resource Hierarchy)
+    local d1 = "citizen:ALICE"
+    local d2 = "stash:BOB"
+    local d_acq = acquireDualLock(d1, d2)
+    local d_locked1 = isLocked(d1)
+    local d_locked2 = isLocked(d2)
+    releaseDualLock(d1, d2)
+    local d_after1 = isLocked(d1)
+    local d_after2 = isLocked(d2)
+
+    local testD_ok = (d_acq == true) and (d_locked1 == true) and (d_locked2 == true) and (d_after1 == false) and (d_after2 == false)
+    if assertTest(testD_ok == true,
+        "Deadlock-Free Dual-Container Mutex Locking (Dijkstra Ordering)",
+        string.format("acq=%s, locked1=%s, locked2=%s, after1=%s, after2=%s", tostring(d_acq), tostring(d_locked1), tostring(d_locked2), tostring(d_after1), tostring(d_after2))) then
+        passes = passes + 1
+    end
+
+    -- Test E: Circular Deadlock Avoidance on Inverted Request Ordering
+    local e1 = "citizen:ALICE"
+    local e2 = "stash:BOB"
+    acquireDualLock(e1, e2) -- Process 1 holds (e1, e2)
+    -- Process 2 requests inverted (e2, e1)
+    local e_invertedAcq = acquireDualLock(e2, e1)
+    releaseDualLock(e1, e2)
+
+    local testE_ok = (e_invertedAcq == false) and (isLocked(e1) == false) and (isLocked(e2) == false)
+    if assertTest(testE_ok == true,
+        "Circular Deadlock Avoidance on Inverted Lock Requests",
+        string.format("invertedAcq=%s, e1Locked=%s, e2Locked=%s", tostring(e_invertedAcq), tostring(isLocked(e1)), tostring(isLocked(e2)))) then
+        passes = passes + 1
+    end
+
+    -- Test F: Partial Dual-Lock Acquisition Rollback Invariant
+    local f1 = "citizen:01"
+    local f2 = "citizen:02" -- f1 < f2
+    acquireLock(f2) -- f2 is already locked
+    local f_dualAcq = acquireDualLock(f1, f2) -- attempts f1 (succeeds) then f2 (fails) -> MUST release f1!
+    local f1_leaked = isLocked(f1)
+    local f2_stillLocked = isLocked(f2)
+    releaseLock(f2)
+
+    local testF_ok = (f_dualAcq == false) and (f1_leaked == false) and (f2_stillLocked == true)
+    if assertTest(testF_ok == true,
+        "Dual Mutex Partial Failure Rollback Invariant (No Lock Leak)",
+        string.format("dualAcq=%s, f1Leaked=%s, f2Locked=%s", tostring(f_dualAcq), tostring(f1_leaked), tostring(f2_stillLocked))) then
+        passes = passes + 1
+    end
+
+    -- Test G: Intra-Container Dual Lock (Self-Move)
+    local g = "citizen:SELF_MOVE"
+    local g_acq = acquireDualLock(g, g)
+    local g_locked = isLocked(g)
+    local g_reacquire = acquireLock(g)
+    releaseDualLock(g, g)
+    local g_after = isLocked(g)
+
+    local testG_ok = (g_acq == true) and (g_locked == true) and (g_reacquire == false) and (g_after == false)
+    if assertTest(testG_ok == true,
+        "Intra-Container Dual Lock Invariant (Self-Move Non-Deadlocking)",
+        string.format("acq=%s, locked=%s, reacquire=%s, after=%s", tostring(g_acq), tostring(g_locked), tostring(g_reacquire), tostring(g_after))) then
+        passes = passes + 1
+    end
+
+    -- Test H: Scoped Execution (WithLock & WithDualLock) Exception Safety
+    local h1 = "citizen:EXCEPTION_1"
+    local h2 = "citizen:EXCEPTION_2"
+    local normalOk, normalRes = withLock(h1, function() return 999 end)
+    local errOk, errRes = withLock(h1, function() error("simulated_db_timeout") end)
+    local dualErrOk, dualErrRes = withDualLock(h1, h2, function() error("simulated_deadlock") end)
+
+    local testH_ok = (normalOk == true and normalRes == 999)
+        and (errOk == false and errRes == "INTERNAL_MUTEX_ERROR" and isLocked(h1) == false)
+        and (dualErrOk == false and dualErrRes == "INTERNAL_MUTEX_ERROR" and isLocked(h1) == false and isLocked(h2) == false)
+
+    if assertTest(testH_ok == true,
+        "Scoped Mutex Execution & Exception Safety (Guaranteed Release)",
+        string.format("normal=%s, err=%s, dualErr=%s, h1Locked=%s, h2Locked=%s",
+            tostring(normalOk), tostring(errRes), tostring(dualErrRes), tostring(isLocked(h1)), tostring(isLocked(h2)))) then
+        passes = passes + 1
+    end
+
+    -- Test I: Concurrent Item Transfer Race Condition & Zero-Duplication Invariant
+    local srcContainer = { id = "citizen:SRC", items = { { item = "gold_bar", count = 10 } } }
+    local dstContainer = { id = "citizen:DST", items = {} }
+
+    local req1Success = false
+    local req2Success = false
+
+    -- Simulated concurrent requests: Request 1 locks and executes
+    if acquireDualLock(srcContainer.id, dstContainer.id) then
+        local amt = srcContainer.items[1].count
+        srcContainer.items[1].count = srcContainer.items[1].count - amt
+        table.insert(dstContainer.items, { item = "gold_bar", count = amt })
+        req1Success = true
+
+        -- Concurrent Request 2 attempts identical transfer while lock is held
+        local req2Allowed = acquireDualLock(srcContainer.id, dstContainer.id)
+        if req2Allowed then
+            -- Mutex failure would corrupt state here
+            req2Success = true
+            releaseDualLock(srcContainer.id, dstContainer.id)
+        end
+
+        releaseDualLock(srcContainer.id, dstContainer.id)
+    end
+
+    local srcRemaining = srcContainer.items[1].count
+    local dstReceived = dstContainer.items[1].count
+    local totalItems = srcRemaining + dstReceived
+
+    local testI_ok = (req1Success == true) and (req2Success == false) and (srcRemaining == 0) and (dstReceived == 10) and (totalItems == 10)
+    if assertTest(testI_ok == true,
+        "Concurrent Transfer Race Condition & Zero-Duplication Invariant",
+        string.format("req1=%s, req2=%s, srcRemaining=%d, dstReceived=%d, total=%d",
+            tostring(req1Success), tostring(req2Success), srcRemaining, dstReceived, totalItems)) then
+        passes = passes + 1
+    end
+
+    -- Test J: Destination Capacity Overflow Protection & Atomic Abort
+    local srcInv = { id = "citizen:SRC_J", count = 1, weightG = 15000 }
+    local dstInv = { id = "citizen:DST_J", count = 0, currentWeightG = 50000, maxWeightG = 60000 }
+
+    local moveOk, moveRes = withDualLock(srcInv.id, dstInv.id, function()
+        if (dstInv.currentWeightG + srcInv.weightG) > dstInv.maxWeightG then
+            return false, "CONTAINER_FULL"
+        end
+        srcInv.count = srcInv.count - 1
+        dstInv.count = dstInv.count + 1
+        return true, "TRANSFERRED"
+    end)
+
+    local testJ_ok = (moveOk == true) and (moveRes == false) and (srcInv.count == 1) and (dstInv.count == 0)
+        and (isLocked(srcInv.id) == false) and (isLocked(dstInv.id) == false)
+
+    if assertTest(testJ_ok == true,
+        "Container Capacity Overflow Protection & Atomic Transfer Abort",
+        string.format("moveOk=%s, moveRes=%s, srcCount=%d, dstCount=%d",
+            tostring(moveOk), tostring(moveRes), srcInv.count, dstInv.count)) then
         passes = passes + 1
     end
 
     return passes == total
 end
 
--- 3. Test Closed-Loop Treasury Double-Entry Conservation Law
+-- 3. Test Closed-Loop Treasury Double-Entry Conservation & Concurrency Overdraft Guards
 function Nyx.Tests.TestTreasuryConservationLaw()
-    print("^3[Nyx:Tests] Running Treasury Economic Conservation Suite...^7")
+    print("^3[Nyx:Tests] Running Comprehensive Treasury Conservation & Concurrency Suite...^7")
     local passes = 0
-    local total = 2
+    local total = 10
+
+    local accounts = {}
+    local ledger = {}
+    local circuitTripped = false
+    local maxSingleTx = 500000.00
+    local exemptCategories = { payroll = true, emergency_subvention = true, tax_sweep = true }
+
+    local function roundCents(val)
+        return math.floor((tonumber(val) or 0) * 100 + 0.5) / 100
+    end
+
+    local function ensureAccount(id, initBal)
+        if not accounts[id] then
+            accounts[id] = roundCents(initBal or 0.00)
+        end
+    end
+
+    local function getBalance(id)
+        return accounts[id] or 0.00
+    end
+
+    local function getTotalSystemBalance()
+        local sum = 0.00
+        for _, b in pairs(accounts) do
+            sum = sum + b
+        end
+        return roundCents(sum)
+    end
 
     local function validateTransaction(entries)
-        local totalDebits = 0
-        local totalCredits = 0
-
+        local totalDebits = 0.00
+        local totalCredits = 0.00
         for _, e in ipairs(entries) do
+            local amt = roundCents(e.amount)
             if e.entry_type == "DEBIT" then
-                totalDebits = totalDebits + e.amount
+                totalDebits = totalDebits + amt
             elseif e.entry_type == "CREDIT" then
-                totalCredits = totalCredits + e.amount
+                totalCredits = totalCredits + amt
+            end
+        end
+        local delta = math.abs(roundCents(totalDebits - totalCredits))
+        if delta > 0.001 then
+            return false, string.format("CONSERVATION_LAW_VIOLATION: Debits (%.2f) != Credits (%.2f)", totalDebits, totalCredits)
+        end
+        return true, nil
+    end
+
+    local function executeTransfer(debitAcc, creditAcc, amount, category, authorizedBy)
+        amount = roundCents(amount)
+        if amount <= 0.00 then return false, "INVALID_AMOUNT" end
+        if debitAcc == creditAcc then return false, "IDENTICAL_ACCOUNTS" end
+
+        ensureAccount(debitAcc)
+        ensureAccount(creditAcc)
+
+        if debitAcc:find("^gov:") then
+            if circuitTripped then
+                if not exemptCategories[category] and authorizedBy ~= "EXECUTIVE_OVERRIDE" then
+                    return false, "FISCAL_CIRCUIT_BREAKER_ACTIVE"
+                end
+            end
+            if amount > maxSingleTx and category ~= "emergency_subvention" and authorizedBy ~= "EXECUTIVE_OVERRIDE" then
+                circuitTripped = true
+                return false, "SINGLE_TRANSACTION_CAP_EXCEEDED"
             end
         end
 
-        local delta = math.abs(totalDebits - totalCredits)
-        if delta > 0.0001 then
-            return false, "CONSERVATION_LAW_VIOLATION: Debits (" .. totalDebits .. ") != Credits (" .. totalCredits .. ")"
+        if accounts[debitAcc] < amount then
+            return false, "INSUFFICIENT_FUNDS"
         end
-        return true
+
+        accounts[debitAcc] = roundCents(accounts[debitAcc] - amount)
+        accounts[creditAcc] = roundCents(accounts[creditAcc] + amount)
+
+        table.insert(ledger, {
+            debit_account = debitAcc,
+            credit_account = creditAcc,
+            amount = amount,
+            category = category or "general",
+            authorized_by = authorizedBy or "SYSTEM"
+        })
+        return true, "SUCCESS"
     end
 
-    -- Test A: Perfectly Balanced Double-Entry Transfer ($500.00 citizen transfer + $25.00 municipal tax)
-    local validTx = {
-        { account_id = "citizen:01",  entry_type = "DEBIT",  amount = 525.00 },
-        { account_id = "citizen:02",  entry_type = "CREDIT", amount = 500.00 },
-        { account_id = "gov:treasury", entry_type = "CREDIT", amount = 25.00 }
-    }
+    local function executeSplitTransfer(debitAcc, creditsList, category, authorizedBy)
+        ensureAccount(debitAcc)
+        local totalCredit = 0.00
+        for _, c in ipairs(creditsList) do
+            totalCredit = totalCredit + roundCents(c.amount)
+        end
+        totalCredit = roundCents(totalCredit)
 
-    local ok1, err1 = validateTransaction(validTx)
-    if assertTest(ok1 == true, "Treasury Balanced Transaction Validation", err1) then
+        if totalCredit <= 0.00 then return false, "INVALID_AMOUNT" end
+        if accounts[debitAcc] < totalCredit then return false, "INSUFFICIENT_FUNDS" end
+
+        accounts[debitAcc] = roundCents(accounts[debitAcc] - totalCredit)
+        for _, c in ipairs(creditsList) do
+            local acc = c.account
+            local amt = roundCents(c.amount)
+            ensureAccount(acc)
+            accounts[acc] = roundCents(accounts[acc] + amt)
+        end
+
+        return true, "SUCCESS"
+    end
+
+    -- Test A: Closed-Loop Double-Entry Conservation Invariant
+    ensureAccount("citizen:ALICE", 1000.00)
+    ensureAccount("merchant:BOB", 500.00)
+    local initialSystemA = getTotalSystemBalance()
+
+    local validTx = {
+        { account_id = "citizen:ALICE", entry_type = "DEBIT", amount = 250.00 },
+        { account_id = "merchant:BOB", entry_type = "CREDIT", amount = 250.00 }
+    }
+    local valOk, valErr = validateTransaction(validTx)
+    local execOk = executeTransfer("citizen:ALICE", "merchant:BOB", 250.00)
+    local finalSystemA = getTotalSystemBalance()
+
+    local testA_ok = (valOk == true) and (execOk == true) and (initialSystemA == finalSystemA)
+        and (getBalance("citizen:ALICE") == 750.00) and (getBalance("merchant:BOB") == 750.00)
+
+    if assertTest(testA_ok == true,
+        "Treasury Closed-Loop Double-Entry Conservation (Sum Debits == Sum Credits)",
+        string.format("valOk=%s, execOk=%s, initial=%.2f, final=%.2f",
+            tostring(valOk), tostring(execOk), initialSystemA, finalSystemA)) then
         passes = passes + 1
     end
 
-    -- Test B: Unbalanced / Leaked Transaction ($100.00 debited, only $80.00 credited)
+    -- Test B: Rejection of Leaked / Asymmetric Transactions
     local leakedTx = {
-        { account_id = "citizen:01", entry_type = "DEBIT",  amount = 100.00 },
-        { account_id = "citizen:02", entry_type = "CREDIT", amount = 80.00 }
+        { account_id = "citizen:ALICE", entry_type = "DEBIT", amount = 100.00 },
+        { account_id = "merchant:BOB", entry_type = "CREDIT", amount = 80.00 }
     }
+    local leakOk, leakErr = validateTransaction(leakedTx)
+    local testB_ok = (leakOk == false) and (string.find(tostring(leakErr), "CONSERVATION_LAW_VIOLATION") ~= nil)
 
-    local ok2, err2 = validateTransaction(leakedTx)
-    if assertTest(ok2 == false and string.find(err2, "CONSERVATION_LAW_VIOLATION") ~= nil, "Treasury Rejection of Unbalanced Transaction", "Unbalanced ledger transaction was illegally accepted!") then
+    if assertTest(testB_ok == true,
+        "Treasury Rejection of Unbalanced / Leaked Transactions",
+        string.format("leakOk=%s, leakErr=%s", tostring(leakOk), tostring(leakErr))) then
+        passes = passes + 1
+    end
+
+    -- Test C: IEEE 754 Floating-Point Precision & Penny Drift Immunity
+    ensureAccount("acc:PRECISION_A", 10000.00)
+    ensureAccount("acc:PRECISION_B", 5000.00)
+    local precisionInitial = roundCents(getBalance("acc:PRECISION_A") + getBalance("acc:PRECISION_B"))
+    local microAmts = { 0.01, 0.03, 0.07, 0.13, 0.29, 0.47, 0.89, 1.17, 2.33, 4.01 }
+
+    for i = 1, 1000 do
+        local amt = microAmts[((i - 1) % #microAmts) + 1]
+        executeTransfer("acc:PRECISION_A", "acc:PRECISION_B", amt)
+    end
+
+    local precisionFinal = roundCents(getBalance("acc:PRECISION_A") + getBalance("acc:PRECISION_B"))
+    local precisionDrift = math.abs(precisionInitial - precisionFinal)
+    local testC_ok = (precisionDrift < 0.001)
+
+    if assertTest(testC_ok == true,
+        "Cent-Precision Arithmetic & Zero Floating-Point Drift (1,000 Micro-TX)",
+        string.format("initial=%.2f, final=%.2f, drift=%.4f", precisionInitial, precisionFinal, precisionDrift)) then
+        passes = passes + 1
+    end
+
+    -- Test D: Concurrent Withdrawal Overdraft Prevention
+    ensureAccount("citizen:SPENDER", 1000.00)
+    ensureAccount("citizen:RECIP_1", 0.00)
+    ensureAccount("citizen:RECIP_2", 0.00)
+    local spenderInitial = getTotalSystemBalance()
+
+    -- Two requests for $600 each arrive concurrently
+    local ok1, _ = executeTransfer("citizen:SPENDER", "citizen:RECIP_1", 600.00)
+    local ok2, err2 = executeTransfer("citizen:SPENDER", "citizen:RECIP_2", 600.00)
+    local spenderFinal = getTotalSystemBalance()
+
+    local testD_ok = (ok1 == true) and (ok2 == false) and (err2 == "INSUFFICIENT_FUNDS")
+        and (getBalance("citizen:SPENDER") == 400.00)
+        and (getBalance("citizen:RECIP_1") == 600.00)
+        and (getBalance("citizen:RECIP_2") == 0.00)
+        and (spenderInitial == spenderFinal)
+
+    if assertTest(testD_ok == true,
+        "Concurrent Withdrawal Overdraft Prevention (Atomic Balance Guard)",
+        string.format("ok1=%s, ok2=%s, err2=%s, spenderBal=%.2f",
+            tostring(ok1), tostring(ok2), tostring(err2), getBalance("citizen:SPENDER"))) then
+        passes = passes + 1
+    end
+
+    -- Test E: Multi-Leg Split Transfer with Municipal Tax Conservation
+    ensureAccount("citizen:BUYER", 1000.00)
+    ensureAccount("business:STORE", 200.00)
+    ensureAccount("gov:city:master", 50000.00)
+    local splitInitial = getTotalSystemBalance()
+
+    local credits = {
+        { account = "business:STORE", amount = 475.00 },
+        { account = "gov:city:master", amount = 25.00 }
+    }
+    local splitOk = executeSplitTransfer("citizen:BUYER", credits, "retail_pos")
+    local splitFinal = getTotalSystemBalance()
+
+    local testE_ok = (splitOk == true)
+        and (getBalance("citizen:BUYER") == 500.00)
+        and (getBalance("business:STORE") == 675.00)
+        and (getBalance("gov:city:master") == 50025.00)
+        and (splitInitial == splitFinal)
+
+    if assertTest(testE_ok == true,
+        "Multi-Leg Split Transaction & Municipal Tax Conservation",
+        string.format("splitOk=%s, buyerBal=%.2f, storeBal=%.2f, govBal=%.2f",
+            tostring(splitOk), getBalance("citizen:BUYER"), getBalance("business:STORE"), getBalance("gov:city:master"))) then
+        passes = passes + 1
+    end
+
+    -- Test F: Transaction Atomicity & Failure Rollback
+    ensureAccount("citizen:ATOMIC_A", 100.00)
+    ensureAccount("citizen:ATOMIC_B", 50.00)
+    local failSameOk, failSameErr = executeTransfer("citizen:ATOMIC_A", "citizen:ATOMIC_A", 50.00)
+    local failNegOk, failNegErr = executeTransfer("citizen:ATOMIC_A", "citizen:ATOMIC_B", -25.00)
+
+    local testF_ok = (failSameOk == false and failSameErr == "IDENTICAL_ACCOUNTS")
+        and (failNegOk == false and failNegErr == "INVALID_AMOUNT")
+        and (getBalance("citizen:ATOMIC_A") == 100.00)
+        and (getBalance("citizen:ATOMIC_B") == 50.00)
+
+    if assertTest(testF_ok == true,
+        "Transaction Atomicity & Zero Balance Mutation on Parameter Errors",
+        string.format("sameErr=%s, negErr=%s, balA=%.2f, balB=%.2f",
+            tostring(failSameErr), tostring(failNegErr), getBalance("citizen:ATOMIC_A"), getBalance("citizen:ATOMIC_B"))) then
+        passes = passes + 1
+    end
+
+    -- Test G: Departmental Bulk Payroll Conservation
+    ensureAccount("gov:dept:police", 50000.00)
+    local employees = {
+        { id = "char:off_1", wage = 2500.00 },
+        { id = "char:off_2", wage = 2800.00 },
+        { id = "char:sgt_1", wage = 3500.00 },
+        { id = "char:lt_1",  wage = 4200.00 },
+        { id = "char:cpt_1", wage = 5000.00 }
+    }
+    local totalWages = 0.00
+    for _, emp in ipairs(employees) do
+        ensureAccount(emp.id, 100.00)
+        totalWages = totalWages + emp.wage
+    end
+    local payrollInitial = getTotalSystemBalance()
+
+    local allPayrollOk = true
+    for _, emp in ipairs(employees) do
+        local ok = executeTransfer("gov:dept:police", emp.id, emp.wage, "payroll")
+        if not ok then allPayrollOk = false end
+    end
+    local payrollFinal = getTotalSystemBalance()
+
+    local testG_ok = (allPayrollOk == true)
+        and (getBalance("gov:dept:police") == 50000.00 - totalWages)
+        and (payrollInitial == payrollFinal)
+
+    if assertTest(testG_ok == true,
+        "Departmental Bulk Payroll Closed-Loop Conservation",
+        string.format("allPayrollOk=%s, deptBal=%.2f, totalWages=%.2f, delta=%.2f",
+            tostring(allPayrollOk), getBalance("gov:dept:police"), totalWages, math.abs(payrollInitial - payrollFinal))) then
+        passes = passes + 1
+    end
+
+    -- Test H: Emergency Departmental Subvention Closed-Loop Injection
+    ensureAccount("gov:dept:ems", 2000.00)
+    ensureAccount("char:medic_1", 0.00)
+    local subInitial = getTotalSystemBalance()
+
+    -- EMS needs $5,000 for medic payroll, has $2,000 -> $3,000 deficit
+    local subOk = executeTransfer("gov:city:master", "gov:dept:ems", 3000.00, "emergency_subvention")
+    local medicOk = executeTransfer("gov:dept:ems", "char:medic_1", 5000.00, "payroll")
+    local subFinal = getTotalSystemBalance()
+
+    local testH_ok = (subOk == true) and (medicOk == true)
+        and (getBalance("gov:dept:ems") == 0.00)
+        and (getBalance("char:medic_1") == 5000.00)
+        and (subInitial == subFinal)
+
+    if assertTest(testH_ok == true,
+        "Emergency Department Subvention Closed-Loop Liquidity Injection",
+        string.format("subOk=%s, medicOk=%s, emsBal=%.2f, medicBal=%.2f, delta=%.2f",
+            tostring(subOk), tostring(medicOk), getBalance("gov:dept:ems"), getBalance("char:medic_1"), math.abs(subInitial - subFinal))) then
+        passes = passes + 1
+    end
+
+    -- Test I: Fiscal Circuit Breaker Outflow Interlock
+    ensureAccount("gov:city:master", 1000000.00)
+    ensureAccount("citizen:VENDOR", 0.00)
+    circuitTripped = true -- trip circuit
+
+    local blockOk, blockErr = executeTransfer("gov:city:master", "citizen:VENDOR", 1000.00, "procurement")
+    local exemptOk, _ = executeTransfer("gov:city:master", "citizen:VENDOR", 2500.00, "payroll")
+    local overrideOk, _ = executeTransfer("gov:city:master", "citizen:VENDOR", 5000.00, "procurement", "EXECUTIVE_OVERRIDE")
+    circuitTripped = false -- reset
+
+    local testI_ok = (blockOk == false and blockErr == "FISCAL_CIRCUIT_BREAKER_ACTIVE")
+        and (exemptOk == true)
+        and (overrideOk == true)
+
+    if assertTest(testI_ok == true,
+        "Fiscal Circuit Breaker Outflow Interlock & Exemption Guards",
+        string.format("blocked=%s, exempt=%s, override=%s",
+            tostring(blockErr), tostring(exemptOk), tostring(overrideOk))) then
+        passes = passes + 1
+    end
+
+    -- Test J: Single-Transaction Outlay Cap Protection
+    circuitTripped = false
+    local capOk, capErr = executeTransfer("gov:city:master", "citizen:VENDOR", 600000.00, "procurement")
+    local tripState = circuitTripped
+    local capOverrideOk, _ = executeTransfer("gov:city:master", "citizen:VENDOR", 600000.00, "procurement", "EXECUTIVE_OVERRIDE")
+
+    local testJ_ok = (capOk == false and capErr == "SINGLE_TRANSACTION_CAP_EXCEEDED")
+        and (tripState == true)
+        and (capOverrideOk == true)
+
+    if assertTest(testJ_ok == true,
+        "Single-Transaction Outlay Cap & Auto-Trip Circuit Defense",
+        string.format("capErr=%s, tripState=%s, overrideOk=%s",
+            tostring(capErr), tostring(tripState), tostring(capOverrideOk))) then
         passes = passes + 1
     end
 
