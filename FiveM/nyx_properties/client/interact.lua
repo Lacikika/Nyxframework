@@ -2,7 +2,7 @@
     Nyxframework: nyx_properties
     File: client/interact.lua
     Description: Zero-polling raycast interaction targets (nyx_interact)
-                 for entrance doors, interior exits, and secured stashes.
+                 for entrance doors, interior exits, tax telemetry, and auctions.
 ]]
 
 Nyx = Nyx or {}
@@ -20,7 +20,7 @@ CreateThread(function()
             for _, prop in ipairs(data.properties) do
                 local entCoords = vector3(prop.entrance.x, prop.entrance.y, prop.entrance.z)
 
-                -- 1. Register Entrance Target via nyx_interact (0.00 ms Idle)
+                -- Register Entrance Target via nyx_interact (0.00 ms Idle)
                 exports['nyx_interact']:AddTargetCoords("prop_entrance_" .. prop.id, entCoords, 2.0, {
                     options = {
                         {
@@ -44,7 +44,44 @@ CreateThread(function()
                                 TriggerServerEvent("nyx:properties:server:promptBuy", prop.id)
                             end,
                             canInteract = function()
-                                return prop.owner == nil
+                                return prop.owner == nil and not prop.reclaimedForAuction
+                            end
+                        },
+                        {
+                            label = "Ingatlan Adó- és Állapotkimutatás",
+                            icon = "fa-solid fa-file-invoice-dollar",
+                            action = function()
+                                Nyx.Properties.ViewTaxAssessment(prop.id)
+                            end
+                        },
+                        {
+                            label = "Szerkezeti Felújítás",
+                            icon = "fa-solid fa-hammer",
+                            action = function()
+                                Nyx.Properties.RepairCondition(prop.id)
+                            end,
+                            canInteract = function()
+                                return prop.isOwnedByMe and (prop.maintenanceCondition or 100.0) < 100.0
+                            end
+                        },
+                        {
+                            label = "Adóhátralék Befizetése",
+                            icon = "fa-solid fa-receipt",
+                            action = function()
+                                Nyx.Properties.PayArrears(prop.id)
+                            end,
+                            canInteract = function()
+                                return prop.isOwnedByMe and (prop.delinquentAmount or 0.0) > 0.0
+                            end
+                        },
+                        {
+                            label = "Árverési Információ",
+                            icon = "fa-solid fa-gavel",
+                            action = function()
+                                Nyx.Properties.ViewTaxAssessment(prop.id)
+                            end,
+                            canInteract = function()
+                                return prop.reclaimedForAuction == true
                             end
                         }
                     },

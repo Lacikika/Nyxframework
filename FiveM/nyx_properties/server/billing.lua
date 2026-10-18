@@ -2,21 +2,44 @@
     Nyxframework: nyx_properties
     File: server/billing.lua
     Description: Automated municipal property millage tax assessment,
+                 dynamic land maintenance evaluation, condition degradation,
                  double-entry treasury collection & delinquency monitoring.
 ]]
 
 Nyx = Nyx or {}
 Nyx.Properties = Nyx.Properties or {}
 
--- 1. Periodic Millage Tax Assessment Cycle
+-- 1. Periodic Millage & Land Maintenance Tax Assessment Cycle
 function Nyx.Properties.ProcessMillageBillingCycle()
     local intervalHours = Config.Millage.BillingIntervalHours or 24
-    local treasuryAccount = Config.Millage.TreasuryAccount or "gov:city:master"
 
+    -- 1.1 Process structural condition decay on all properties
+    local nowTime = os.time()
+    for _, prop in pairs(Nyx.Properties.Loaded or {}) do
+        if prop.ownerCitizenId and not prop.reclaimedForAuction then
+            local lastMaint = prop.lastMaintenanceAt or nowTime
+            local decay = Nyx.Taxation.CalculateConditionDecay(lastMaint, nowTime)
+            if decay > 0.0 then
+                local floorCond = (Config.Taxation and Config.Taxation.MinConditionFloor) or 10.0
+                local currentCond = prop.maintenanceCondition or 100.0
+                local newCond = math.max(floorCond, currentCond - decay)
+
+                if newCond ~= currentCond then
+                    prop.maintenanceCondition = newCond
+                    MySQL.prepare("UPDATE `nyx_properties` SET `maintenance_condition` = ? WHERE `property_id` = ?", {
+                        newCond, prop.id
+                    })
+                end
+            end
+        end
+    end
+
+    -- 1.2 Query properties due for tax assessment
     local propsToBill = MySQL.query.await([[
-        SELECT `property_id`, `label`, `owner_citizen_id`, `price`, `millage_tax_rate`
+        SELECT `property_id`
         FROM `nyx_properties`
-        WHERE `owner_citizen_id` IS NOT NULL 
+        WHERE `owner_citizen_id` IS NOT NULL
+          AND `reclaimed_for_auction` = 0
           AND (`last_tax_billed_at` IS NULL OR `last_tax_billed_at` <= NOW() - INTERVAL ? HOUR)
     ]], { intervalHours })
 
@@ -26,91 +49,42 @@ function Nyx.Properties.ProcessMillageBillingCycle()
     local delinquentCount = 0
 
     for _, p in ipairs(propsToBill) do
-        local price = tonumber(p.price) or 0.00
-        local rate = tonumber(p.millage_tax_rate) or (Config.Millage.DefaultMillageRate or 0.0150)
-        local taxDue = math.floor((price * rate) * 100) / 100
-
-        if taxDue > 0 then
-            local citizenId = p.owner_citizen_id
-            local ownerPlayer = exports['nyx_core']:GetPlayerByCitizenId(citizenId)
-
-            local debitSuccess = false
-            local bankBal = 0
-
-            if ownerPlayer then
-                bankBal = ownerPlayer:getWallet("bank") or 0
-                if bankBal >= taxDue then
-                    ownerPlayer:removeMoney("bank", taxDue, string.format("Városi Építményadó (Millage Tax): %s", p.label))
-                    debitSuccess = true
-                end
-            else
-                -- Offline citizen account check via database
-                local charRow = MySQL.single.await("SELECT `money` FROM `nyx_characters` WHERE `citizen_id` = ?", { citizenId })
-                if charRow and charRow.money then
-                    local moneyData = json.decode(charRow.money) or {}
-                    local offlineBank = tonumber(moneyData.bank) or 0
-                    if offlineBank >= taxDue then
-                        moneyData.bank = offlineBank - taxDue
-                        MySQL.prepare("UPDATE `nyx_characters` SET `money` = ? WHERE `citizen_id` = ?", { json.encode(moneyData), citizenId })
-                        debitSuccess = true
-                    end
-                end
-            end
-
-            if debitSuccess then
-                -- Credit Municipal Treasury via oxmysql prepared statement
-                exports['nyx_treasury']:EnsureAccount(treasuryAccount, "City Treasury", "department", 0.00)
-                MySQL.prepare([[
-                    UPDATE `nyx_treasury_accounts` SET `balance` = `balance` + ? WHERE `account_id` = ?
-                ]], { taxDue, treasuryAccount })
-
-                -- Log in treasury ledger
-                MySQL.prepare([[
-                    INSERT INTO `nyx_treasury_ledger`
-                        (`tx_uuid`, `category`, `debit_account`, `credit_account`, `amount`, `memo`)
-                    VALUES (UUID(), 'property_tax', ?, ?, ?, ?)
-                ]], {
-                    string.format("char:%s:bank", citizenId),
-                    treasuryAccount,
-                    taxDue,
-                    string.format("Millage Property Tax: Property #%d (%s)", p.property_id, p.label)
-                })
-
-                -- Audit trail
-                MySQL.prepare([[
-                    INSERT INTO `nyx_property_audit`
-                        (`property_id`, `action`, `actor_citizen_id`, `amount`, `notes`)
-                    VALUES (?, 'MILLAGE_TAX_DEBIT', ?, ?, 'Statutory property tax collected')
-                ]], { p.property_id, citizenId, taxDue })
-
-                MySQL.prepare("UPDATE `nyx_properties` SET `last_tax_billed_at` = NOW() WHERE `property_id` = ?", { p.property_id })
-                billedCount = billedCount + 1
-
-                if ownerPlayer then
-                    TriggerClientEvent("nyx:ui:notify", ownerPlayer.source, {
-                        type = "info",
-                        title = "ÉPÍTMÉNYADÓ LEVONVA",
-                        message = string.format("Levonva: $%.2f ingatlanadó a(z) %s után.", taxDue, p.label)
-                    })
-                end
-            else
-                delinquentCount = delinquentCount + 1
-                if Config.Debug then
-                    print(string.format("^1[Nyx:Properties] Delinquency Alert: Citizen %s cannot cover $%.2f millage tax for Property #%d^7", citizenId, taxDue, p.property_id))
-                end
+        local ok, resOrErr, assessment = Nyx.Properties.ExecuteTaxCollection(p.property_id)
+        if ok then
+            billedCount = billedCount + 1
+        else
+            delinquentCount = delinquentCount + 1
+            if Config.Debug then
+                print(string.format("^1[Nyx:Properties:Billing] Delinquency Alert: Property #%d tax collection failed: %s^7",
+                    p.property_id, tostring(resOrErr)))
             end
         end
     end
 
     if Config.Debug and (billedCount > 0 or delinquentCount > 0) then
-        print(string.format("^3[Nyx:Properties:Billing] Tax assessment complete: %d settled, %d delinquent.^7", billedCount, delinquentCount))
+        print(string.format("^3[Nyx:Properties:Billing] Tax assessment complete: %d settled, %d delinquent.^7",
+            billedCount, delinquentCount))
     end
 end
 
--- 2. Periodic Millage Heartbeat (Every 30 minutes check)
+-- 2. Periodic Millage Heartbeat (Runs every 30 minutes)
 CreateThread(function()
     while true do
         Wait(1800000) -- 30 minutes tick
         Nyx.Properties.ProcessMillageBillingCycle()
     end
 end)
+
+-- 3. Console Command for Administrative Tax Cycle Execution
+RegisterCommand("nyx_properties_bill_cycle", function(source, args)
+    if source == 0 then
+        print("^3[Nyx:Properties] Admin triggering manual property millage billing cycle...^7")
+        Nyx.Properties.ProcessMillageBillingCycle()
+    else
+        local player = exports['nyx_core']:GetPlayer(source)
+        if player and player.hasPermission and player.hasPermission("admin") then
+            print(string.format("^3[Nyx:Properties] Admin %s triggering manual property billing cycle...^7", player.citizenId))
+            Nyx.Properties.ProcessMillageBillingCycle()
+        end
+    end
+end, true)

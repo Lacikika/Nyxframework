@@ -66,11 +66,43 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] Feature: Spatial grid ground drops & time-based item durability decay (`nyx_inventory` / `nyx_interact`)
 - [x] Feature: Physical freight pallets & power-dependent industrial assembly (`nyx_logistics` / `nyx_services`)
 - [x] QA: Add concurrency unit tests for inventory mutex locks and treasury double-entry conservation (`nyx_core/server/tests.lua`)
-- [ ] Feature: Progressive property millage & dynamic land maintenance taxation (`nyx_properties` / `nyx_treasury`)
+- [x] Feature: Progressive property millage & dynamic land maintenance taxation (`nyx_properties` / `nyx_treasury`)
 
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Progressive property millage & dynamic land maintenance taxation (`nyx_properties` / `nyx_treasury`)**
+  - **Database Migration & Schema Extensions (`027_properties_progressive_millage_and_maintenance_taxation.sql`, `index.json`)**:
+    - Extended `nyx_properties` with `land_area_sqm` (DECIMAL 10,2), `maintenance_condition` (DECIMAL 5,2), `last_maintenance_at`, `delinquency_tier` (TINYINT 0-4), `delinquent_amount` (DECIMAL 15,2), `consecutive_missed_cycles`, `zone_id`, and `reclaimed_for_auction`.
+    - Seeded default property land footprints (`apt_integrity_101`: 120m², `store_vinewood_24`: 320m², `wh_elysian_04`: 1250m²) and district mappings.
+    - Created `nyx_property_tax_assessments` table tracking holding multipliers, land area taxes, delinquency penalties, payment methods, and double-entry treasury transaction UUIDs.
+    - Created `nyx_property_auctions` table for foreclosure reclamation, minimum starting bid discounts (50%), blind auction bids, and escrow tracking.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 27) and mirrored to `nyx_properties`.
+  - **Pure Lua 5.4 Shared Taxation & Footprint Engine (`nyx_properties/shared/taxation.lua`, `fxmanifest.lua`)**:
+    - *Exponential Holding Multiplier*: Formulated $\text{multiplier} = 1.5^{(\text{PropertiesOwned} - 1)}$ discouraging monopolistic asset hoarding, with configurable cap (10.0x).
+    - *Effective Millage Clamping*: Formulated `CalculateEffectiveMillageRate` applying holding multiplier to base rates and clamping to statutory ceiling (10%).
+    - *Dynamic Land Maintenance Tax*: Implemented $T_{\text{land}} = \text{sqm} \times \text{BaseRate}[\text{type}] \times \text{ZoneMult} \times \text{BlightFactor}$ with distinct rates ($1.20/m² residential, $2.50/m² commercial, $3.20/m² industrial) and zone surcharges (+15% LS metro, +10% port industrial).
+    - *Blight Externality Penalty*: Implemented `CalculateConditionBlightFactor` scaling maintenance tax up to +50% for dilapidated structures (0% condition).
+    - *Delinquency State Machine*: Defined Tiers 0-4 (Good Standing, Notice, Late Penalized with 10% late surcharge, Foreclosure Warning with 25% surcharge and lock interlock, and Asset Forfeiture to Auction).
+    - *Integer-Cent Closed-Loop Treasury Splits*: Formulated `CalculateRevenueDistribution` strictly conserving every cent ($\sum \text{Allocations} == \text{TotalTax}$) across Emergency Services (40%), Public Works (45%), and Master City Reserve (15%).
+    - *Structural Degradation & Repair Math*: Formulated `CalculateConditionDecay` and `CalculateRepairCost`.
+  - **Authoritative Server Taxation, Delinquency & Foreclosure Subsystem (`nyx_properties/server/taxation.lua`, `server/billing.lua`, `server/main.lua`, `server/exports.lua`)**:
+    - *Automated Collection & Offline Debit*: Enhanced `Nyx.Properties.ExecuteTaxCollection` evaluating portfolio size, debiting online player wallets or offline character records, and executing closed-loop double-entry revenue transfers to `gov:dept:police`, `gov:dept:works`, and `gov:city:master`.
+    - *Delinquency Escalation & Sanctions*: Increments consecutive missed cycles upon failed debit, escalating delinquency tiers, updating arrears, and applying Tier 3 doorlock interlocks (`is_locked = 1`).
+    - *RPC Endpoints & Exports*: Added `properties:getTaxAssessment`, `properties:payDelinquentTaxes`, and `properties:repairCondition` with atomic treasury recording. Added server exports `GetPropertyTaxAssessment`, `AssessPropertyTaxes`, `CountCitizenProperties`.
+  - **Municipal Foreclosure Blind-Auction Reclamation Engine (`nyx_properties/server/auction.lua`, `server/main.lua`, `server/exports.lua`)**:
+    - *Forfeiture & Revocation*: On Tier 4 delinquency, revokes deed (`owner_citizen_id = NULL`), deletes keys, marks `reclaimed_for_auction = 1`, and creates a 48-hour municipal auction with a 50% minimum bid.
+    - *Escrowed Bidding & Outbid Refunds*: Implemented `PlaceAuctionBid` holding bids in escrow and immediately executing 100% closed-loop refunds to outbid players.
+    - *Automated Settlement Sweeper*: Added 60-second sweeper settling expired auctions (`SettleAuction`), transferring deed and Tier 4 key to highest bidder, routing proceeds to `gov:city:master`, and resetting delinquency.
+    - *RPC Endpoints & Exports*: Added `properties:getActiveAuctions`, `properties:bidAuction`, and server exports `ForfeitPropertyToAuction`, `PlaceAuctionBid`, `SettleAuction`.
+  - **Client UI & Third-Eye (`LALT`) Integration (`nyx_properties/client/taxation.lua`, `client/interact.lua`, `client/main.lua`, `client/exports.lua`)**:
+    - Added contextual Third-Eye entrance options: "Ingatlan Adó- és Állapotkimutatás", "Szerkezeti Felújítás" (repair), "Adóhátralék Befizetése" (pay arrears), and "Árverési Információ" (auction info).
+    - Enforced client entry rejection with specific civic warning on Tier 3+ foreclosure seizure (`PROPERTY_SEIZED_TAX_DELINQUENCY`).
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestProgressiveMillageAndLandMaintenanceTaxation()` (Test 21) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created standalone Python test suite `tests/test_progressive_property_millage_and_maintenance.py` validating 13 distinct test scenarios (exponential holding multiplier, 10% statutory cap, land maintenance formulas, dilapidation blight penalties, delinquency state machine, total assessment aggregation, exact double-entry split conservation, condition decay/repair, foreclosure lockout interlocks, asset forfeiture, auction escrow outbid refunds, deed settlement conservation, and SQL migration/manifest integrity).
+    - Full pytest suite: 168/168 tests passing (100% pass rate).
+    - Verified clean passes across all 13 resources, 176 Lua files, and all 27 SQL migrations via `scripts/validator.py` and `scripts/verify.ps1`.
 - **[2026-10-18] QA: Add concurrency unit tests for inventory mutex locks and treasury double-entry conservation (`nyx_core/server/tests.lua`)**
   - **Comprehensive Inventory Mutex Concurrency Suite (`nyx_core/server/tests.lua` - Test 2)**:
     - Expanded from 3 basic mock assertions to 10 comprehensive in-engine unit tests (`total = 10`):

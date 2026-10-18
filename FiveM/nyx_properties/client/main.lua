@@ -21,10 +21,17 @@ function Nyx.Properties.Enter(propertyId)
             message = "Beléptél az ingatlanba."
         })
     else
+        local errMsg = "Nem sikerült belépni az ingatlanba."
+        if res and res.error == "DOOR_LOCKED" then
+            errMsg = "Az ajtó zárva van!"
+        elseif res and res.error == "PROPERTY_SEIZED_TAX_DELINQUENCY" then
+            errMsg = "Az ingatlant lefoglalta a hatóság súlyos adóhátralék miatt!"
+        end
+
         TriggerEvent("nyx:ui:notify", {
             type = "error",
             title = "BELÉPÉS SIKERTELEN",
-            message = (res and res.error == "DOOR_LOCKED") and "Az ajtó zárva van!" or "Nem sikerült belépni az ingatlanba."
+            message = errMsg
         })
     end
 end

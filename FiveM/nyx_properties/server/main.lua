@@ -2,7 +2,7 @@
     Nyxframework: nyx_properties
     File: server/main.lua
     Description: Authoritative Property Engine, Routing Bucket Isolation,
-                 Deed Transfers, Stash Initialization & Utility Meter Binding.
+                 Deed Transfers, Stash Initialization, Land Footprint & Utility Meter Binding.
 ]]
 
 Nyx = Nyx or {}
@@ -18,19 +18,26 @@ MySQL.ready(function()
             local stashId = string.format("property:%s:main", prop.code)
             local meterId = string.format("meter:prop:%s", prop.code)
             local bucketId = 1000 + i -- Virtual routing bucket per property interior
+            local landArea = prop.landAreaSqm or 150.00
+            local zone = prop.zoneId or "zone_ls_metro"
+            local initialCond = prop.initialCondition or 100.00
 
             MySQL.insert.await([[
                 INSERT INTO `nyx_properties`
                     (`property_code`, `label`, `type`, `price`, `millage_tax_rate`,
+                     `land_area_sqm`, `zone_id`, `maintenance_condition`,
                      `entrance_coords`, `interior_coords`, `routing_bucket`,
                      `stash_inventory_id`, `utility_meter_id`, `linked_substation_id`)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ]], {
                 prop.code,
                 prop.label,
                 prop.type,
                 prop.price,
                 prop.millageRate,
+                landArea,
+                zone,
+                initialCond,
                 json.encode(prop.entrance),
                 json.encode(prop.interior),
                 bucketId,
@@ -54,6 +61,14 @@ MySQL.ready(function()
                 ownerCitizenId = r.owner_citizen_id,
                 price = tonumber(r.price) or 0.00,
                 millageRate = tonumber(r.millage_tax_rate) or 0.0150,
+                landAreaSqm = tonumber(r.land_area_sqm) or 150.00,
+                maintenanceCondition = tonumber(r.maintenance_condition) or 100.00,
+                lastMaintenanceAt = r.last_maintenance_at,
+                delinquencyTier = tonumber(r.delinquency_tier) or 0,
+                delinquentAmount = tonumber(r.delinquent_amount) or 0.00,
+                consecutiveMissedCycles = tonumber(r.consecutive_missed_cycles) or 0,
+                zoneId = r.zone_id or "zone_ls_metro",
+                reclaimedForAuction = (r.reclaimed_for_auction == 1),
                 entrance = json.decode(r.entrance_coords),
                 interior = json.decode(r.interior_coords),
                 routingBucket = r.routing_bucket,
@@ -97,6 +112,13 @@ exports['nyx_core']:RegisterRPC("properties:getProperties", function(src, filter
             label = p.label,
             type = p.type,
             price = p.price,
+            landAreaSqm = p.landAreaSqm,
+            maintenanceCondition = p.maintenanceCondition,
+            delinquencyTier = p.delinquencyTier,
+            delinquentAmount = p.delinquentAmount,
+            consecutiveMissedCycles = p.consecutiveMissedCycles,
+            zoneId = p.zoneId,
+            reclaimedForAuction = p.reclaimedForAuction,
             owner = p.ownerCitizenId,
             isOwnedByMe = (p.ownerCitizenId == citizenId),
             hasKey = hasKey,
@@ -118,6 +140,10 @@ exports['nyx_core']:RegisterRPC("properties:buyProperty", function(src, property
     local prop = Nyx.Properties.Loaded[propertyId]
     if not prop then return { success = false, error = "PROPERTY_NOT_FOUND" } end
 
+    if prop.reclaimedForAuction then
+        return { success = false, error = "PROPERTY_IN_AUCTION" }
+    end
+
     if prop.ownerCitizenId ~= nil then
         return { success = false, error = "PROPERTY_ALREADY_OWNED" }
     end
@@ -131,7 +157,10 @@ exports['nyx_core']:RegisterRPC("properties:buyProperty", function(src, property
     player:removeMoney("bank", prop.price, string.format("Property Deed Purchase: %s", prop.label))
     
     local treasuryAccount = Config.Millage.TreasuryAccount or "gov:city:master"
-    exports['nyx_treasury']:EnsureAccount(treasuryAccount, "City Treasury", "department", 0.00)
+    if exports['nyx_treasury'] and exports['nyx_treasury'].EnsureAccount then
+        exports['nyx_treasury']:EnsureAccount(treasuryAccount, "City Treasury", "department", 0.00)
+    end
+
     MySQL.prepare([[
         UPDATE `nyx_treasury_accounts` SET `balance` = `balance` + ? WHERE `account_id` = ?
     ]], { prop.price, treasuryAccount })
@@ -139,7 +168,12 @@ exports['nyx_core']:RegisterRPC("properties:buyProperty", function(src, property
     -- Update database ownership
     MySQL.prepare([[
         UPDATE `nyx_properties`
-        SET `owner_citizen_id` = ?, `last_tax_billed_at` = NOW()
+        SET `owner_citizen_id` = ?,
+            `last_tax_billed_at` = NOW(),
+            `delinquency_tier` = 0,
+            `delinquent_amount` = 0.00,
+            `consecutive_missed_cycles` = 0,
+            `maintenance_condition` = 100.00
         WHERE `property_id` = ?
     ]], { player.citizenId, propertyId })
 
@@ -159,6 +193,10 @@ exports['nyx_core']:RegisterRPC("properties:buyProperty", function(src, property
 
     -- Update in-memory state
     prop.ownerCitizenId = player.citizenId
+    prop.delinquencyTier = 0
+    prop.delinquentAmount = 0.00
+    prop.consecutiveMissedCycles = 0
+    prop.maintenanceCondition = 100.00
 
     -- Register utility meter in nyx_services
     if exports['nyx_services'] and exports['nyx_services'].RegisterMeter then
@@ -177,6 +215,14 @@ exports['nyx_core']:RegisterRPC("properties:enterProperty", function(src, proper
     local prop = Nyx.Properties.Loaded[propertyId]
     if not prop then return { success = false, error = "PROPERTY_NOT_FOUND" } end
 
+    -- Check permission
+    local hasKey, tier = Nyx.Properties.HasKey(propertyId, player.citizenId)
+
+    -- Foreclosure Sanction: Tier 3+ delinquency locks out residents (unless law enforcement tier 5)
+    if prop.delinquencyTier and prop.delinquencyTier >= 3 and (not hasKey or tier < 5) then
+        return { success = false, error = "PROPERTY_SEIZED_TAX_DELINQUENCY" }
+    end
+
     -- Zero-Trust Distance Check
     local ped = GetPlayerPed(tostring(src))
     local pCoords = GetEntityCoords(ped)
@@ -187,7 +233,6 @@ exports['nyx_core']:RegisterRPC("properties:enterProperty", function(src, proper
     end
 
     -- Check access permission
-    local hasKey, tier = Nyx.Properties.HasKey(propertyId, player.citizenId)
     if prop.isLocked and (not hasKey or tier < 2) then
         return { success = false, error = "DOOR_LOCKED" }
     end

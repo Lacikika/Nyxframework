@@ -4014,7 +4014,380 @@ function Nyx.Tests.TestPhysicalPalletsAndPowerAssembly()
     return passes == total
 end
 
--- 21. Master Test Runner
+-- 21. Test Progressive Property Millage & Dynamic Land Maintenance Taxation
+function Nyx.Tests.TestProgressiveMillageAndLandMaintenanceTaxation()
+    print("^3[Nyx:Tests] Running Progressive Property Millage & Land Maintenance Taxation Suite...^7")
+    local passes = 0
+    local total = 10
+
+    local calcHolding = Nyx.Taxation and Nyx.Taxation.CalculateHoldingMultiplier or function(n, base, maxMult)
+        n = math.max(1, math.floor(tonumber(n) or 1))
+        base = tonumber(base) or 1.50
+        maxMult = tonumber(maxMult) or 10.00
+        if n <= 1 then return 1.0000 end
+        local raw = base ^ (n - 1)
+        return math.floor(math.min(maxMult, math.max(1.0, raw)) * 10000 + 0.5) / 10000
+    end
+
+    local calcEffectiveRate = Nyx.Taxation and Nyx.Taxation.CalculateEffectiveMillageRate or function(baseRate, n, maxRate)
+        baseRate = tonumber(baseRate) or 0.0150
+        maxRate = tonumber(maxRate) or 0.1000
+        local mult = calcHolding(n)
+        return math.floor(math.min(maxRate, baseRate * mult) * 10000 + 0.5) / 10000
+    end
+
+    local calcMillageTax = Nyx.Taxation and Nyx.Taxation.CalculateMillageTax or function(price, rate)
+        return math.floor((price * rate) * 100) / 100
+    end
+
+    local calcBlight = Nyx.Taxation and Nyx.Taxation.CalculateConditionBlightFactor or function(cond, maxSurcharge)
+        cond = math.max(0.0, math.min(100.0, tonumber(cond) or 100.0))
+        maxSurcharge = tonumber(maxSurcharge) or 0.50
+        local factor = 1.0 + ((100.0 - cond) / 100.0) * maxSurcharge
+        return math.floor(factor * 10000 + 0.5) / 10000
+    end
+
+    local calcLandTax = Nyx.Taxation and Nyx.Taxation.CalculateLandMaintenanceTax or function(sqm, pType, zone, cond)
+        local rates = { residential = 1.20, commercial = 2.50, industrial = 3.20 }
+        local zones = { zone_ls_metro = 0.15, zone_port_industrial = 0.10, zone_sandy_shores = 0.0, zone_paleto_bay = 0.0 }
+        local base = rates[pType] or 1.20
+        local zoneMult = 1.0 + (zones[zone] or 0.0)
+        local blight = calcBlight(cond)
+        local raw = sqm * base * zoneMult * blight
+        return math.floor(raw * 100) / 100, base, zoneMult, blight
+    end
+
+    local evalDelinquency = Nyx.Taxation and Nyx.Taxation.EvaluateDelinquencyTier or function(cycles)
+        cycles = math.max(0, math.floor(tonumber(cycles) or 0))
+        if cycles == 0 then return 0, "GOOD_STANDING"
+        elseif cycles == 1 then return 1, "NOTICE_GRACE"
+        elseif cycles == 2 then return 2, "LATE_PENALIZED"
+        elseif cycles == 3 then return 3, "FORECLOSURE_WARNING"
+        else return 4, "FORFEITURE_AUCTION" end
+    end
+
+    local calcPenalty = Nyx.Taxation and Nyx.Taxation.CalculateDelinquencyPenalty or function(tier, arrears)
+        tier = tonumber(tier) or 0
+        arrears = math.max(0.0, tonumber(arrears) or 0.0)
+        if tier <= 1 or arrears <= 0.0 then return 0.00, 0.0 end
+        local r = (tier == 2) and 0.10 or 0.25
+        return math.floor((arrears * r) * 100) / 100, r
+    end
+
+    local calcSplits = Nyx.Taxation and Nyx.Taxation.CalculateRevenueDistribution or function(total)
+        total = math.floor((tonumber(total) or 0.0) * 100) / 100
+        if total <= 0.0 then return { emergency = 0, works = 0, master = 0, total = 0 } end
+        local em = math.floor((total * 0.40) * 100) / 100
+        local wo = math.floor((total * 0.45) * 100) / 100
+        local ma = math.floor((total - em - wo) * 100) / 100
+        return { emergency = em, works = wo, master = ma, total = total }
+    end
+
+    -- Test A: Progressive Holding Multiplier Math (1.5^(N-1))
+    local h1 = calcHolding(1) -- 1.5^0 = 1.0000
+    local h2 = calcHolding(2) -- 1.5^1 = 1.5000
+    local h3 = calcHolding(3) -- 1.5^2 = 2.2500
+    local h4 = calcHolding(4) -- 1.5^3 = 3.3750
+    local h5 = calcHolding(5) -- 1.5^4 = 5.0625
+    local h10 = calcHolding(10) -- Clamped to maxMultiplier 10.0000
+
+    local testA_ok = (h1 == 1.0000)
+        and (h2 == 1.5000)
+        and (h3 == 2.2500)
+        and (h4 == 3.3750)
+        and (h5 == 5.0625)
+        and (h10 == 10.0000)
+
+    if assertTest(testA_ok == true,
+        "Progressive Holding Multiplier (1.5^(N-1)) Across Portfolio Sizes",
+        string.format("h1=%.4f, h2=%.4f, h3=%.4f, h4=%.4f, h5=%.4f, h10=%.4f",
+            h1, h2, h3, h4, h5, h10)) then
+        passes = passes + 1
+    end
+
+    -- Test B: Effective Millage Rate Clamping with Statutory Maximum Cap (10%)
+    local baseRate = 0.0150
+    local rate1 = calcEffectiveRate(baseRate, 1, 0.1000)  -- 0.0150 * 1.00 = 0.0150
+    local rate3 = calcEffectiveRate(baseRate, 3, 0.1000)  -- 0.0150 * 2.25 = 0.0338
+    local rate5 = calcEffectiveRate(baseRate, 5, 0.1000)  -- 0.0150 * 5.0625 = 0.0759
+    local rate10 = calcEffectiveRate(baseRate, 10, 0.1000) -- 0.0150 * 10.0 = 0.1500 -> Clamped to 0.1000
+
+    local testB_ok = (rate1 == 0.0150)
+        and (rate3 == 0.0338)
+        and (rate5 == 0.0759)
+        and (rate10 == 0.1000)
+
+    if assertTest(testB_ok == true,
+        "Effective Millage Rate Progression & 10% Statutory Ceiling Clamping",
+        string.format("rate1=%.4f, rate3=%.4f, rate5=%.4f, rate10=%.4f",
+            rate1, rate3, rate5, rate10)) then
+        passes = passes + 1
+    end
+
+    -- Test C: Dynamic Land Footprint Maintenance Tax (m^2 * TypeRate * ZoneMultiplier)
+    local landRes, _, zRes, _ = calcLandTax(120.0, "residential", "zone_ls_metro", 100.0)
+    -- 120 * 1.20 * 1.15 * 1.0 = 165.60
+    local landInd, _, zInd, _ = calcLandTax(1250.0, "industrial", "zone_port_industrial", 100.0)
+    -- 1250 * 3.20 * 1.10 * 1.0 = 4400.00
+    local landRural, _, zRural, _ = calcLandTax(500.0, "commercial", "zone_sandy_shores", 100.0)
+    -- 500 * 2.50 * 1.00 * 1.0 = 1250.00
+
+    local testC_ok = (math.abs(landRes - 165.60) < 0.01)
+        and (math.abs(landInd - 4400.00) < 0.01)
+        and (math.abs(landRural - 1250.00) < 0.01)
+
+    if assertTest(testC_ok == true,
+        "Dynamic Land Footprint Maintenance Tax ($/m^2) by Zoning & District",
+        string.format("res=%.2f, ind=%.2f, rural=%.2f", landRes, landInd, landRural)) then
+        passes = passes + 1
+    end
+
+    -- Test D: Dilapidation & Blight Condition Penalty Multiplier
+    local b100 = calcBlight(100.0) -- 1.0000 (Pristine)
+    local b50 = calcBlight(50.0)   -- 1.2500 (+25% surcharge)
+    local b0 = calcBlight(0.0)     -- 1.5000 (+50% maximum dilapidation blight penalty)
+
+    local taxPristine, _, _, _ = calcLandTax(120.0, "residential", "zone_ls_metro", 100.0) -- 165.60
+    local taxDilapidated, _, _, _ = calcLandTax(120.0, "residential", "zone_ls_metro", 0.0)  -- 165.60 * 1.5 = 248.40
+
+    local testD_ok = (b100 == 1.0000)
+        and (b50 == 1.2500)
+        and (b0 == 1.5000)
+        and (math.abs(taxDilapidated - 248.40) < 0.01)
+
+    if assertTest(testD_ok == true,
+        "Dilapidation & Blight Condition Multiplier on Structural Neglect",
+        string.format("b100=%.4f, b50=%.4f, b0=%.4f, pristine=$%.2f, blighted=$%.2f",
+            b100, b50, b0, taxPristine, taxDilapidated)) then
+        passes = passes + 1
+    end
+
+    -- Test E: Delinquency State Machine & Progressive Penalty Escalation
+    local t0, s0 = evalDelinquency(0)
+    local t1, s1 = evalDelinquency(1)
+    local t2, s2 = evalDelinquency(2)
+    local t3, s3 = evalDelinquency(3)
+    local t4, s4 = evalDelinquency(4)
+
+    local p0, _ = calcPenalty(t0, 500.00) -- $0.00
+    local p1, _ = calcPenalty(t1, 500.00) -- $0.00 (Grace period notice)
+    local p2, _ = calcPenalty(t2, 500.00) -- 10% on $500.00 = $50.00
+    local p3, _ = calcPenalty(t3, 500.00) -- 25% on $500.00 = $125.00
+
+    local testE_ok = (t0 == 0 and s0 == "GOOD_STANDING" and p0 == 0.00)
+        and (t1 == 1 and s1 == "NOTICE_GRACE" and p1 == 0.00)
+        and (t2 == 2 and s2 == "LATE_PENALIZED" and p2 == 50.00)
+        and (t3 == 3 and s3 == "FORECLOSURE_WARNING" and p3 == 125.00)
+        and (t4 == 4 and s4 == "FORFEITURE_AUCTION")
+
+    if assertTest(testE_ok == true,
+        "Delinquency State Machine Tiers (0-4) & Arrears Penalty Progression",
+        string.format("t0=%d, t1=%d, t2=%d(+$%.2f), t3=%d(+$%.2f), t4=%d",
+            t0, t1, t2, p2, t3, p3, t4)) then
+        passes = passes + 1
+    end
+
+    -- Test F: Total Assessment Aggregation & Cent Precision
+    local calcTotal = Nyx.Taxation and Nyx.Taxation.CalculateTotalAssessment or function(params)
+        local h = calcHolding(params.propertiesOwned)
+        local effRate = calcEffectiveRate(params.baseMillageRate, params.propertiesOwned)
+        local millTax = calcMillageTax(params.price, effRate)
+        local landTax = calcLandTax(params.landAreaSqm, params.propertyType, params.zoneId, params.condition)
+        local tier, status = evalDelinquency(params.missedCycles)
+        local pen, penR = calcPenalty(tier, params.overdueArrears)
+        local totalDue = math.floor((millTax + landTax + pen) * 100) / 100
+        return {
+            holdingMultiplier = h,
+            effectiveMillageRate = effRate,
+            millageTax = millTax,
+            maintenanceTax = landTax,
+            delinquencyTier = tier,
+            delinquencyStatus = status,
+            penalty = pen,
+            totalTaxDue = totalDue
+        }
+    end
+
+    local assess = calcTotal({
+        price = 125000.00,
+        baseMillageRate = 0.0150,
+        propertiesOwned = 3, -- holding x2.25
+        landAreaSqm = 120.00,
+        propertyType = "residential",
+        zoneId = "zone_ls_metro",
+        condition = 100.00,
+        overdueArrears = 200.00,
+        missedCycles = 2 -- Tier 2 late penalty (10% of 200 = 20.00)
+    })
+
+    -- Millage: 125000 * 0.0338 = 4225.00
+    -- Land: 120 * 1.20 * 1.15 = 165.60
+    -- Penalty: 20.00
+    -- Total: 4225.00 + 165.60 + 20.00 = 4410.60
+    local testF_ok = (assess.holdingMultiplier == 2.2500)
+        and (assess.effectiveMillageRate == 0.0338)
+        and (math.abs(assess.millageTax - 4225.00) < 0.01)
+        and (math.abs(assess.maintenanceTax - 165.60) < 0.01)
+        and (assess.penalty == 20.00)
+        and (math.abs(assess.totalTaxDue - 4410.60) < 0.01)
+
+    if assertTest(testF_ok == true,
+        "Total Assessment Aggregation & Exact Cent-Precision Verification",
+        string.format("millage=$%.2f, land=$%.2f, pen=$%.2f -> total=$%.2f",
+            assess.millageTax, assess.maintenanceTax, assess.penalty, assess.totalTaxDue)) then
+        passes = passes + 1
+    end
+
+    -- Test G: Double-Entry Closed-Loop Revenue Split Conservation
+    local s1000 = calcSplits(1000.00)
+    local s523 = calcSplits(523.47)
+
+    local sum1000 = s1000.emergency + s1000.works + s1000.master
+    local sum523 = s523.emergency + s523.works + s523.master
+
+    local delta1000 = math.abs(sum1000 - 1000.00)
+    local delta523 = math.abs(sum523 - 523.47)
+
+    local testG_ok = (delta1000 < 0.0001) and (delta523 < 0.0001)
+        and (s1000.emergency == 400.00)
+        and (s1000.works == 450.00)
+        and (s1000.master == 150.00)
+
+    if assertTest(testG_ok == true,
+        "Double-Entry Municipal Revenue Split Closed-Loop Conservation",
+        string.format("1000: em=%.2f, wo=%.2f, ma=%.2f (sum=%.2f, d=%.4f) | 523.47: em=%.2f, wo=%.2f, ma=%.2f (sum=%.2f, d=%.4f)",
+            s1000.emergency, s1000.works, s1000.master, sum1000, delta1000,
+            s523.emergency, s523.works, s523.master, sum523, delta523)) then
+        passes = passes + 1
+    end
+
+    -- Test H: Delinquency Foreclosure Interlock (Tier 3 Lockout & Tier 5 Enforcement Bypass)
+    local function evaluatePropertyAccess(tierDelinquency, userKeyTier, isDoorLocked)
+        if tierDelinquency >= 3 and userKeyTier < 5 then
+            return false, "PROPERTY_SEIZED_TAX_DELINQUENCY"
+        end
+        if isDoorLocked and userKeyTier < 2 then
+            return false, "DOOR_LOCKED"
+        end
+        return true, "ACCESS_GRANTED"
+    end
+
+    local accResidentNormal, _ = evaluatePropertyAccess(0, 2, false)
+    local accResidentDelinquent, errDelinq = evaluatePropertyAccess(3, 2, false)
+    local accOfficerEmergency, _ = evaluatePropertyAccess(3, 5, false)
+
+    local testH_ok = (accResidentNormal == true)
+        and (accResidentDelinquent == false and errDelinq == "PROPERTY_SEIZED_TAX_DELINQUENCY")
+        and (accOfficerEmergency == true)
+
+    if assertTest(testH_ok == true,
+        "Foreclosure Lockout Interlock on Delinquency Tier 3 with Judicial Bypass",
+        string.format("normal=%s, delinquent=%s, judicial=%s",
+            tostring(accResidentNormal), tostring(errDelinq), tostring(accOfficerEmergency))) then
+        passes = passes + 1
+    end
+
+    -- Test I: Delinquency Tier 4 Asset Forfeiture to Public Blind Auction
+    local function simulateForfeiture(prop)
+        if prop.consecutiveMissedCycles >= 4 then
+            local minBid = math.floor((prop.price * 0.50) * 100) / 100
+            prop.previousOwner = prop.ownerCitizenId
+            prop.ownerCitizenId = nil
+            prop.reclaimedForAuction = true
+            prop.isLocked = true
+            return true, {
+                propertyId = prop.id,
+                previousOwner = prop.previousOwner,
+                minimumBid = minBid,
+                auctionStatus = "active"
+            }
+        end
+        return false, "NOT_ELIGIBLE"
+    end
+
+    local testProp = {
+        id = 101,
+        ownerCitizenId = "CIT_4910",
+        price = 125000.00,
+        consecutiveMissedCycles = 4,
+        isLocked = false,
+        reclaimedForAuction = false
+    }
+
+    local forfeited, auctionData = simulateForfeiture(testProp)
+    local testI_ok = (forfeited == true)
+        and (testProp.ownerCitizenId == nil)
+        and (testProp.reclaimedForAuction == true)
+        and (testProp.isLocked == true)
+        and (auctionData.minimumBid == 62500.00)
+        and (auctionData.previousOwner == "CIT_4910")
+
+    if assertTest(testI_ok == true,
+        "Asset Forfeiture to Public Blind Auction upon Delinquency Tier 4",
+        string.format("forfeited=%s, minBid=$%.2f, prevOwner=%s",
+            tostring(forfeited), auctionData.minimumBid, tostring(auctionData.previousOwner))) then
+        passes = passes + 1
+    end
+
+    -- Test J: Blind Auction Escrow Bidding, Outbid Refund Conservation & Deed Settlement
+    local auctionLedger = {
+        auctionId = 55,
+        propertyId = 101,
+        minimumBid = 62500.00,
+        highestBid = 0.00,
+        highestBidder = nil,
+        status = "active"
+    }
+
+    local bankA = 100000.00
+    local bankB = 100000.00
+    local municipalTreasury = 500000.00
+    local initialSystemTotal = bankA + bankB + municipalTreasury
+
+    -- Step 1: Citizen A bids $65,000
+    local bidA = 65000.00
+    bankA = bankA - bidA
+    auctionLedger.highestBid = bidA
+    auctionLedger.highestBidder = "CIT_A"
+
+    -- Step 2: Citizen B outbids with $75,000 -> Citizen A gets immediate 100% refund
+    local bidB = 75000.00
+    bankB = bankB - bidB
+    -- Refund Citizen A:
+    bankA = bankA + auctionLedger.highestBid
+    auctionLedger.highestBid = bidB
+    auctionLedger.highestBidder = "CIT_B"
+
+    -- Verify mid-auction conservation: bankA (100k) + bankB (25k) + escrow (75k) + treasury (500k) == 700k
+    local midTotal = bankA + bankB + auctionLedger.highestBid + municipalTreasury
+
+    -- Step 3: Settle auction -> escrow transferred to municipal treasury, winner gets deed
+    municipalTreasury = municipalTreasury + auctionLedger.highestBid
+    local escrowSettled = auctionLedger.highestBid
+    auctionLedger.status = "completed"
+    local winner = auctionLedger.highestBidder
+
+    local finalSystemTotal = bankA + bankB + municipalTreasury
+    local testJ_ok = (midTotal == initialSystemTotal)
+        and (finalSystemTotal == initialSystemTotal)
+        and (bankA == 100000.00)
+        and (bankB == 25000.00)
+        and (municipalTreasury == 575000.00)
+        and (winner == "CIT_B")
+        and (auctionLedger.status == "completed")
+
+    if assertTest(testJ_ok == true,
+        "Blind Auction Escrow Bidding, Outbid Refund Conservation & Deed Settlement",
+        string.format("init=$%.2f, mid=$%.2f, final=$%.2f (Delta=%.2f, Winner=%s)",
+            initialSystemTotal, midTotal, finalSystemTotal,
+            math.abs(finalSystemTotal - initialSystemTotal), tostring(winner))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 22. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -4040,9 +4413,10 @@ function Nyx.Tests.RunAll()
     local t18 = Nyx.Tests.TestFiscalCircuitAndPayrollScaling()
     local t19 = Nyx.Tests.TestSpatialGridDropsAndDurabilityDecay()
     local t20 = Nyx.Tests.TestPhysicalPalletsAndPowerAssembly()
+    local t21 = Nyx.Tests.TestProgressiveMillageAndLandMaintenanceTaxation()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

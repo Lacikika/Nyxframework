@@ -24,5 +24,6 @@
   "023_judiciary_jury_dispatcher_and_courtroom_routing.sql",
   "024_treasury_fiscal_circuit_and_payroll_scaling.sql",
   "025_spatial_grid_drops_and_durability_decay.sql",
-  "026_logistics_physical_pallets_and_power_assembly.sql"
+  "026_logistics_physical_pallets_and_power_assembly.sql",
+  "027_properties_progressive_millage_and_maintenance_taxation.sql"
 ]
