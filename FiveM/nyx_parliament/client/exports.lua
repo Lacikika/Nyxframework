@@ -17,3 +17,13 @@ end)
 exports("IsVotingUIOpen", function()
     return Nyx.Parliament.IsOpen
 end)
+
+exports("GetCurrentBooth", function()
+    return Nyx.Parliament.ActiveBoothId, Nyx.Parliament.ActiveBoothLabel
+end)
+
+exports("WithdrawCandidacy", function(candidateId, cb)
+    local res = exports['nyx_core']:TriggerRPCAwait("parliament:withdrawCandidacy", candidateId)
+    if cb then cb(res) end
+    return res
+end)

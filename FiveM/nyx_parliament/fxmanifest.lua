@@ -16,7 +16,8 @@ dependencies {
 shared_scripts {
     'config.lua',
     'shared/irv.lua',
-    'shared/legislation_ui.lua'
+    'shared/legislation_ui.lua',
+    'shared/elections.lua'
 }
 
 server_scripts {

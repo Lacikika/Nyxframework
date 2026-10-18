@@ -68,12 +68,12 @@ created: 2026-09-20
 ## 3. Autonomous Civic Governance & Law (`nyx_parliament`)
 
 ### 3.1 Democratic Election Lifecycle
-- [ ] **Candidate Registration:** Players deposit collateral and gather signature thresholds to run for municipal offices (e.g., Mayor, District Commissioner, Chief Magistrate).
-- [ ] **Ballot Stations & Security:**
+- [x] **Candidate Registration:** Players deposit collateral and gather signature thresholds to run for municipal offices (e.g., Mayor, District Commissioner, Chief Magistrate).
+- [x] **Ballot Stations & Security:**
   - Physical voting booths placed at municipal centers and community halls.
   - Identification checks prevent multi-character election fraud via machine/license footprint hashing.
   - Ranked-Choice Voting (Instant Runoff) calculation engine running entirely server-side.
-- [ ] **Term Limits & Recall Referendums:** Automated expiration of official powers after configurable day cycles (e.g., 30 days). If approval drops below critical margins, citizens can trigger early recall petitions.
+- [x] **Term Limits & Recall Referendums:** Automated expiration of official powers after configurable day cycles (e.g., 30 days). If approval drops below critical margins, citizens can trigger early recall petitions.
 
 ### 3.2 Dynamic Law Creation
 - [ ] **Bill Formulation UI:** Officials author structured legislation (penal code fine maximums, speed limits, legal sales tax caps, zoning classifications).

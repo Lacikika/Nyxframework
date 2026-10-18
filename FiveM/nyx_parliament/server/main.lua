@@ -59,8 +59,8 @@ Nyx.RPC.Register("parliament:getOverview", function(src)
     -- 2. Query Active & Recent Sessions
     local sessions = {}
     local sessionRows = MySQL.query.await([[
-        SELECT `session_id`, `title`, `description`, `type`, `category`, `required_quorum`,
-               `starts_at`, `ends_at`, `status`, `metadata`, `winner_option`
+        SELECT `session_id`, `title`, `description`, `type`, `category`, `office_id`, `election_phase`,
+               `required_quorum`, `starts_at`, `nomination_ends_at`, `ends_at`, `status`, `metadata`, `winner_option`, `total_turnout`
         FROM `nyx_parliament_sessions`
         WHERE `status` IN ('active', 'scheduled', 'concluded')
         ORDER BY FIELD(`status`, 'active', 'scheduled', 'concluded'), `created_at` DESC
@@ -78,10 +78,11 @@ Nyx.RPC.Register("parliament:getOverview", function(src)
         if r.type == "election" then
             local candRows = MySQL.query.await([[
                 SELECT `candidate_id`, `session_id`, `citizen_id`, `display_name`, `party_affiliation`,
-                       `campaign_slogan`, `platform_summary`, `collateral_deposited`, `endorsements_count`, `status`
+                       `campaign_slogan`, `platform_summary`, `collateral_deposited`, `collateral_status`,
+                       `endorsements_count`, `vote_count`, `vote_percentage`, `status`
                 FROM `nyx_parliament_candidates`
                 WHERE `session_id` = ?
-                ORDER BY `endorsements_count` DESC, `created_at` ASC
+                ORDER BY `endorsements_count` DESC, `vote_count` DESC, `created_at` ASC
             ]], { r.session_id }) or {}
             candidates = candRows
         elseif meta.candidates then
@@ -96,11 +97,15 @@ Nyx.RPC.Register("parliament:getOverview", function(src)
             description = r.description,
             type = r.type,
             category = r.category or "general",
+            officeId = r.office_id,
+            electionPhase = r.election_phase or "voting",
             requiredQuorum = r.required_quorum,
             startsAt = r.starts_at,
+            nominationEndsAt = r.nomination_ends_at,
             endsAt = r.ends_at,
             status = r.status,
             winner = r.winner_option,
+            totalTurnout = r.total_turnout or 0,
             metadata = meta,
             candidates = candidates
         }
@@ -125,14 +130,14 @@ Nyx.RPC.Register("parliament:getOverview", function(src)
     -- 4. Active Elected Officials
     local officials = MySQL.query.await([[
         SELECT `office_id`, `title`, `citizen_id`, `display_name`, `elected_session_id`,
-               `term_start`, `term_end`, `status`
+               `term_start`, `term_end`, `status`, `consecutive_terms`, `cooldown_until`
         FROM `nyx_parliament_officials`
         WHERE `status` = 'active'
     ]]) or {}
 
     -- 5. Active Recall Petitions
     local petitions = MySQL.query.await([[
-        SELECT `petition_id`, `office_id`, `initiator_citizen_id`, `reason`,
+        SELECT `petition_id`, `office_id`, `target_citizen_id`, `initiator_citizen_id`, `reason`,
                `signatures_count`, `required_signatures`, `status`, `expires_at`
         FROM `nyx_parliament_recall_petitions`
         WHERE `status` = 'active' AND `expires_at` >= CURRENT_TIMESTAMP
@@ -147,6 +152,21 @@ Nyx.RPC.Register("parliament:getOverview", function(src)
         LIMIT 10
     ]]) or {}
 
+    -- 7. Certified Voting Booth Terminals
+    local booths = MySQL.query.await([[
+        SELECT `booth_id`, `label`, `location_zone`, `coords`, `total_ballots_cast`, `is_active`
+        FROM `nyx_parliament_booth_terminals`
+        WHERE `is_active` = 1
+    ]]) or {}
+
+    -- 8. Recent Official Term Audits
+    local termAudits = MySQL.query.await([[
+        SELECT `audit_id`, `office_id`, `citizen_id`, `display_name`, `event_type`, `session_id`, `reason`, `notes`, `created_at`
+        FROM `nyx_parliament_term_audits`
+        ORDER BY `created_at` DESC
+        LIMIT 10
+    ]]) or {}
+
     return {
         citizenId = citId,
         characterName = charName,
@@ -158,7 +178,9 @@ Nyx.RPC.Register("parliament:getOverview", function(src)
         penalCode = penalCode,
         officials = officials,
         petitions = petitions,
-        recentAmendments = recentAmendments
+        recentAmendments = recentAmendments,
+        booths = booths,
+        termAudits = termAudits
     }
 end)
 

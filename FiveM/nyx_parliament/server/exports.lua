@@ -90,3 +90,38 @@ exports("GetAmendmentAuditLogs", function(filterLawId)
     return MySQL.query.await(query, params) or {}
 end)
 
+exports("WithdrawCandidacy", function(src, candidateId)
+    return Nyx.Parliament.WithdrawCandidacy(src, candidateId)
+end)
+
+exports("ScheduleElectionSession", function(officeId, nomHours, voteHours)
+    return Nyx.Parliament.ScheduleElectionSession(officeId, nomHours, voteHours)
+end)
+
+exports("VacateOfficial", function(officeId, reason, eventType)
+    return Nyx.Parliament.VacateOfficial(officeId, reason, eventType)
+end)
+
+exports("CheckAndExpireOfficialTerms", function()
+    return Nyx.Parliament.CheckAndExpireOfficialTerms()
+end)
+
+exports("ReconcileElectionCollaterals", function(sessionId, winnerId, totalVotes)
+    return Nyx.Parliament.ReconcileElectionCollaterals(sessionId, winnerId, totalVotes)
+end)
+
+exports("GetTermAudits", function(officeId)
+    local query = "SELECT * FROM `nyx_parliament_term_audits`"
+    local params = {}
+    if officeId and #officeId > 0 then
+        query = query .. " WHERE `office_id` = ?"
+        params[#params + 1] = officeId
+    end
+    query = query .. " ORDER BY `created_at` DESC LIMIT 50"
+    return MySQL.query.await(query, params) or {}
+end)
+
+exports("GetBoothTerminals", function()
+    return MySQL.query.await("SELECT * FROM `nyx_parliament_booth_terminals` WHERE `is_active` = 1") or {}
+end)
+

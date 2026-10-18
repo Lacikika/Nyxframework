@@ -2,7 +2,7 @@
     Nyxframework: nyx_parliament
     File: server/voting.lua
     Description: Tamper-proof ballot submission pipeline, hardware token verification,
-                 and receipt generation.
+                 physical voting booth terminal provenance, and cryptographic receipt generation.
 ]]
 
 Nyx = Nyx or {}
@@ -10,26 +10,16 @@ Nyx.Parliament = Nyx.Parliament or {}
 
 -- Helper: Retrieve deterministic hardware identity hash
 local function getClientHwidHash(src)
-    local numTokens = GetNumPlayerTokens(tostring(src))
     local tokens = {}
-    for i = 0, numTokens - 1 do
-        tokens[#tokens + 1] = GetPlayerToken(tostring(src), i)
-    end
-
-    if #tokens > 0 then
-        local raw = table.concat(tokens, ":")
-        return string.format("HWID-%08x%08x", #raw, numTokens * 54321)
-    end
-
-    -- Fallback: Use rockstar license if hardware tokens unavailable
-    local identifiers = GetPlayerIdentifiers(tostring(src))
-    for _, id in ipairs(identifiers) do
-        if id:sub(1, 8) == "license:" then
-            return "LIC-" .. id:sub(9)
+    local numTokens = GetNumPlayerTokens and GetNumPlayerTokens(tostring(src)) or 0
+    if numTokens > 0 then
+        for i = 0, numTokens - 1 do
+            tokens[#tokens + 1] = GetPlayerToken(tostring(src), i)
         end
     end
 
-    return "ANON-DEV-" .. tostring(src)
+    local identifiers = GetPlayerIdentifiers and GetPlayerIdentifiers(tostring(src)) or {}
+    return Nyx.DemocraticElections.GenerateHardwareFootprintHash(identifiers, tokens, src)
 end
 
 -- RPC: Query Active Legislative and Election Sessions
@@ -54,8 +44,12 @@ Nyx.RPC.Register("parliament:getActiveSessions", function(src)
                 title = r.title,
                 description = r.description,
                 type = r.type,
+                officeId = r.office_id,
+                electionPhase = r.election_phase or "voting",
                 startsAt = r.starts_at,
+                nominationEndsAt = r.nomination_ends_at,
                 endsAt = r.ends_at,
+                totalTurnout = r.total_turnout or 0,
                 metadata = meta
             }
         end
@@ -65,7 +59,7 @@ Nyx.RPC.Register("parliament:getActiveSessions", function(src)
 end)
 
 -- RPC: Cast Tamper-Proof Ranked-Choice Ballot
-Nyx.RPC.Register("parliament:castBallot", function(src, sessionId, rankedChoices)
+Nyx.RPC.Register("parliament:castBallot", function(src, sessionId, rankedChoices, boothId, boothLabel)
     local player = exports['nyx_core']:GetPlayer(src)
     if not player then return { success = false, error = "UNAUTHORIZED" } end
 
@@ -83,7 +77,29 @@ Nyx.RPC.Register("parliament:castBallot", function(src, sessionId, rankedChoices
         return { success = false, error = "SESSION_NOT_ACTIVE" }
     end
 
-    -- 2. Anti-Sybil / Double Voting Prevention via Hardware Token
+    -- Check Election Phase (cannot vote during candidate nomination phase)
+    if session.election_phase and session.election_phase == "nomination" then
+        return { success = false, error = "VOTING_PERIOD_NOT_OPEN" }
+    end
+
+    -- 2. Physical Booth Proximity & Attribution
+    local bId = boothId or "remote"
+    local bLabel = boothLabel or "Remote Terminal"
+
+    if Config.EnforceBoothProximity then
+        local ped = GetPlayerPed(tostring(src))
+        if ped and DoesEntityExist(ped) then
+            local coords = GetEntityCoords(ped)
+            local prox = Nyx.DemocraticElections.ValidateBoothProximity(coords, Config.Booths, Config.BoothInteractDistance or 2.5)
+            if not prox.isNear then
+                return { success = false, error = "NOT_AT_VOTING_BOOTH", distance = prox.distance }
+            end
+            bId = prox.boothId or bId
+            bLabel = prox.boothLabel or bLabel
+        end
+    end
+
+    -- 3. Anti-Sybil / Double Voting Prevention via Hardware Token
     local hwidHash = getClientHwidHash(src)
     local alreadyVoted = MySQL.scalar.await([[
         SELECT COUNT(*) FROM `nyx_parliament_voter_registry` 
@@ -94,7 +110,7 @@ Nyx.RPC.Register("parliament:castBallot", function(src, sessionId, rankedChoices
         return { success = false, error = "ALREADY_VOTED" }
     end
 
-    -- 3. Ballot Choices Sanitization (no duplicate candidates)
+    -- 4. Ballot Choices Sanitization (no duplicate candidates)
     local seen = {}
     local sanitizedPreferences = {}
     for _, choice in ipairs(rankedChoices) do
@@ -108,18 +124,22 @@ Nyx.RPC.Register("parliament:castBallot", function(src, sessionId, rankedChoices
         return { success = false, error = "NO_VALID_CHOICES" }
     end
 
-    -- 4. Generate Anonymized Verification Receipt Hash
+    -- 5. Generate Anonymized Verification Receipt Hash
     local receiptHash = string.format("NYX-BALLOT-%s", Nyx.RPC.GenerateNonce():sub(1, 12):upper())
 
-    -- 5. Commit Voter Participation and Anonymized Ballot in Transaction
+    -- 6. Commit Voter Participation and Anonymized Ballot in Transaction
     local success = MySQL.transaction.await({
         {
             query = "INSERT INTO `nyx_parliament_voter_registry` (`session_id`, `hardware_hash`) VALUES (?, ?)",
             values = { sessionId, hwidHash }
         },
         {
-            query = "INSERT INTO `nyx_parliament_ballots` (`session_id`, `ballot_hash`, `preferences`) VALUES (?, ?, ?)",
-            values = { sessionId, receiptHash, json.encode(sanitizedPreferences) }
+            query = "INSERT INTO `nyx_parliament_ballots` (`session_id`, `ballot_hash`, `preferences`, `booth_id`, `booth_label`) VALUES (?, ?, ?, ?, ?)",
+            values = { sessionId, receiptHash, json.encode(sanitizedPreferences), bId, bLabel }
+        },
+        {
+            query = "UPDATE `nyx_parliament_sessions` SET `total_turnout` = `total_turnout` + 1 WHERE `session_id` = ?",
+            values = { sessionId }
         }
     })
 
@@ -127,13 +147,27 @@ Nyx.RPC.Register("parliament:castBallot", function(src, sessionId, rankedChoices
         return { success = false, error = "TRANSACTION_COMMIT_FAILED" }
     end
 
+    -- Update booth station stats if cast at a certified station
+    pcall(function()
+        if bId ~= "remote" then
+            MySQL.prepare.await([[
+                UPDATE `nyx_parliament_booth_terminals`
+                SET `total_ballots_cast` = `total_ballots_cast` + 1, `last_ping_at` = CURRENT_TIMESTAMP
+                WHERE `booth_id` = ?
+            ]], { bId })
+        end
+    end)
+
     if Config.Debug then
-        print(string.format("^2[Nyx:Parliament] Ballot cast successfully in session '%s' (Receipt: %s)^7", sessionId, receiptHash))
+        print(string.format("^2[Nyx:Parliament] Ballot cast in session '%s' at '%s' (Receipt: %s)^7",
+            sessionId, bLabel, receiptHash))
     end
 
     return {
         success = true,
-        receiptHash = receiptHash
+        receiptHash = receiptHash,
+        boothId = bId,
+        boothLabel = bLabel
     }
 end)
 
@@ -199,14 +233,16 @@ end)
 -- RPC: Verify Ballot Receipt
 Nyx.RPC.Register("parliament:verifyReceipt", function(src, sessionId, receiptHash)
     local ballot = MySQL.single.await([[
-        SELECT `ballot_id`, `submitted_at` FROM `nyx_parliament_ballots` 
+        SELECT `ballot_id`, `submitted_at`, `booth_id`, `booth_label` FROM `nyx_parliament_ballots` 
         WHERE `session_id` = ? AND `ballot_hash` = ?
     ]], { sessionId, receiptHash })
 
     if ballot then
         return {
             verified = true,
-            submittedAt = ballot.submitted_at
+            submittedAt = ballot.submitted_at,
+            boothId = ballot.booth_id,
+            boothLabel = ballot.booth_label
         }
     end
 

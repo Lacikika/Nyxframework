@@ -113,6 +113,8 @@ function Nyx.UI.SanitizePayload(data)
     if data.actions and type(data.actions) == "table" then sanitized.actions = data.actions end
     if data.billPayload and type(data.billPayload) == "table" then sanitized.billPayload = data.billPayload end
     if data.description and type(data.description) == "string" then sanitized.description = string.sub(data.description, 1, 1024) end
+    if data.boothId and type(data.boothId) == "string" then sanitized.boothId = string.sub(data.boothId, 1, 32) end
+    if data.boothLabel and type(data.boothLabel) == "string" then sanitized.boothLabel = string.sub(data.boothLabel, 1, 96) end
     -- Real Estate & Property Portal parameters
     if data.auctionId and (type(data.auctionId) == "string" or type(data.auctionId) == "number") then sanitized.auctionId = tonumber(data.auctionId) or tostring(data.auctionId) end
     if data.propertyId and (type(data.propertyId) == "string" or type(data.propertyId) == "number") then sanitized.propertyId = tonumber(data.propertyId) or tostring(data.propertyId) end
@@ -567,7 +569,7 @@ end)
 
 Nyx.UI.SafeNUICallback("parliament:castBallot", function(data, cb)
     if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
-        local res = exports['nyx_core']:TriggerRPCAwait("parliament:castBallot", data and data.sessionId, data and data.preferences)
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:castBallot", data and data.sessionId, data and data.preferences, data and data.boothId, data and data.boothLabel)
         return cb(res or { success = false })
     end
     cb({ success = false, error = "RPC_UNAVAILABLE" })
@@ -584,6 +586,14 @@ end)
 Nyx.UI.SafeNUICallback("parliament:registerCandidate", function(data, cb)
     if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
         local res = exports['nyx_core']:TriggerRPCAwait("parliament:registerCandidate", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("parliament:withdrawCandidacy", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:withdrawCandidacy", data and (data.candidateId or data.id))
         return cb(res or { success = false })
     end
     cb({ success = false, error = "RPC_UNAVAILABLE" })
@@ -658,6 +668,22 @@ end)
 Nyx.UI.SafeNUICallback("parliament:getAmendmentAudit", function(data, cb)
     if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
         local res = exports['nyx_core']:TriggerRPCAwait("parliament:getAmendmentAudit", data and data.filterLawId)
+        return cb(res or {})
+    end
+    cb({})
+end)
+
+Nyx.UI.SafeNUICallback("parliament:getBoothTerminals", function(_, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:getBoothTerminals")
+        return cb(res or {})
+    end
+    cb({})
+end)
+
+Nyx.UI.SafeNUICallback("parliament:getTermAudits", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:getTermAudits", data and data.officeId)
         return cb(res or {})
     end
     cb({})

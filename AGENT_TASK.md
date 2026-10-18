@@ -108,11 +108,54 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Municipal Utility Metering & Automated Grid Billing (`nyx_services` & `nyx_properties`)**
   - **Implementation:** Meter residential and commercial properties for continuous kilowatt-hour and water consumption drawn from localized substations, with automated utility invoicing and power cut-off delinquency enforcement.
 
-- [ ] **Feature: Democratic Parliamentary Elections & Recall Referendums (`nyx_parliament` & `nyx_ui`)**
+- [x] **Feature: Democratic Parliamentary Elections & Recall Referendums (`nyx_parliament` & `nyx_ui`)**
   - **Implementation:** Candidate registration with signatures and collateral deposits, physical voting booth terminal interaction, and automated term limit expiration with citizen recall referendums.
+
+- [ ] **Feature: Auditable Public Treasury Ledger & Department Allocation Monitor (`nyx_treasury` & `nyx_ui`)**
+  - **Implementation:** Real-time read-only webview showing open municipal balance sheets, categorized transaction logs, automated percentage splits (emergency services, infrastructure, social dividend), and fiscal crisis threshold telemetry.
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Democratic Parliamentary Elections & Recall Referendums (`nyx_parliament` & `nyx_ui`)**
+  - **Database Migration (`056_democratic_parliamentary_elections_and_recall_referendums.sql`)**:
+    - Created migration file and registered Step 56 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Mirrored migration to `FiveM/nyx_parliament/sql/migrations/056_democratic_parliamentary_elections_and_recall_referendums.sql`.
+    - Extended `nyx_parliament_sessions` with `election_phase` ENUM('nomination','voting','tallying','concluded'), `office_id`, `nomination_ends_at`, and `total_turnout`.
+    - Extended `nyx_parliament_candidates` with `collateral_status` ENUM('escrowed','refunded','forfeited'), `refund_treasury_tx_id`, `vote_count`, and `vote_percentage`.
+    - Extended `nyx_parliament_ballots` with physical provenance metadata: `booth_id` and `booth_label`.
+    - Extended `nyx_parliament_officials` with `cooldown_until` and `consecutive_terms`.
+    - Extended `nyx_parliament_recall_petitions` with `target_citizen_id` and `cooldown_expires_at`.
+    - Created `nyx_parliament_term_audits` immutable audit ledger (`audit_id` PK, `office_id`, `citizen_id`, `action` ENUM('instated','term_expired','recalled','resigned','election_scheduled'), `previous_citizen_id`, `reason`, `notes`, `created_at`) with indexes on `office_id`, `citizen_id`, and `created_at`.
+    - Created `nyx_parliament_booth_terminals` certified station registry (`booth_id` PK, `label`, `location_zone`, `coords_x`, `coords_y`, `coords_z`, `interact_radius`, `is_active`, `total_ballots_cast`, `created_at`) with seeded canonical stations (`booth:city_hall`, `booth:sandy_shores`, `booth:paleto_bay`).
+  - **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_parliament/shared/elections.lua`)**:
+    - Defined statutory constants: `NominationWindowHours` (48h), `VotingWindowHours` (72h), `CollateralRefundVoteThresholdPct` (10.0%), `CandidateCollateralDefault` ($2,500.00), `RequiredEndorsementsDefault` (3), `RecallSignatureThresholdDefault` (5), `RecallImmunityCooldownDays` (7 days), and `DefaultBoothInteractDistance` (2.5m).
+    - Configured statutory offices (`mayor`, `chief_magistrate`, `district_commissioner`) with departmental bindings, term limits, and max consecutive terms.
+    - Implemented `EvaluateCandidateEligibility` validating session state, active candidacy, candidate limits (10), and consecutive term limits.
+    - Implemented `CalculateCollateralEscrow` validating double-entry balance and accounts (`char:{cit_id}:bank` -> `gov:city:master`).
+    - Implemented `EvaluateCollateralRefund` zero-sum economic fairness: 100% refund for voluntary withdrawal during nomination, election winners, and candidates achieving >= 10.0% vote share; forfeiture to municipal treasury for disqualified or low-turnout fringe candidates.
+    - Implemented `ValidateBoothProximity` computing 3D Euclidean distances and resolving certified physical stations.
+    - Implemented `GenerateHardwareFootprintHash` extracting hardware machine tokens or license hashes for anti-Sybil ballot deduplication.
+    - Implemented `EvaluateTermExpiration` checking active official terms against server epoch.
+    - Implemented `EvaluateRecallEligibility` protecting officials with 7-day statutory recall immunity cooldowns and blocking duplicate petitions.
+    - Implemented `EvaluateRecallReferendumOutcome` state machine: vacating official and triggering snap elections on recall passage, or establishing 7-day immunity on failure.
+    - Implemented status badge and recall progress bar formatters.
+  - **Authoritative Server Subsystems & RPCs (`nyx_parliament`)**:
+    - `FiveM/nyx_parliament/server/elections.lua`: Candidate registration with collateral escrow, voluntary withdrawal with instant collateral refund (`parliament:withdrawCandidacy`), candidate endorsement threshold qualification, consecutive term tracking, term expiration sweeps (`CheckAndExpireOfficialTerms`), automated succession election scheduling (`ScheduleElectionSession`), official vacation (`VacateOfficial`), and recall petition initiation/signing with immunity cooldown enforcement.
+    - `FiveM/nyx_parliament/server/voting.lua`: Ballot casting enriched with physical voting booth provenance (`booth_id`, `booth_label`), booth turnout incrementing, nomination phase vote blocking, and machine footprint hashing.
+    - `FiveM/nyx_parliament/server/enactment.lua`: Session conclusion thread reconciling candidate collateral refunds/forfeitures (`ReconcileElectionCollaterals`), updating vote counts and percentages, instating winning officials with audit logging, and executing recall referendum outcomes. Background thread actively checks term expirations and stale petitions every 60 seconds.
+    - `FiveM/nyx_parliament/server/exports.lua`: Exported public APIs `WithdrawCandidacy`, `ScheduleElectionSession`, `VacateOfficial`, `CheckAndExpireOfficialTerms`, `ReconcileElectionCollaterals`, `GetTermAudits`, and `GetBoothTerminals`.
+    - `FiveM/nyx_parliament/server/main.lua`: Hydrated `parliament:getOverview` with election phase, candidate vote counts/percentages, certified booth terminals, and term audit history.
+  - **Client & Master UI Integration (`nyx_ui` & `nyx_parliament`)**:
+    - `FiveM/nyx_parliament/client/booths.lua`: Third-Eye targets on certified municipal booths forwarding station context (`boothId`, `boothLabel`).
+    - `FiveM/nyx_parliament/client/legislation_ui.lua`: Preserves active booth provenance, forwards to NUI bridge, registered player command `/withdrawcandidate [sessionId]`, and added event handler for official vacations.
+    - `FiveM/nyx_parliament/client/exports.lua`: Exported `GetCurrentBooth` and `WithdrawCandidacy`.
+    - `FiveM/nyx_ui/client/bridge.lua`: Whitelisted `boothId` and `boothLabel` in NUI payload sanitization, registered NUI callbacks for `parliament:withdrawCandidacy`, `parliament:getBoothTerminals`, and `parliament:getTermAudits`.
+    - `FiveM/nyx_ui/web/js/app.js`: Stored `boothId`/`boothLabel` in state, forwarded in `castParliamentBallot`, hydrated booths and term audits in state, and added browser dev mode mock handlers.
+  - **Verification & Test Coverage**:
+    - Added in-engine integration test Test 51 (`Nyx.Tests.TestDemocraticParliamentaryElectionsAndRecallReferendums`) to `FiveM/nyx_core/server/tests.lua` (8 sub-tests covering eligibility, collateral escrow, endorsements, collateral disposition, booth proximity, hardware footprint, term expiration, and recall referendums) and wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_democratic_parliamentary_elections_and_recall_referendums.py` (13/13 tests passing).
+    - Full pytest suite: 477/477 passed (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 268 Lua files, 56 migrations (100% clean verification).
 - **[2026-10-18] Feature: Municipal Utility Metering & Automated Grid Billing (`nyx_services` & `nyx_properties`)**
   - **Database Migration (`055_municipal_utility_metering_and_automated_grid_billing.sql`)**:
     - Created migration file and registered Step 55 in `FiveM/nyx_core/sql/migrations/index.json`.

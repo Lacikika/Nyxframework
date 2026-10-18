@@ -2,7 +2,8 @@
     Nyxframework: nyx_parliament
     File: server/enactment.lua
     Description: Statutory bill enactment hook, database mutation, real-time law propagation,
-                 and election certification lifecycle.
+                 election certification lifecycle, collateral reconciliation, automated term expiration,
+                 and recall referendum execution.
 ]]
 
 Nyx = Nyx or {}
@@ -92,7 +93,7 @@ function Nyx.Parliament.ConcludeSession(sessionId)
     end
 
     MySQL.prepare.await([[
-        UPDATE `nyx_parliament_sessions` SET `status` = 'tallying' WHERE `session_id` = ?
+        UPDATE `nyx_parliament_sessions` SET `status` = 'tallying', `election_phase` = 'tallying' WHERE `session_id` = ?
     ]], { sessionId })
 
     local winner, finalCounts, roundLogs, winStatus, candidateDetails = Nyx.Parliament.TabulateRankedChoice(sessionId)
@@ -101,15 +102,23 @@ function Nyx.Parliament.ConcludeSession(sessionId)
         return false, winStatus or finalCounts
     end
 
-    -- Record winner
+    -- Calculate total votes cast across final round
+    local totalVotes = 0
+    if finalCounts and type(finalCounts) == "table" then
+        for _, count in pairs(finalCounts) do
+            totalVotes = totalVotes + (tonumber(count) or 0)
+        end
+    end
+
+    -- Record winner and concluded status
     MySQL.prepare.await([[
         UPDATE `nyx_parliament_sessions` 
-        SET `status` = 'concluded', `winner_option` = ? 
+        SET `status` = 'concluded', `election_phase` = 'concluded', `winner_option` = ? 
         WHERE `session_id` = ?
     ]], { winner, sessionId })
 
-    print(string.format("^2[Nyx:Parliament] Session '%s' concluded. Winner: ^3%s^7 (%s)",
-        sessionId, tostring(winner), tostring(winStatus)))
+    print(string.format("^2[Nyx:Parliament] Session '%s' concluded. Winner: ^3%s^7 (%s, %d total votes tallied)",
+        sessionId, tostring(winner), tostring(winStatus), totalVotes))
 
     local meta = {}
     if session.metadata then
@@ -121,11 +130,10 @@ function Nyx.Parliament.ConcludeSession(sessionId)
         end
     end
 
-    -- 1. If general election, instate the elected candidate into office
+    -- 1. If general election, update candidate vote statistics, reconcile collateral, and instate winner
     if session.type == "election" then
-        local officeId = meta.officeId
+        local officeId = session.office_id or meta.officeId
         if not officeId then
-            -- Infer office from session id prefix (e.g. "election:mayor_2026" -> "mayor")
             local clean = session.session_id:gsub("^election:", "")
             local firstPart = clean:match("^([%a_]+)")
             if firstPart and Config.Offices and Config.Offices[firstPart] then
@@ -135,11 +143,26 @@ function Nyx.Parliament.ConcludeSession(sessionId)
             end
         end
 
+        -- Update candidate final vote tallies and percentages
+        if finalCounts and type(finalCounts) == "table" then
+            for candId, count in pairs(finalCounts) do
+                local cVotes = tonumber(count) or 0
+                local cPct = totalVotes > 0 and math.floor(((cVotes / totalVotes) * 100.0) * 100 + 0.5) / 100.0 or 0.00
+                MySQL.prepare.await([[
+                    UPDATE `nyx_parliament_candidates`
+                    SET `vote_count` = ?, `vote_percentage` = ?
+                    WHERE `candidate_id` = ?
+                ]], { cVotes, cPct, candId })
+            end
+        end
+
+        -- Reconcile candidate collateral deposits
+        Nyx.Parliament.ReconcileElectionCollaterals(sessionId, winner, totalVotes)
+
         local citizenId = candidateDetails and (candidateDetails.citizen_id or candidateDetails.citizenId)
         local displayName = candidateDetails and (candidateDetails.display_name or candidateDetails.name)
 
         if not citizenId then
-            -- Look up citizen ID directly from candidate table
             local candRow = MySQL.single.await([[
                 SELECT `citizen_id`, `display_name` FROM `nyx_parliament_candidates` WHERE `candidate_id` = ?
             ]], { winner })
@@ -155,16 +178,27 @@ function Nyx.Parliament.ConcludeSession(sessionId)
         end
     end
 
-    -- 2. If recall referendum, evaluate removal
-    if session.type == "referendum" and (winner == "RECALL_YES" or winner == "PASS") then
-        local officeId = meta.officeId
-        if officeId then
-            MySQL.prepare.await([[
-                UPDATE `nyx_parliament_officials` SET `status` = 'recalled' WHERE `office_id` = ? AND `status` = 'active'
-            ]], { officeId })
+    -- 2. If recall referendum, evaluate outcome
+    if session.type == "referendum" then
+        local officeId = session.office_id or meta.officeId
+        local outcome = Nyx.DemocraticElections.EvaluateRecallReferendumOutcome(winner, officeId)
 
-            print(string.format("^1[Nyx:Parliament] Recall referendum passed! Office '%s' vacated.^7", officeId))
-            TriggerClientEvent("nyx:parliament:client:officialRecalled", -1, officeId)
+        if outcome.vacateOfficial and officeId then
+            -- Recall succeeded: vacate official and automatically schedule snap election
+            Nyx.Parliament.VacateOfficial(officeId, "Citizen recall referendum passed by popular ballot", "recalled")
+            print(string.format("^1[Nyx:Parliament] Recall referendum PASSED! Office '%s' vacated. Scheduling snap election...^7", officeId))
+            Nyx.Parliament.ScheduleElectionSession(officeId)
+        elseif outcome.applyCooldown and officeId then
+            -- Recall failed: official retained, apply 7-day recall immunity cooldown
+            local cooldownDays = outcome.cooldownDays or Config.RecallImmunityDays or 7
+            MySQL.prepare.await([[
+                UPDATE `nyx_parliament_officials`
+                SET `cooldown_until` = DATE_ADD(CURRENT_TIMESTAMP, INTERVAL ? DAY)
+                WHERE `office_id` = ? AND `status` = 'active'
+            ]], { cooldownDays, officeId })
+
+            print(string.format("^2[Nyx:Parliament] Recall referendum DEFEATED. Official in office '%s' retained with %d-day immunity cooldown.^7",
+                officeId, cooldownDays))
         end
     end
 
@@ -177,21 +211,45 @@ function Nyx.Parliament.ConcludeSession(sessionId)
     return true, winner, winStatus, roundLogs
 end
 
--- Periodic Session Lifecycle Thread (checks for expired sessions every Config.SessionCheckInterval)
+-- Periodic Session & Official Lifecycle Thread
 CreateThread(function()
     local intervalMs = (Config.SessionCheckInterval or 60) * 1000
     while true do
         Wait(intervalMs)
 
-        local expiredRows = MySQL.query.await([[
-            SELECT `session_id` FROM `nyx_parliament_sessions` 
-            WHERE `status` = 'active' AND `ends_at` <= CURRENT_TIMESTAMP
-        ]])
+        -- 1. Advance nomination phase to voting phase when nomination period concludes
+        pcall(function()
+            MySQL.prepare.await([[
+                UPDATE `nyx_parliament_sessions`
+                SET `election_phase` = 'voting'
+                WHERE `type` = 'election' AND `election_phase` = 'nomination'
+                  AND `nomination_ends_at` IS NOT NULL AND `nomination_ends_at` <= CURRENT_TIMESTAMP
+                  AND `status` = 'active'
+            ]])
+        end)
 
-        if expiredRows then
-            for _, row in ipairs(expiredRows) do
-                Nyx.Parliament.ConcludeSession(row.session_id)
+        -- 2. Conclude expired sessions
+        pcall(function()
+            local expiredRows = MySQL.query.await([[
+                SELECT `session_id` FROM `nyx_parliament_sessions` 
+                WHERE `status` = 'active' AND `ends_at` <= CURRENT_TIMESTAMP
+            ]])
+
+            if expiredRows then
+                for _, row in ipairs(expiredRows) do
+                    Nyx.Parliament.ConcludeSession(row.session_id)
+                end
             end
-        end
+        end)
+
+        -- 3. Check and expire completed official term limits
+        pcall(function()
+            Nyx.Parliament.CheckAndExpireOfficialTerms()
+        end)
+
+        -- 4. Check and expire stale recall petitions
+        pcall(function()
+            Nyx.Parliament.CheckAndExpireRecallPetitions()
+        end)
     end
 end)

@@ -662,6 +662,22 @@ function handleDevMockNui(action, data) {
             { audit_id: 2, session_id: 103, law_id: 'TX-401', field: 'rate', old_value: '0.07', new_value: '0.08', enacted_by_session_title: 'Költségvetési Stabilitási Törvény', enacted_at: '2026-10-12 18:00' }
         ];
     }
+    if (action === 'parliament:withdrawCandidacy') {
+        showNotification({ type: 'info', title: 'JELÖLTSÉG VISSZAVONVA', message: 'Jelöltségedet visszavontad, kaució visszafizetve.' });
+        return { success: true, candidateId: data.candidateId, collateralRefunded: 2500.00 };
+    }
+    if (action === 'parliament:getBoothTerminals') {
+        return [
+            { booth_id: 'booth:city_hall', label: 'City Hall Council Voting Booth', location_zone: 'Downtown Los Santos', total_ballots_cast: 42, is_active: 1 },
+            { booth_id: 'booth:sandy_shores', label: 'Sandy Shores Regional Ballot Station', location_zone: 'Sandy Shores', total_ballots_cast: 18, is_active: 1 },
+            { booth_id: 'booth:paleto_bay', label: 'Paleto Bay Justice Center Ballot Station', location_zone: 'Paleto Bay', total_ballots_cast: 12, is_active: 1 }
+        ];
+    }
+    if (action === 'parliament:getTermAudits') {
+        return [
+            { audit_id: 1, office_id: 'mayor', citizen_id: 'CIT_0144', display_name: 'Elena Vance', event_type: 'instated', reason: 'Electoral victory certified by Instant-Runoff Voting', created_at: '2026-10-18 10:00:00' }
+        ];
+    }
     // Property Blind-Auction & Stewardship Portal Mock Handlers
     if (action === 'closePropertyPortal') {
         return { success: true };
@@ -3267,6 +3283,8 @@ async function openSubpoenaDisclosure(citizenId) {
 // 12D. Parliamentary Ranked-Choice Voting & Legislation Terminal
 function openParliamentUI(payload) {
     NyxState.parliament.isOpen = true;
+    NyxState.parliament.boothId = payload && payload.boothId ? payload.boothId : null;
+    NyxState.parliament.boothLabel = payload && payload.boothLabel ? payload.boothLabel : null;
     const overlay = document.getElementById('parliament-overlay');
     if (overlay) overlay.classList.remove('hidden');
 
@@ -3283,6 +3301,8 @@ function openParliamentUI(payload) {
         NyxState.parliament.amendments = payload.amendments || [];
         NyxState.parliament.petitions = payload.petitions || [];
         NyxState.parliament.officials = payload.officials || [];
+        NyxState.parliament.booths = payload.booths || [];
+        NyxState.parliament.termAudits = payload.termAudits || [];
         renderParliamentOverviewData();
     } else {
         refreshParliamentOverview();
@@ -3337,6 +3357,8 @@ async function refreshParliamentOverview() {
         NyxState.parliament.amendments = res.amendments || [];
         NyxState.parliament.petitions = res.petitions || [];
         NyxState.parliament.officials = res.officials || [];
+        NyxState.parliament.booths = res.booths || [];
+        NyxState.parliament.termAudits = res.termAudits || [];
         renderParliamentOverviewData();
     }
 }
@@ -3486,7 +3508,9 @@ async function castParliamentBallot() {
     lockButtonAction(castBtn, async () => {
         const res = await postNui('parliament:castBallot', {
             sessionId: sessionId,
-            preferences: preferences
+            preferences: preferences,
+            boothId: NyxState.parliament.boothId || null,
+            boothLabel: NyxState.parliament.boothLabel || null
         });
 
         if (res && res.success) {

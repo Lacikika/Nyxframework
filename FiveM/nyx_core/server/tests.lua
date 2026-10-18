@@ -10646,7 +10646,199 @@ function Nyx.Tests.TestMunicipalUtilityMeteringAndGridBilling()
     return passes == total
 end
 
--- 45. Master Test Runner (Suite 1 - Suite 50)
+-- 51. Test Democratic Parliamentary Elections & Recall Referendums
+function Nyx.Tests.TestDemocraticParliamentaryElectionsAndRecallReferendums()
+    print("^3[Nyx:Tests] Running Democratic Parliamentary Elections & Recall Referendums Suite...^7")
+    local passes = 0
+    local total = 8
+
+    local Elections = Nyx.DemocraticElections
+    if not Elections then
+        local chunk = LoadResourceFile("nyx_parliament", "shared/elections.lua")
+        if chunk then
+            local fn, err = load(chunk, "nyx_parliament/shared/elections.lua")
+            if fn then fn() end
+        end
+        Elections = Nyx.DemocraticElections
+    end
+
+    if not Elections then
+        print("^1[Nyx:Tests] Failed to load Nyx.DemocraticElections domain engine!^7")
+        return false
+    end
+
+    -- Sub-test A: Candidate Eligibility & Term Limits Validation
+    local mockSessionNom = { type = "election", status = "active", election_phase = "nomination", office_id = "mayor" }
+    local mockCandidates = {
+        { candidate_id = "cand_1", citizen_id = "CIT_1001", status = "nominated" },
+        { candidate_id = "cand_2", citizen_id = "CIT_1002", status = "qualified" }
+    }
+    local okNew, _ = Elections.EvaluateCandidateEligibility("CIT_1003", "mayor", mockSessionNom, mockCandidates, nil)
+    local okDup, errDup = Elections.EvaluateCandidateEligibility("CIT_1001", "mayor", mockSessionNom, mockCandidates, nil)
+
+    local mockMaxOfficial = { citizen_id = "CIT_1005", consecutive_terms = 2, status = "active" }
+    local okTermLim, errTermLim = Elections.EvaluateCandidateEligibility("CIT_1005", "mayor", mockSessionNom, mockCandidates, mockMaxOfficial)
+
+    local testA_ok = (okNew == true) and
+                     (okDup == false and errDup == "ALREADY_REGISTERED_AS_CANDIDATE") and
+                     (okTermLim == false and errTermLim == "TERM_LIMIT_EXCEEDED")
+
+    if assertTest(testA_ok == true,
+        "Candidate Eligibility, Duplicate Prevention & Consecutive Term Limit Bounding",
+        string.format("okNew=%s, errDup=%s, errTermLim=%s", tostring(okNew), tostring(errDup), tostring(errTermLim))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Collateral Escrow & Double-Entry Account Formulation
+    local okEscrow, escrowPlan, _ = Elections.CalculateCollateralEscrow(2500.00, 5000.00, "CIT_1003", "election:mayor_2026")
+    local okDeficit, deficitPlan, errDeficit = Elections.CalculateCollateralEscrow(2500.00, 1000.00, "CIT_1003", "election:mayor_2026")
+
+    local testB_ok = (okEscrow == true and escrowPlan.debitAccount == "char:CIT_1003:bank" and
+                      escrowPlan.creditAccount == "gov:city:master" and escrowPlan.required == 2500.00) and
+                     (okDeficit == false and errDeficit == "INSUFFICIENT_COLLATERAL_FUNDS" and deficitPlan.deficit == 1500.00)
+
+    if assertTest(testB_ok == true,
+        "Collateral Escrow Account Resolution & Solvency Deficit Invariants",
+        string.format("okEscrow=%s, debit=%s, credit=%s, deficit=%.2f",
+            tostring(okEscrow), tostring(escrowPlan and escrowPlan.debitAccount),
+            tostring(escrowPlan and escrowPlan.creditAccount), deficitPlan and deficitPlan.deficit or 0.0)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Candidate Endorsement Gathering & Auto-Qualification Threshold
+    local ParliamentUI = Nyx.ParliamentUI
+    if not ParliamentUI then
+        local chunk = LoadResourceFile("nyx_parliament", "shared/legislation_ui.lua")
+        if chunk then
+            local fn = load(chunk, "nyx_parliament/shared/legislation_ui.lua")
+            if fn then fn() end
+        end
+        ParliamentUI = Nyx.ParliamentUI
+    end
+
+    local candUnder = { citizen_id = "CIT_1001", endorsements_count = 2, status = "nominated" }
+    local okSelf, errSelf = ParliamentUI.ValidateEndorsement(candUnder, "CIT_1001", 3)
+    local okEndorse, outcomeEndorse = ParliamentUI.ValidateEndorsement(candUnder, "CIT_9999", 3)
+
+    local testC_ok = (okSelf == false and errSelf == "CANNOT_ENDORSE_SELF") and
+                     (okEndorse == true and outcomeEndorse.newCount == 3 and outcomeEndorse.willQualify == true and outcomeEndorse.progressPercent == 100.0)
+
+    if assertTest(testC_ok == true,
+        "Candidate Endorsement State Machine & Automatic Qualification Threshold",
+        string.format("errSelf=%s, newCount=%s, willQualify=%s, pct=%.1f",
+            tostring(errSelf), tostring(outcomeEndorse and outcomeEndorse.newCount),
+            tostring(outcomeEndorse and outcomeEndorse.willQualify), outcomeEndorse and outcomeEndorse.progressPercent or 0.0)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Voluntary Candidate Withdrawal & Collateral Disposition Matrix
+    local candWithdrawn = { candidate_id = "cand_1", collateral_deposited = 2500.00, status = "withdrawn" }
+    local candWinner = { candidate_id = "cand_2", collateral_deposited = 2500.00, status = "qualified", vote_count = 50 }
+    local candThresholdMet = { candidate_id = "cand_3", collateral_deposited = 2500.00, status = "qualified", vote_count = 12 }
+    local candThresholdFailed = { candidate_id = "cand_4", collateral_deposited = 2500.00, status = "qualified", vote_count = 2 }
+    local candDisqualified = { candidate_id = "cand_5", collateral_deposited = 2500.00, status = "disqualified", vote_count = 0 }
+
+    local totalVotes = 100
+    local resWithdrawn = Elections.EvaluateCollateralRefund(candWithdrawn, totalVotes, "cand_2", 10.0)
+    local resWinner = Elections.EvaluateCollateralRefund(candWinner, totalVotes, "cand_2", 10.0)
+    local resThresh = Elections.EvaluateCollateralRefund(candThresholdMet, totalVotes, "cand_2", 10.0)
+    local resFailed = Elections.EvaluateCollateralRefund(candThresholdFailed, totalVotes, "cand_2", 10.0)
+    local resDisq = Elections.EvaluateCollateralRefund(candDisqualified, totalVotes, "cand_2", 10.0)
+
+    local testD_ok = (resWithdrawn.eligible == true and resWithdrawn.status == "refunded" and resWithdrawn.amount == 2500.00) and
+                     (resWinner.eligible == true and resWinner.status == "refunded") and
+                     (resThresh.eligible == true and resThresh.status == "refunded" and resThresh.sharePct == 12.0) and
+                     (resFailed.eligible == false and resFailed.status == "forfeited" and resFailed.amount == 0.0) and
+                     (resDisq.eligible == false and resDisq.status == "forfeited")
+
+    if assertTest(testD_ok == true,
+        "Collateral Disposition Matrix (Withdrawal, Electoral Victory, Threshold & Disqualification)",
+        string.format("withdrawn=%s, winner=%s, thresh=%s, failed=%s, disq=%s",
+            resWithdrawn.status, resWinner.status, resThresh.status, resFailed.status, resDisq.status)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Physical Voting Booth Proximity & Station Resolution
+    local cityHallNear = vector3(-540.9, -199.3, 48.0)
+    local farCoords = vector3(0.0, 0.0, 70.0)
+
+    local proxNear = Elections.ValidateBoothProximity(cityHallNear, Elections.Booths, 2.5)
+    local proxFar = Elections.ValidateBoothProximity(farCoords, Elections.Booths, 2.5)
+
+    local testE_ok = (proxNear.isNear == true and proxNear.boothId == "booth:city_hall" and proxNear.distance < 1.0) and
+                     (proxFar.isNear == false and proxFar.boothId == nil and proxFar.distance > 500.0)
+
+    if assertTest(testE_ok == true,
+        "Physical Voting Booth 3D Spatial Proximity & Certified Station Resolution",
+        string.format("near=[%s, %s, dist=%.2f], far=[%s, dist=%.2f]",
+            tostring(proxNear.isNear), tostring(proxNear.boothId), proxNear.distance,
+            tostring(proxFar.isNear), proxFar.distance)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Anti-Sybil Hardware / License Footprint Hashing
+    local mockTokens = { "tok_abc123", "tok_def456", "tok_ghi789" }
+    local mockIdentifiers = { "license:abcdef1234567890", "discord:12345" }
+
+    local hashTokens = Elections.GenerateHardwareFootprintHash(mockIdentifiers, mockTokens, 1)
+    local hashLicense = Elections.GenerateHardwareFootprintHash(mockIdentifiers, {}, 1)
+
+    local testF_ok = (hashTokens:find("^HWID%-") ~= nil) and
+                     (hashLicense == "LIC-abcdef1234567890")
+
+    if assertTest(testF_ok == true,
+        "Anti-Sybil Multi-Character Footprint Hash Formulation (HWID & License)",
+        string.format("hashTokens=%s, hashLicense=%s", hashTokens, hashLicense)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Term Limit Expiration Lifecycle Evaluation
+    local nowEpoch = 1770000000
+    local offExpired = { office_id = "mayor", citizen_id = "CIT_1001", term_end_epoch = nowEpoch - 60, status = "active", consecutive_terms = 1 }
+    local offActive = { office_id = "chief_magistrate", citizen_id = "CIT_1002", term_end_epoch = nowEpoch + 86400, status = "active", consecutive_terms = 1 }
+
+    local evalExpired = Elections.EvaluateTermExpiration(offExpired, nowEpoch)
+    local evalActive = Elections.EvaluateTermExpiration(offActive, nowEpoch)
+
+    local testG_ok = (evalExpired.isExpired == true and evalExpired.officeId == "mayor") and
+                     (evalActive.isExpired == false and evalActive.remainingSeconds == 86400)
+
+    if assertTest(testG_ok == true,
+        "Authoritative Term Limit Expiration State Evaluation",
+        string.format("expired=[%s, rem=%d], active=[%s, rem=%d]",
+            tostring(evalExpired.isExpired), evalExpired.remainingSeconds,
+            tostring(evalActive.isExpired), evalActive.remainingSeconds)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test H: Citizen Recall Petition, Referendum Outcome & Immunity Cooldown
+    local mockOfficial = { office_id = "mayor", citizen_id = "CIT_1001", status = "active", cooldown_until_epoch = nowEpoch + 500 }
+    local mockOfficialNoCooldown = { office_id = "mayor", citizen_id = "CIT_1001", status = "active", cooldown_until_epoch = nil }
+
+    local okSelfRecall, errSelfRecall = Elections.EvaluateRecallEligibility(mockOfficialNoCooldown, "CIT_1001", {}, nowEpoch)
+    local okCooldown, errCooldown = Elections.EvaluateRecallEligibility(mockOfficial, "CIT_2002", {}, nowEpoch)
+    local okValidRecall, _ = Elections.EvaluateRecallEligibility(mockOfficialNoCooldown, "CIT_2002", {}, nowEpoch)
+
+    local outcomeYes = Elections.EvaluateRecallReferendumOutcome("RECALL_YES", "mayor")
+    local outcomeNo = Elections.EvaluateRecallReferendumOutcome("RECALL_NO", "mayor")
+
+    local testH_ok = (okSelfRecall == false and errSelfRecall == "CANNOT_RECALL_SELF") and
+                     (okCooldown == false and errCooldown:find("RECALL_COOLDOWN_ACTIVE") ~= nil) and
+                     (okValidRecall == true) and
+                     (outcomeYes.passed == true and outcomeYes.vacateOfficial == true and outcomeYes.scheduleSnapElection == true) and
+                     (outcomeNo.passed == false and outcomeNo.vacateOfficial == false and outcomeNo.applyCooldown == true and outcomeNo.cooldownDays == 7)
+
+    if assertTest(testH_ok == true,
+        "Citizen Recall Referendum Logic, Immunity Cooldown & Succession Dispatches",
+        string.format("selfErr=%s, coolErr=%s, yesVacate=%s, noCooldown=%s",
+            tostring(errSelfRecall), tostring(errCooldown), tostring(outcomeYes.vacateOfficial), tostring(outcomeNo.applyCooldown))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 45. Master Test Runner (Suite 1 - Suite 51)
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -10702,14 +10894,15 @@ function Nyx.Tests.RunAll()
     local t48 = Nyx.Tests.TestArmoredCashTransitAndBankingFreight()
     local t49 = Nyx.Tests.TestEndToEndStressSimulationAcross14Resources()
     local t50 = Nyx.Tests.TestMunicipalUtilityMeteringAndGridBilling()
+    local t51 = Nyx.Tests.TestDemocraticParliamentaryElectionsAndRecallReferendums()
 
     print("^5--------------------------------------------------^7")
-    local suites1to49Passed = false
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 and t41 and t42 and t43 and t44 and t45 and t46 and t47 and t48 and t49 then
-        suites1to49Passed = true
+    local suites1to50Passed = false
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 and t41 and t42 and t43 and t44 and t45 and t46 and t47 and t48 and t49 and t50 then
+        suites1to50Passed = true
     end
 
-    if suites1to49Passed and t50 then
+    if suites1to50Passed and t51 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

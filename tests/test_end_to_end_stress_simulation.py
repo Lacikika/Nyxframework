@@ -301,7 +301,7 @@ class TestEndToEndStressSimulation(unittest.TestCase):
 
         self.assertIn("Nyx.Tests.TestEndToEndStressSimulationAcross14Resources", content)
         self.assertIn("t49 = Nyx.Tests.TestEndToEndStressSimulationAcross14Resources()", content)
-        self.assertIn("and t48 and t49 then", content)
+        self.assertIn("and t48 and t49", content)
         self.assertIn("Migration 054 Schema Contracts", content)
         self.assertIn("0.00ms Baseline Idle Performance Guarantee", content)
 
