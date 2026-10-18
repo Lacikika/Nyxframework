@@ -40,5 +40,6 @@
   "039_vehicles_diagnostics_and_civic_impound_terminal.sql",
   "040_citizen_os_smartphone_framework.sql",
   "041_anatomical_trauma_and_medical_injury_engine.sql",
-  "042_pillbox_hospital_supply_depletion_and_emergency_hauls.sql"
+  "042_pillbox_hospital_supply_depletion_and_emergency_hauls.sql",
+  "043_gas_station_reservoirs_and_bulk_fuel_hauling.sql"
 ]

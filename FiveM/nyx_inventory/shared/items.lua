@@ -255,6 +255,24 @@ Nyx.Items.Registry = {
         type = 'freight',
         description = 'Heavy sealed drum of refined diesel fuel for substation turbine generators.'
     },
+    ['bulk_fuel_tank'] = {
+        name = 'bulk_fuel_tank',
+        label = 'Commercial Bulk Fuel Pod (500L)',
+        weight = 75000,
+        stackable = true,
+        maxStack = 10,
+        type = 'freight',
+        description = 'Standardized commercial tanker pod carrying 500 liters of refined fuel for station reservoirs.'
+    },
+    ['fuel_canister'] = {
+        name = 'fuel_canister',
+        label = 'Emergency Fuel Jerrycan (20L)',
+        weight = 15000,
+        stackable = false,
+        maxSlots = 1,
+        type = 'utility',
+        description = 'Portable heavy-duty jerrycan with 20 liters of emergency fuel for roadside refueling.'
+    },
 
     -- Industrial Materials & Logistics
     ['refined_iron'] = {

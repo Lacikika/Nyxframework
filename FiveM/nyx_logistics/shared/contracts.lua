@@ -31,7 +31,10 @@ Nyx.Logistics.FreightConfig = {
         [`packer`] = true,
         [`boxville`] = true,
         [`boxville2`] = true,
-        [`boxville3`] = true
+        [`boxville3`] = true,
+        [`tanker`] = true,
+        [`tanker2`] = true,
+        [`armytanker`] = true
     },
 
     -- Public Dispatch Terminals (nyx_interact targets)

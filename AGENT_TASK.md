@@ -69,7 +69,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Pillbox Hospital Supply Depletion & Emergency Medical Hauls (`nyx_services` & `nyx_logistics`)**
   - **Implementation:** Replace static medical supply loops with finite container `stash:pillbox_meds`. Low medical stock triggers priority emergency logistics contracts for couriers.
 
-- [ ] **Feature: Dynamic Gas Station Reservoir Stocks & Bulk Fuel Hauling (`nyx_logistics` & `nyx_vehicles`)**
+- [x] **Feature: Dynamic Gas Station Reservoir Stocks & Bulk Fuel Hauling (`nyx_logistics` & `nyx_vehicles`)**
   - **Implementation:** Gas pumps draw from localized underground tanks. Zero fuel blocks vehicle refueling and creates refinery-to-station bulk tanker delivery missions.
 
 - [ ] **Feature: Physical Vehicle Keys, Fleet RFID Tokens & Lockpicking Forensics (`nyx_vehicles` & `nyx_inventory`)**
@@ -107,6 +107,47 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Dynamic Gas Station Reservoir Stocks & Bulk Fuel Hauling (`nyx_logistics` & `nyx_vehicles`)**
+  - **Database Migration (`043_gas_station_reservoirs_and_bulk_fuel_hauling.sql`, `index.json`)**:
+    - Created `nyx_vehicles_gas_stations` table (`station_id` PK, `name`, `brand`, `zone_id`, `reservoir_stash_id` UNIQUE, `coords`, `fuel_capacity`, `fuel_stock`, `fuel_price_per_liter`, `critical_threshold`, `degraded_threshold`, `is_active`, `last_emergency_contract_at`, `last_delivery_at`) for persistent underground tank management.
+    - Created `nyx_vehicles_fuel_audit` table (`audit_id` PK, `audit_uuid` UNIQUE, `station_id`, `reservoir_stash_id`, `action`, `liters`, `cost`, `price_per_liter`, `remaining_stock`, `vehicle_plate`, `citizen_id`, `contract_id`, `notes`, `created_at`) for immutable event auditing across refuels and hauls.
+    - Seeded canonical stations into `nyx_vehicles_gas_stations`: Legion Square Petrol (`gas_legion`), Davis LTD Gasoline (`gas_davis`), Sandy Shores 24/7 Gas (`gas_sandy_shores`), Paleto Bay Xero Gas (`gas_paleto`), Rockford Hills RON Express (`gas_rockford`).
+    - Seeded underground reservoirs into `nyx_inventories`: `reservoir:gas_legion`, `reservoir:gas_davis`, `reservoir:gas_sandy_shores`, `reservoir:gas_paleto`, `reservoir:gas_rockford`, and central depot `stash:refinery_fuel` (15k-20k kg capacity).
+    - Seeded initial bulk fuel stock into `stash:refinery_fuel`: 200x `industrial_fuel` and 50x `bulk_fuel_tank`.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 43) and mirrored to `FiveM/nyx_vehicles/sql/migrations/`.
+  - **Item Registry Integration (`nyx_inventory/shared/items.lua`)**:
+    - Registered `bulk_fuel_tank` (Commercial Bulk Fuel Pod 500L, freight cargo item for tanker flatbeds/semi-trailers) and `fuel_canister` (Emergency Fuel Jerrycan 20L, portable utility item for roadside refueling).
+  - **Commercial Logistics Tanker Fleet Authorization (`nyx_logistics/shared/contracts.lua`)**:
+    - Added heavy commercial tanker models and trailers (`tanker`, `tanker2`, `armytanker`) to `Nyx.Logistics.FreightConfig.CommercialVehicles`.
+  - **Shared Pure Lua 5.4 Fuel Engine (`nyx_vehicles/shared/fuel.lua`, `fxmanifest.lua`)**:
+    - Implemented `Nyx.VehicleFuel.CalculateRefuelAmount`: enforces strict zero-fuel reservoir blocking (`RESERVOIR_DEPLETED`), tank space clamping, and positive requested amounts.
+    - Implemented `Nyx.VehicleFuel.CalculateDynamicPrice`: elastic scarcity pricing scaling linearly up to $2.0\times$ base price as underground reservoir reserves drop below 50%.
+    - Implemented `Nyx.VehicleFuel.EvaluateReservoirStatus`: 4-tier classification (`optimal`, `degraded`, `critical_shortage`, `depleted`).
+    - Implemented `Nyx.VehicleFuel.CalculateBulkDeliveryContract`: dynamic hazard multiplier ($1.25\times$ to $2.00\times$), 15% escrow deposit, and pod quantity calculation.
+    - Implemented `Nyx.VehicleFuel.ValidateRefuelPayload` and `ValidateRestockPayload`: zero-trust parameter validation and fuel item whitelisting.
+    - Implemented `Nyx.VehicleFuel.GetNearestGasStation`, `FormatFuelBadge`, and `FormatCurrency`.
+    - Declared `shared/fuel.lua` in `FiveM/nyx_vehicles/fxmanifest.lua`.
+  - **Server-Side Subsystem & RPCs (`nyx_vehicles/server/fuel.lua`, `server/exports.lua`)**:
+    - Hydrated gas stations on startup into memory with live database state.
+    - Implemented `vehicles:getGasStations` and `vehicles:getGasStationStatus` returning station telemetry, dynamic pricing, and readiness badges.
+    - Implemented `vehicles:refuelVehicle`: authoritative proximity check, vehicle fuel tank validation, zero-fuel reservoir protection, player payment deduction, city treasury excise deposit, vehicle fuel update, and audit logging.
+    - Implemented `vehicles:restockGasStation`: manual restock from player inventory items (`bulk_fuel_tank`, `industrial_fuel`, `fuel_canister`).
+    - Implemented automated emergency logistics contract dispatcher in `CheckShortageContract`: automatically posts bulk fuel delivery missions to `nyx_logistics_freight_contracts` when reservoir stock crosses critical threshold.
+    - Exported `GetGasStation`, `GetAllGasStations`, `GetGasStationReservoir`, and `ReplenishReservoir` in `FiveM/nyx_vehicles/server/exports.lua`.
+    - Declared `server/fuel.lua` in `FiveM/nyx_vehicles/fxmanifest.lua`.
+  - **Logistics Delivery Hook (`nyx_logistics/server/contracts.lua`)**:
+    - Added gas station delivery completion hook in `logistics:deliverContract`: automatically triggers `nyx:vehicles:server:bulkFuelDelivered` when a courier or tanker trucker delivers bulk fuel cargo to `reservoir:gas_*`, instantly replenishing station fuel stocks, updating `last_delivery_at`, and logging to fuel audit table.
+  - **Client-Side Pump Interaction & Refueling Simulation (`nyx_vehicles/client/fuel.lua`, `fxmanifest.lua`)**:
+    - Implemented proximity pump resolution and `/refuel` (`/tankol`) and `/gasstations` commands.
+    - Implemented empty reservoir protection with client warning notifications when underground tanks are dry.
+    - Implemented realistic pumping nozzle animation and progress timing with server RPC synchronization.
+    - Exported `RefuelVehicle`, `GetNearestGasStation`, and `IsRefueling`.
+    - Declared `client/fuel.lua` in `FiveM/nyx_vehicles/fxmanifest.lua`.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestGasStationReservoirsAndBulkFuelHauling()` (Test 38) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_gas_station_reservoirs_and_bulk_fuel_hauling.py` with 10 test cases covering migration 043 schema, reservoir mapping, item registrations, tanker vehicles, zero-fuel blocking, dynamic scarcity pricing, status taxonomy, bulk tanker contract math, zero-trust validation, and in-engine registration (10/10 passing).
+    - Full pytest suite: 338/338 tests passing (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 229 Lua files, 43 migrations, 100% clean verification.
 - **[2026-10-18] Feature: Pillbox Hospital Supply Depletion & Emergency Medical Hauls (`nyx_services` & `nyx_logistics`)**
   - **Database Migration (`042_pillbox_hospital_supply_depletion_and_emergency_hauls.sql`, `index.json`)**:
     - Extended `nyx_services_hospitals` with `stash_id` (VARCHAR(64) DEFAULT 'stash:pillbox_meds'), `critical_threshold` (INT DEFAULT 5), `degraded_threshold` (INT DEFAULT 15), and `last_emergency_contract_at` (TIMESTAMP NULL).

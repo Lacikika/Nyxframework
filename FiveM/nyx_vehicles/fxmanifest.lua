@@ -18,7 +18,8 @@ shared_scripts {
     '@nyx_treasury/shared/degradation.lua',
     'config.lua',
     'shared/registration.lua',
-    'shared/diagnostics.lua'
+    'shared/diagnostics.lua',
+    'shared/fuel.lua'
 }
 
 server_scripts {
@@ -29,6 +30,7 @@ server_scripts {
     'server/impound.lua',
     'server/registration.lua',
     'server/diagnostics.lua',
+    'server/fuel.lua',
     'server/spawner.lua',
     'server/main.lua',
     'server/exports.lua'
@@ -41,6 +43,7 @@ client_scripts {
     'client/wear.lua',
     'client/impound.lua',
     'client/diagnostics.lua',
+    'client/fuel.lua',
     'client/main.lua',
     'client/exports.lua'
 }

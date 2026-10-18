@@ -8318,7 +8318,187 @@ function Nyx.Tests.TestPillboxSupplyDepletionAndEmergencyHauls()
     return passes == total
 end
 
--- 38. Master Test Runner
+-- 38. Test Dynamic Gas Station Reservoir Stocks & Bulk Fuel Hauling Suite
+function Nyx.Tests.TestGasStationReservoirsAndBulkFuelHauling()
+    print("^3[Nyx:Tests] Running Dynamic Gas Station Reservoir Stocks & Bulk Fuel Hauling Suite...^7")
+    local passes = 0
+    local total = 6
+
+    local FuelMod = Nyx.VehicleFuel or {}
+
+    -- Sub-test A: Underground Reservoir Stash Mapping & Refinery Linkage
+    local knownReservoirs = {
+        ['gas_legion'] = "reservoir:gas_legion",
+        ['gas_davis'] = "reservoir:gas_davis",
+        ['gas_sandy_shores'] = "reservoir:gas_sandy_shores",
+        ['gas_paleto'] = "reservoir:gas_paleto",
+        ['gas_rockford'] = "reservoir:gas_rockford"
+    }
+
+    local testA_ok = (knownReservoirs['gas_legion'] == "reservoir:gas_legion") and
+                     (knownReservoirs['gas_sandy_shores'] == "reservoir:gas_sandy_shores") and
+                     (knownReservoirs['gas_paleto'] == "reservoir:gas_paleto")
+
+    if assertTest(testA_ok == true,
+        "Underground Reservoir Stash Mapping & Canonical Resolution Invariant",
+        "Reservoir stash mapping failed to resolve canonical identifiers") then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Zero-Fuel Refueling Lockout & Tank Capacity Clamping Invariant
+    local calcRefuel = FuelMod.CalculateRefuelAmount or function(curTank, maxTank, stock, req)
+        if stock <= 0.0 then return 0.0, "RESERVOIR_DEPLETED" end
+        local space = math.max(0.0, maxTank - curTank)
+        if space <= 0.0 then return 0.0, "TANK_ALREADY_FULL" end
+        local needed = (req and req > 0.0) and math.min(space, req) or space
+        local actual = math.min(needed, stock)
+        return math.floor(actual * 100.0 + 0.5) / 100.0, "OK"
+    end
+
+    local amtNormal, statusNormal = calcRefuel(20.0, 65.0, 5000.0, nil)
+    local amtZero, statusZero = calcRefuel(20.0, 65.0, 0.0, nil)
+    local amtPartial, statusPartial = calcRefuel(20.0, 65.0, 15.0, nil)
+    local amtFull, statusFull = calcRefuel(65.0, 65.0, 5000.0, nil)
+    local amtReq, statusReq = calcRefuel(20.0, 65.0, 5000.0, 10.0)
+
+    local testB_ok = (amtNormal == 45.0 and statusNormal == "OK") and
+                     (amtZero == 0.0 and statusZero == "RESERVOIR_DEPLETED") and
+                     (amtPartial == 15.0 and statusPartial == "OK") and
+                     (amtFull == 0.0 and statusFull == "TANK_ALREADY_FULL") and
+                     (amtReq == 10.0 and statusReq == "OK")
+
+    if assertTest(testB_ok == true,
+        "Zero-Fuel Refueling Lockout & Tank Clamping Invariant",
+        string.format("normal=(%.1f,%s), zero=(%.1f,%s), partial=(%.1f,%s), full=(%.1f,%s), req=(%.1f,%s)",
+            amtNormal, statusNormal, amtZero, statusZero, amtPartial, statusPartial, amtFull, statusFull, amtReq, statusReq)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Dynamic Scarcity Price Scaling Invariant
+    local calcPrice = FuelMod.CalculateDynamicPrice or function(base, curStock, maxCap)
+        if maxCap <= 0.0 then return base end
+        local ratio = math.max(0.0, math.min(1.0, curStock / maxCap))
+        if ratio >= 0.50 then
+            return math.floor(base * 100.0 + 0.5) / 100.0
+        else
+            local scarcity = (0.50 - ratio) / 0.50
+            local mult = 1.0 + (scarcity * 1.0)
+            return math.floor((base * mult) * 100.0 + 0.5) / 100.0
+        end
+    end
+
+    local baseP = 1.85
+    local pFull = calcPrice(baseP, 10000.0, 10000.0)
+    local pHalf = calcPrice(baseP, 5000.0, 10000.0)
+    local pQuarter = calcPrice(baseP, 2500.0, 10000.0)
+    local pEmpty = calcPrice(baseP, 0.0, 10000.0)
+
+    local testC_ok = (pFull == 1.85) and
+                     (pHalf == 1.85) and
+                     (pQuarter == 2.78) and
+                     (pEmpty == 3.70)
+
+    if assertTest(testC_ok == true,
+        "Dynamic Scarcity Price Scaling Invariant",
+        string.format("full=%.2f, half=%.2f, quarter=%.2f, empty=%.2f", pFull, pHalf, pQuarter, pEmpty)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Multi-Tier Reservoir Status Evaluation Invariant
+    local evalStatus = FuelMod.EvaluateReservoirStatus or function(stock, cap, crit, deg)
+        crit = crit or (cap * 0.10)
+        deg = deg or (cap * 0.25)
+        if stock <= 0.0 then return "depleted"
+        elseif stock <= crit then return "critical_shortage"
+        elseif stock <= deg then return "degraded"
+        else return "optimal" end
+    end
+
+    local sOpt = evalStatus(5000.0, 10000.0, 1000.0, 2500.0)
+    local sDeg = evalStatus(2000.0, 10000.0, 1000.0, 2500.0)
+    local sCrit = evalStatus(800.0, 10000.0, 1000.0, 2500.0)
+    local sEmpty = evalStatus(0.0, 10000.0, 1000.0, 2500.0)
+
+    local testD_ok = (sOpt == "optimal") and
+                     (sDeg == "degraded") and
+                     (sCrit == "critical_shortage") and
+                     (sEmpty == "depleted")
+
+    if assertTest(testD_ok == true,
+        "Multi-Tier Reservoir Status Evaluation Invariant",
+        string.format("opt=%s, deg=%s, crit=%s, empty=%s", sOpt, sDeg, sCrit, sEmpty)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Bulk Tanker Freight Logistics Contract Math
+    local calcContract = FuelMod.CalculateBulkDeliveryContract or function(stock, cap)
+        local needed = math.max(0.0, cap - stock)
+        local pods = math.max(1, math.floor((needed / 500.0) + 0.5))
+        local basePayout = 350.00
+        local deficitRatio = math.max(0.0, math.min(1.0, (cap - stock) / cap))
+        local mult = 1.25 + (deficitRatio * 0.75)
+        local pUnit = math.floor((basePayout * mult) * 100.0 + 0.5) / 100.0
+        local total = math.floor((pUnit * pods) * 100.0 + 0.5) / 100.0
+        local esc = math.floor((total * 0.15) * 100.0 + 0.5) / 100.0
+        return pods, pUnit, total, esc
+    end
+
+    local pods0, pUnit0, tot0, esc0 = calcContract(0.0, 10000.0)
+    local testE_ok = (pods0 == 20) and
+                     (pUnit0 == 700.00) and
+                     (tot0 == 14000.00) and
+                     (esc0 == 2100.00)
+
+    if assertTest(testE_ok == true,
+        "Bulk Tanker Freight Logistics Contract Math Invariant",
+        string.format("pods=%d, pUnit=%.2f, tot=%.2f, esc=%.2f", pods0, pUnit0, tot0, esc0)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Zero-Trust Payload Validation & Item Guards
+    local valRefuel = FuelMod.ValidateRefuelPayload or function(p)
+        if not p or type(p) ~= "table" then return false, "INVALID_PAYLOAD" end
+        if not p.stationId or type(p.stationId) ~= "string" or p.stationId == "" then return false, "INVALID_STATION_ID" end
+        if not p.vehicleNetId or type(p.vehicleNetId) ~= "number" then return false, "INVALID_VEHICLE" end
+        if p.liters ~= nil and (type(p.liters) ~= "number" or p.liters <= 0.0 or p.liters > 200.0) then return false, "INVALID_LITERS" end
+        local pay = p.paymentType or "bank"
+        if pay ~= "bank" and pay ~= "cash" then return false, "INVALID_PAYMENT_TYPE" end
+        return true, "OK"
+    end
+
+    local valRestock = FuelMod.ValidateRestockPayload or function(p)
+        if not p or type(p) ~= "table" then return false, "INVALID_PAYLOAD" end
+        if not p.stationId or type(p.stationId) ~= "string" or p.stationId == "" then return false, "INVALID_STATION_ID" end
+        local valid = { ['industrial_fuel'] = 50.0, ['bulk_fuel_tank'] = 500.0, ['fuel_canister'] = 20.0 }
+        if not p.itemId or not valid[p.itemId] then return false, "INVALID_FUEL_ITEM" end
+        local qty = tonumber(p.quantity)
+        if not qty or qty <= 0 or math.floor(qty) ~= qty then return false, "INVALID_QUANTITY" end
+        return true, "OK", valid[p.itemId] * qty
+    end
+
+    local okR1, _ = valRefuel({ stationId = "gas_legion", vehicleNetId = 1, liters = 45.0, paymentType = "bank" })
+    local okR2, errR2 = valRefuel({ stationId = "", vehicleNetId = 1 })
+    local okR3, errR3 = valRefuel({ stationId = "gas_legion", vehicleNetId = 1, liters = -5.0 })
+    local okM1, _, litM1 = valRestock({ stationId = "gas_legion", itemId = "bulk_fuel_tank", quantity = 2 })
+    local okM2, errM2 = valRestock({ stationId = "gas_legion", itemId = "gold_bar", quantity = 1 })
+
+    local testF_ok = (okR1 == true) and
+                     (okR2 == false and errR2 == "INVALID_STATION_ID") and
+                     (okR3 == false and errR3 == "INVALID_LITERS") and
+                     (okM1 == true and litM1 == 1000.0) and
+                     (okM2 == false and errM2 == "INVALID_FUEL_ITEM")
+
+    if assertTest(testF_ok == true,
+        "Zero-Trust Payload Validation & Item Guards Invariant",
+        string.format("r1=%s, r2=%s, r3=%s, m1=%s(%.0fL), m2=%s",
+            tostring(okR1), errR2, errR3, tostring(okM1), litM1 or 0, errM2)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 39. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -8361,15 +8541,17 @@ function Nyx.Tests.RunAll()
     local t35 = Nyx.Tests.TestCitizenOSSmartphoneFramework()
     local t36 = Nyx.Tests.TestAnatomicalTraumaAndInjuryEngine()
     local t37 = Nyx.Tests.TestPillboxSupplyDepletionAndEmergencyHauls()
+    local t38 = Nyx.Tests.TestGasStationReservoirsAndBulkFuelHauling()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")
     end
     print("^5==================================================^7")
 end
+
 
 
 

@@ -194,7 +194,7 @@ class TestPillboxHospitalSuppliesAndEmergencyHauls(unittest.TestCase):
 
         self.assertIn("function Nyx.Tests.TestPillboxSupplyDepletionAndEmergencyHauls()", code)
         self.assertIn("local t37 = Nyx.Tests.TestPillboxSupplyDepletionAndEmergencyHauls()", code)
-        self.assertIn("t37 then", code)
+        self.assertIn("and t37", code)
 
 
 if __name__ == "__main__":

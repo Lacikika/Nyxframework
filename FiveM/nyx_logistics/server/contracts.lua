@@ -532,6 +532,11 @@ Nyx.RPC.Register("logistics:deliverContract", function(src, payload)
         TriggerEvent("nyx:services:server:hospitalSuppliesDelivered", destInvId, contractId, contract.item_id, contract.quantity)
     end
 
+    -- Notify vehicle services if destination is a gas station underground reservoir
+    if destInvId and (destInvId:find("reservoir:gas_") or contract.contract_type == "bulk_fuel") then
+        TriggerEvent("nyx:vehicles:server:bulkFuelDelivered", destInvId, contractId, contract.item_id, contract.quantity)
+    end
+
     return {
         success = true,
         payout = payout,

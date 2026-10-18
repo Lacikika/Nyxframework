@@ -95,3 +95,19 @@ exports("GetCivicImpoundLots", function()
     return Nyx.Vehicles.ImpoundLots or {}
 end)
 
+exports("GetGasStation", function(stationId)
+    return Nyx.VehicleFuel.GetGasStation(stationId)
+end)
+
+exports("GetAllGasStations", function()
+    return Nyx.VehicleFuel.GetAllGasStations()
+end)
+
+exports("GetGasStationReservoir", function(stationId)
+    return Nyx.VehicleFuel.GetGasStationReservoir(stationId)
+end)
+
+exports("ReplenishReservoir", function(stationId, liters)
+    return Nyx.VehicleFuel.ReplenishReservoir(stationId, liters)
+end)
+
