@@ -1,0 +1,97 @@
+# ==============================================================================
+#                 NYXFRAMEWORK PRODUCTION SERVER CONFIGURATION
+# ==============================================================================
+# Target Engine: FiveM (Cerulean, Lua 5.4, OneSync Infinity)
+# Architecture: Authoritative Server Kernel, Closed-Loop Economy, Single-Frame SPA
+
+# --- NETWORK & HOST CONFIGURATION ---
+endpoint_add_tcp "0.0.0.0:30120"
+endpoint_add_udp "0.0.0.0:30120"
+sv_maxclients 48
+
+sv_hostname "Nyxframework Development | Authoritative Civic RP [OneSync]"
+sets sv_projectName "Nyxframework Server"
+sets sv_projectDesc "Zero-trust authoritative FiveM framework built on Lua 5.4 & oxmysql"
+sets locale "en-US"
+sets tags "nyx, roleplay, realistic, closed-loop, economy, custom, lua54"
+
+# --- ONESYNC ENFORCEMENT ---
+set onesync on
+set onesync_population false
+set onesync_distanceCullVehicles true
+set sv_enforceGameBuild 3095 # The Chop Shop or newer
+
+# --- DATABASE CONNECTION (oxmysql) ---
+# Format: mysql://USER:PASSWORD@HOST:PORT/DATABASE?charset=utf8mb4
+set mysql_connection_string "mysql://root:password@127.0.0.1:3306/nyxframework?charset=utf8mb4"
+set mysql_slow_query_warning 150
+set mysql_debug 0
+
+# --- NYXFRAMEWORK ENVIRONMENT FLAGS ---
+set nyx_environment "production" # "development" | "production"
+set nyx_debug false
+
+# ==============================================================================
+#                           RESOURCE ENSURE ORDER
+# ==============================================================================
+# CRITICAL: Do NOT alter the ensure order below. Dependencies must load sequentially.
+
+# 1. Base GTA & FiveM Runtime Defaults
+ensure mapmanager
+ensure chat
+ensure spawnmanager
+ensure sessionmanager
+ensure basic-gamemode
+# ensure hardcap # Nem szukseges OneSync alatt
+
+# 2. Database Driver
+ensure oxmysql
+
+# 3. Master Kernel & Data Migration Engine
+# (Applies SQL migrations 001 through 009 in bitwise SHA-256 sequence)
+ensure nyx_core
+
+# 4. Master Frontend & Interaction Shells
+# (Single-frame CEF master SPA, centralized audio, and dormant raycast engine)
+ensure nyx_ui
+ensure nyx_interact
+
+# 5. Core Dynamic Storage & Economy
+# (Atomic mutex containers, double-entry public ledger, and point-of-sale tax)
+ensure nyx_inventory
+ensure nyx_treasury
+
+# 6. Supply Chain & Public Infrastructure
+# (Depleting nodes, dynamic shelf elasticity, power grid, and utility meters)
+ensure nyx_logistics
+ensure nyx_services
+
+# 7. Civic Institutions & Justice
+# (Ranked-choice IRV elections, dynamic statutes, and cryptographic forensics)
+ensure nyx_parliament
+ensure nyx_judiciary
+
+# 8. Organizations & Vehicles
+# (Autonomous charters, multi-sig vaults, and persistent vehicle lifecycle)
+ensure nyx_factions
+ensure nyx_vehicles
+
+# 9. Real Estate & Emergency Services
+# (Secured properties, 5-tier RFID locks, and emergency CAD / MDT terminal)
+ensure nyx_properties
+ensure nyx_mdt
+
+# ==============================================================================
+#                           PERMISSIONS & ACCESS CONTROL
+# ==============================================================================
+add_ace group.admin command allow
+add_ace group.admin command.quit deny
+add_ace resource.nyx_core command.add_ace allow
+add_ace resource.nyx_core command.add_principal allow
+
+# Add server administrators here (replace with actual FiveM license / steam IDs)
+# add_principal identifier.license:0123456789abcdef group.admin
+
+# --- STEAM & FIVEM LICENSES ---
+set sv_licenseKey "YOUR_CFXRE_LICENSE_KEY_HERE"
+# set steam_webApiKey "your_steam_web_api_key_here" # Szerezz be egyet itt ha szukseges: https://steamcommunity.com/dev/apikey

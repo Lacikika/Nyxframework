@@ -1,0 +1,20 @@
+[Unit]
+Description=FiveM Dedicated Server (Nyxframework)
+After=network.target mariadb.service
+Wants=mariadb.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/fivem/server-data
+ExecStart=/opt/fivem/alpine/run.sh +exec server.cfg
+Restart=always
+RestartSec=5s
+KillSignal=SIGINT
+TimeoutStopSec=30s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

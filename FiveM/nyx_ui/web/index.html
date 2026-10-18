@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nyxframework Master SPA</title>
+    <!-- Modern Typography & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+    <div id="nyx-app">
+        <!-- ================================================================
+             1. SPATIAL INTERACTION RETICLE & CONTEXT RADIAL
+             ================================================================ -->
+        <div id="interact-overlay" class="hidden">
+            <div id="reticle" class="reticle-dot">
+                <div class="reticle-pulse"></div>
+            </div>
+
+            <!-- Radial Blooming Context Menu -->
+            <div id="radial-container" class="radial-wheel hidden">
+                <div class="radial-center-badge">
+                    <i id="radial-center-icon" class="fa-solid fa-crosshairs"></i>
+                    <span id="radial-center-title">INTERACT</span>
+                </div>
+                <div id="radial-items" class="radial-wheel-items">
+                    <!-- Dynamic radial segments positioned via CSS trigonometry -->
+                </div>
+            </div>
+
+            <!-- Context Target List (Linear Fallback/Detailed Mode) -->
+            <div id="target-menu" class="hidden">
+                <div class="target-header">
+                    <span id="target-category-badge" class="badge">INTERACT</span>
+                    <span id="target-title">Target Object</span>
+                </div>
+                <div id="target-options" class="options-list">
+                    <!-- Dynamic option buttons -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================
+             2. NOTIFICATION TOAST STACK
+             ================================================================ -->
+        <div id="toast-container" class="toast-stack">
+            <!-- Dynamic toasts rendered via JS -->
+        </div>
+
+        <!-- ================================================================
+             3. MINIMALIST ADAPTIVE HUD & DIGITAL CLUSTER
+             ================================================================ -->
+        <div id="hud-container" class="hud-layer">
+            <!-- Top Right: Financial Balances & Status Badges -->
+            <div class="hud-top-right">
+                <div class="finance-card">
+                    <div class="finance-item cash">
+                        <i class="fa-solid fa-money-bill-wave"></i>
+                        <span id="hud-cash">$0</span>
+                    </div>
+                    <div class="finance-item bank">
+                        <i class="fa-solid fa-building-columns"></i>
+                        <span id="hud-bank">$0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Left / Center: Vitals Matrix & Digital Vehicular Cluster -->
+            <div class="hud-bottom-cluster">
+                <!-- Digital Vehicular Telemetry Cluster (Auto-hides on foot) -->
+                <div id="hud-vehicle" class="vehicle-hud hidden">
+                    <div class="veh-speed-block">
+                        <span id="hud-speed" class="speed-value">0</span>
+                        <span class="speed-unit">MPH</span>
+                    </div>
+
+                    <div class="veh-telemetry-cluster">
+                        <!-- RPM Progress Bar -->
+                        <div class="rpm-wrapper">
+                            <div class="rpm-track">
+                                <div id="hud-rpm-fill" class="rpm-fill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Gauges & Status Flags -->
+                        <div class="veh-gauges-row">
+                            <div class="gauge-pill fuel" title="Fuel Tank">
+                                <i class="fa-solid fa-gas-pump"></i>
+                                <span id="hud-fuel-val">100%</span>
+                            </div>
+                            <div class="gauge-pill gear" title="Transmission Gear">
+                                <span class="gear-tag">G</span>
+                                <span id="hud-gear" class="gear-val">1</span>
+                            </div>
+                            <!-- Vehicle Warning Status Icons -->
+                            <div class="veh-warnings">
+                                <i id="veh-warn-engine" class="fa-solid fa-triangle-exclamation warn-icon off" title="Engine Check"></i>
+                                <i id="veh-warn-fuel" class="fa-solid fa-oil-can warn-icon off" title="Low Fuel / Pressure"></i>
+                                <i id="veh-icon-lock" class="fa-solid fa-lock veh-lock-icon locked" title="Vehicle Security State"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Adaptive Player Vitals Matrix (Auto-hides when full/stationary) -->
+                <div id="vitals-matrix" class="vitals-matrix">
+                    <div class="vital-pill health" id="vital-pill-health" title="Health">
+                        <i class="fa-solid fa-heart"></i>
+                        <div class="vital-track"><div id="vital-health" class="fill" style="width: 100%;"></div></div>
+                    </div>
+                    <div class="vital-pill armor" id="vital-pill-armor" title="Armor">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <div class="vital-track"><div id="vital-armor" class="fill" style="width: 0%;"></div></div>
+                    </div>
+                    <div class="vital-pill hunger" id="vital-pill-hunger" title="Hunger / Nutrition">
+                        <i class="fa-solid fa-burger"></i>
+                        <div class="vital-track"><div id="vital-hunger" class="fill" style="width: 100%;"></div></div>
+                    </div>
+                    <div class="vital-pill thirst" id="vital-pill-thirst" title="Thirst / Hydration">
+                        <i class="fa-solid fa-droplet"></i>
+                        <div class="vital-track"><div id="vital-thirst" class="fill" style="width: 100%;"></div></div>
+                    </div>
+                    <div class="vital-pill stamina" id="vital-pill-stamina" title="Stamina">
+                        <i class="fa-solid fa-bolt"></i>
+                        <div class="vital-track"><div id="vital-stamina" class="fill" style="width: 100%;"></div></div>
+                    </div>
+                    <div class="vital-pill voice" id="vital-pill-voice" title="Proximity Voice Range">
+                        <i id="voice-range-icon" class="fa-solid fa-microphone"></i>
+                        <div class="vital-track"><div id="vital-voice" class="fill" style="width: 50%;"></div></div>
+                    </div>
+                    <div id="vital-radio-pill" class="vital-pill radio hidden" title="Encrypted Radio Channel">
+                        <i class="fa-solid fa-walkie-talkie"></i>
+                        <span id="vital-radio-freq">CH 1</span>
+                    </div>
+                    <div id="vital-oxygen-pill" class="vital-pill oxygen hidden" title="Oxygen">
+                        <i class="fa-solid fa-lungs"></i>
+                        <div class="vital-track"><div id="vital-oxygen" class="fill" style="width: 100%;"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================
+             4. 5-SLOT QUICK-ACTION HOTBAR (Bottom Center)
+             ================================================================ -->
+        <div id="hotbar-container" class="hotbar-strip">
+            <div class="hotbar-slot" data-slot="1">
+                <span class="hotbar-num">1</span>
+                <div class="hotbar-icon" id="hotbar-icon-1"><i class="fa-solid fa-hand"></i></div>
+                <span class="hotbar-label" id="hotbar-label-1">Slot 1</span>
+            </div>
+            <div class="hotbar-slot" data-slot="2">
+                <span class="hotbar-num">2</span>
+                <div class="hotbar-icon" id="hotbar-icon-2"></div>
+                <span class="hotbar-label" id="hotbar-label-2">Slot 2</span>
+            </div>
+            <div class="hotbar-slot" data-slot="3">
+                <span class="hotbar-num">3</span>
+                <div class="hotbar-icon" id="hotbar-icon-3"></div>
+                <span class="hotbar-label" id="hotbar-label-3">Slot 3</span>
+            </div>
+            <div class="hotbar-slot" data-slot="4">
+                <span class="hotbar-num">4</span>
+                <div class="hotbar-icon" id="hotbar-icon-4"></div>
+                <span class="hotbar-label" id="hotbar-label-4">Slot 4</span>
+            </div>
+            <div class="hotbar-slot" data-slot="5">
+                <span class="hotbar-num">5</span>
+                <div class="hotbar-icon" id="hotbar-icon-5"></div>
+                <span class="hotbar-label" id="hotbar-label-5">Slot 5</span>
+            </div>
+        </div>
+
+        <!-- ================================================================
+             5. DYNAMIC WEIGHT-BASED SLOT-GRID INVENTORY INTERFACE (40-120 Slots)
+             ================================================================ -->
+        <div id="inventory-overlay" class="inventory-screen hidden">
+            <div class="inventory-shell">
+                <!-- Left Container: Personal Pockets / Backpack -->
+                <div class="inventory-panel left-panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <i class="fa-solid fa-user-shield"></i>
+                            <span id="player-inv-label">Personal Inventory</span>
+                        </div>
+                        <div class="weight-meter">
+                            <span id="player-weight-label">0.0 / 30.0 kg</span>
+                            <div class="progress-bar"><div id="player-weight-fill" class="fill" style="width: 0%;"></div></div>
+                        </div>
+                    </div>
+                    <div id="player-slots" class="slots-grid scrollable-slots">
+                        <!-- Dynamic slot matrix (40-120 slots) -->
+                    </div>
+                </div>
+
+                <!-- Center Action & Splitter Toolbar -->
+                <div class="inventory-center-actions">
+                    <div class="action-card-header">
+                        <span>ACTIONS</span>
+                    </div>
+                    <button id="inv-use-btn" class="action-btn" title="Use Item"><i class="fa-solid fa-hand-pointer"></i> Use</button>
+                    <button id="inv-give-btn" class="action-btn" title="Hand to Nearest Citizen"><i class="fa-solid fa-handshake"></i> Give</button>
+                    <button id="inv-inspect-btn" class="action-btn" title="Inspect Item Metadata & Durability"><i class="fa-solid fa-microscope"></i> Inspect</button>
+                    <button id="inv-drop-btn" class="action-btn danger" title="Drop on Ground"><i class="fa-solid fa-arrow-down"></i> Drop</button>
+                    
+                    <div class="split-amount-box">
+                        <span class="split-label">SPLIT COUNT</span>
+                        <input type="number" id="inv-split-input" min="1" max="1000" value="1" class="split-input">
+                    </div>
+
+                    <button id="inv-close-btn" class="action-btn close"><i class="fa-solid fa-xmark"></i> Close (ESC)</button>
+                </div>
+
+                <!-- Right Container: Trunk / Glovebox / Stash / Ground -->
+                <div class="inventory-panel right-panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <i id="target-inv-icon" class="fa-solid fa-box-open"></i>
+                            <span id="target-inv-label">Target Container</span>
+                        </div>
+                        <div class="weight-meter">
+                            <span id="target-weight-label">0.0 / 100.0 kg</span>
+                            <div class="progress-bar"><div id="target-weight-fill" class="fill" style="width: 0%;"></div></div>
+                        </div>
+                    </div>
+                    <div id="target-slots" class="slots-grid scrollable-slots">
+                        <!-- Dynamic slot matrix -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Real-Time Item Metadata Inspect Popover -->
+            <div id="inspect-popover" class="inspect-popover hidden">
+                <div class="inspect-header">
+                    <i id="inspect-icon" class="fa-solid fa-shield"></i>
+                    <div>
+                        <h4 id="inspect-name">Combat Pistol</h4>
+                        <span id="inspect-rarity" class="inspect-tag">WEAPON</span>
+                    </div>
+                </div>
+                <div class="inspect-body">
+                    <div class="inspect-stat-row">
+                        <span>Durability:</span>
+                        <span id="inspect-durability-text">98%</span>
+                    </div>
+                    <div class="inspect-progress-track">
+                        <div id="inspect-durability-bar" class="fill" style="width: 98%;"></div>
+                    </div>
+                    <div id="inspect-spoiled-flag" class="spoiled-warning hidden">
+                        <i class="fa-solid fa-biohazard"></i> SPOILED / CONTAMINATED
+                    </div>
+                    <div class="inspect-meta-grid" id="inspect-meta-details">
+                        <!-- Dynamic metadata (Serial, ballistics, manufacturer) -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================
+             6. FREIGHT HAULING BOARD TERMINAL (`nyx_logistics`)
+             ================================================================ -->
+        <div id="freight-overlay" class="modal-backdrop hidden">
+            <div class="modal-dialog freight-dialog">
+                <div class="modal-header">
+                    <div class="header-left">
+                        <i class="fa-solid fa-truck-ramp-box icon-accent"></i>
+                        <div>
+                            <h3 id="freight-board-title">Logisztikai & Fuvarozási Tőzsde</h3>
+                            <span class="sub-heading">Authoritative Freight Hauling & Escrow Logistics Exchange</span>
+                        </div>
+                    </div>
+                    <button id="freight-close-btn" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body freight-body">
+                    <!-- Active Contract Banner -->
+                    <div id="freight-active-banner" class="freight-active-card hidden">
+                        <div class="card-top">
+                            <span class="title"><i class="fa-solid fa-clock-rotate-left"></i> Aktív Folyamatban Lévő Fuvarod</span>
+                            <span id="freight-active-timer" class="badge">IN TRANSIT</span>
+                        </div>
+                        <div id="freight-active-details" class="card-details"></div>
+                        <div class="card-actions">
+                            <button id="freight-load-btn" class="btn btn-primary"><i class="fa-solid fa-dolly"></i> Rakomány Felrakása</button>
+                            <button id="freight-deliver-btn" class="btn btn-success"><i class="fa-solid fa-check-double"></i> Átadás a Célállomáson</button>
+                            <button id="freight-abandon-btn" class="btn btn-danger"><i class="fa-solid fa-ban"></i> Lemondás (Kaució Elveszik)</button>
+                        </div>
+                    </div>
+
+                    <!-- Available Contracts Section -->
+                    <h4 class="section-title">Elérhető Fuvarmegbízások a Piacon</h4>
+                    <div id="freight-contracts-list" class="freight-list">
+                        <!-- Dynamic list items -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================
+             7. CIVIC TREASURY OPEN LEDGER TRANSPARENCY DASHBOARD (`nyx_treasury`)
+             ================================================================ -->
+        <div id="treasury-overlay" class="modal-backdrop hidden">
+            <div class="modal-dialog treasury-dialog">
+                <div class="modal-header">
+                    <div class="header-left">
+                        <i class="fa-solid fa-scale-balanced icon-accent emerald"></i>
+                        <div>
+                            <h3>Nyilvános Államkincstári Főkönyv</h3>
+                            <span class="sub-heading">Autonomous Double-Entry Treasury & Fiscal Transparency Portal</span>
+                        </div>
+                    </div>
+                    <button id="treasury-close-btn" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body treasury-body">
+                    <!-- Metrics Overview Cards -->
+                    <div class="treasury-kpi-grid">
+                        <div class="kpi-card">
+                            <span class="kpi-label">VÁROSI TARTALÉK ALAP</span>
+                            <span id="treasury-kpi-reserve" class="kpi-val">$0.00</span>
+                            <span class="kpi-sub">Fiskális Krízis Küszöb: $500,000</span>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-label">ÉRVÉNYES ÁFA (POS TAX)</span>
+                            <span id="treasury-kpi-postax" class="kpi-val">8.00%</span>
+                            <span class="kpi-sub">Parlamenti Rendelet Hatálya</span>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-label">P2P ÁTUTALÁSI ILLETÉK</span>
+                            <span id="treasury-kpi-p2ptax" class="kpi-val">2.00%</span>
+                            <span class="kpi-sub">Kincstári Transzfer Adó</span>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-label">FŐKÖNYVI EGYENSÚLY (ΣD == ΣC)</span>
+                            <span id="treasury-kpi-balance" class="kpi-val status-ok">BALANCED</span>
+                            <span class="kpi-sub">Zárt Gazdasági Megmaradás</span>
+                        </div>
+                    </div>
+
+                    <!-- Recent Ledger Transactions Table -->
+                    <h4 class="section-title">Valós Idejű Főkönyvi Tranzakciós Napló (Audit Ledger)</h4>
+                    <div class="table-container">
+                        <table class="nyx-table">
+                            <thead>
+                                <tr>
+                                    <th>Időpont</th>
+                                    <th>Kategória</th>
+                                    <th>Terhelt Számla (Debit)</th>
+                                    <th>Jóváírt Számla (Credit)</th>
+                                    <th>Összeg</th>
+                                    <th>Megjegyzés</th>
+                                </tr>
+                            </thead>
+                            <tbody id="treasury-ledger-rows">
+                                <!-- Dynamic audit entries -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================
+             8. MOBILE DATA TERMINAL & COURT DOCKET VIEWER (`nyx_mdt`)
+             ================================================================ -->
+        <div id="mdt-overlay" class="modal-backdrop hidden">
+            <div class="modal-dialog mdt-dialog">
+                <div class="modal-header mdt-header">
+                    <div class="header-left">
+                        <i class="fa-solid fa-shield-halved icon-accent blue"></i>
+                        <div>
+                            <h3>SAN ANDREAS EMERGENCY CAD / MDT</h3>
+                            <span class="sub-heading">Integrated Emergency Dispatch, Criminal Records & Court Dockets</span>
+                        </div>
+                    </div>
+                    <div class="mdt-status-tag">
+                        <span id="mdt-officer-badge">UNIT: 1-ADAM-12</span>
+                        <span class="badge online">ON-DUTY</span>
+                    </div>
+                    <button id="mdt-close-btn" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="mdt-nav-tabs">
+                    <button class="mdt-tab active" data-tab="dispatch"><i class="fa-solid fa-tower-broadcast"></i> 911 Dispatch Feed</button>
+                    <button class="mdt-tab" data-tab="citizens"><i class="fa-solid fa-address-card"></i> Citizen Database</button>
+                    <button class="mdt-tab" data-tab="vehicles"><i class="fa-solid fa-car"></i> Vehicle Registry</button>
+                    <button class="mdt-tab" data-tab="warrants"><i class="fa-solid fa-file-signature"></i> Active Warrants & Dockets</button>
+                </div>
+                <div class="modal-body mdt-body">
+                    <!-- Tab 1: Live Dispatch -->
+                    <div id="mdt-tab-dispatch" class="mdt-tab-pane">
+                        <div class="dispatch-layout">
+                            <div class="dispatch-feed" id="mdt-dispatch-list">
+                                <!-- Dynamic 911 calls -->
+                            </div>
+                            <div class="dispatch-details-panel" id="mdt-dispatch-details">
+                                <div class="empty-state">Válassz ki egy hívást a részletek megtekintéséhez.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Citizen Search -->
+                    <div id="mdt-tab-citizens" class="mdt-tab-pane hidden">
+                        <div class="mdt-search-bar">
+                            <input type="text" id="mdt-citizen-search-input" placeholder="Keresés név vagy Citizen ID alapján (pl. NYX1024)...">
+                            <button id="mdt-citizen-search-btn" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass"></i> Keresés</button>
+                        </div>
+                        <div id="mdt-citizen-result" class="citizen-profile-view hidden">
+                            <!-- Populated on search -->
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Vehicle Search -->
+                    <div id="mdt-tab-vehicles" class="mdt-tab-pane hidden">
+                        <div class="mdt-search-bar">
+                            <input type="text" id="mdt-vehicle-search-input" placeholder="Rendszám keresése (pl. NYX 777)...">
+                            <button id="mdt-vehicle-search-btn" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass"></i> Keresés</button>
+                        </div>
+                        <div id="mdt-vehicle-result" class="vehicle-profile-view hidden">
+                            <!-- Populated on search -->
+                        </div>
+                    </div>
+
+                    <!-- Tab 4: Warrants & Dockets -->
+                    <div id="mdt-tab-warrants" class="mdt-tab-pane hidden">
+                        <div class="warrants-container">
+                            <div class="warrants-list" id="mdt-warrants-list">
+                                <!-- Populated from nyx_judiciary -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================
+             9. UNIVERSAL MODAL / CONFIRMATION DIALOG
+             ================================================================ -->
+        <div id="dialog-overlay" class="modal-backdrop hidden">
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3 id="dialog-title">System Confirmation</h3>
+                    <button id="dialog-close-btn" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <p id="dialog-message">Please confirm the following operation.</p>
+                    <div id="dialog-input-container" class="hidden">
+                        <input type="text" id="dialog-input" class="modal-input" placeholder="Enter value...">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="dialog-cancel-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="dialog-confirm-btn" class="btn btn-primary">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Master SPA Script -->
+    <script src="js/app.js"></script>
+</body>
+</html>

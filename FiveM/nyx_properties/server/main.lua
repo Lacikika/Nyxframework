@@ -1,0 +1,244 @@
+--[[
+    Nyxframework: nyx_properties
+    File: server/main.lua
+    Description: Authoritative Property Engine, Routing Bucket Isolation,
+                 Deed Transfers, Stash Initialization & Utility Meter Binding.
+]]
+
+Nyx = Nyx or {}
+Nyx.Properties = Nyx.Properties or {}
+Nyx.Properties.Loaded = {} -- [property_id] = propertyData
+
+-- 1. Initialize Default Properties and Load Database State
+MySQL.ready(function()
+    -- Seed default properties if table empty
+    local count = MySQL.scalar.await("SELECT COUNT(*) FROM `nyx_properties`")
+    if count == 0 and Config.DefaultProperties then
+        for i, prop in ipairs(Config.DefaultProperties) do
+            local stashId = string.format("property:%s:main", prop.code)
+            local meterId = string.format("meter:prop:%s", prop.code)
+            local bucketId = 1000 + i -- Virtual routing bucket per property interior
+
+            MySQL.insert.await([[
+                INSERT INTO `nyx_properties`
+                    (`property_code`, `label`, `type`, `price`, `millage_tax_rate`,
+                     `entrance_coords`, `interior_coords`, `routing_bucket`,
+                     `stash_inventory_id`, `utility_meter_id`, `linked_substation_id`)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ]], {
+                prop.code,
+                prop.label,
+                prop.type,
+                prop.price,
+                prop.millageRate,
+                json.encode(prop.entrance),
+                json.encode(prop.interior),
+                bucketId,
+                stashId,
+                meterId,
+                prop.linkedSubstation or "substation_central"
+            })
+        end
+        print("^2[Nyx:Properties] Seeded default property registry into database.^7")
+    end
+
+    -- Load all properties into memory
+    local rows = MySQL.query.await("SELECT * FROM `nyx_properties`")
+    if rows then
+        for _, r in ipairs(rows) do
+            local propData = {
+                id = r.property_id,
+                code = r.property_code,
+                label = r.label,
+                type = r.type,
+                ownerCitizenId = r.owner_citizen_id,
+                price = tonumber(r.price) or 0.00,
+                millageRate = tonumber(r.millage_tax_rate) or 0.0150,
+                entrance = json.decode(r.entrance_coords),
+                interior = json.decode(r.interior_coords),
+                routingBucket = r.routing_bucket,
+                isLocked = (r.is_locked == 1),
+                stashId = r.stash_inventory_id,
+                meterId = r.utility_meter_id,
+                linkedSubstation = r.linked_substation_id
+            }
+
+            Nyx.Properties.Loaded[r.property_id] = propData
+
+            -- Register stash in nyx_inventory
+            if exports['nyx_inventory'] and exports['nyx_inventory'].RegisterContainer then
+                local maxKg = (r.type == 'industrial') and 500000 or ((r.type == 'commercial') and 250000 or 100000)
+                local maxSlots = (r.type == 'industrial') and 100 or ((r.type == 'commercial') and 80 or 50)
+                exports['nyx_inventory']:RegisterContainer(propData.stashId, r.label .. " Széf", maxKg, maxSlots)
+            end
+
+            -- Register meter in nyx_services if owned
+            if r.owner_citizen_id and exports['nyx_services'] and exports['nyx_services'].RegisterMeter then
+                exports['nyx_services']:RegisterMeter(propData.meterId, r.owner_citizen_id, propData.linkedSubstation, r.type)
+            end
+        end
+        print(string.format("^2[Nyx:Properties] Loaded %d real estate properties into server memory.^7", #rows))
+    end
+end)
+
+-- 2. RPC: Query Properties List
+exports['nyx_core']:RegisterRPC("properties:getProperties", function(src, filter)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return { success = false, error = "UNAUTHORIZED" } end
+
+    local citizenId = player.citizenId
+    local result = {}
+
+    for _, p in pairs(Nyx.Properties.Loaded) do
+        local hasKey, tier = Nyx.Properties.HasKey(p.id, citizenId)
+        result[#result + 1] = {
+            id = p.id,
+            code = p.code,
+            label = p.label,
+            type = p.type,
+            price = p.price,
+            owner = p.ownerCitizenId,
+            isOwnedByMe = (p.ownerCitizenId == citizenId),
+            hasKey = hasKey,
+            keyTier = tier or 0,
+            isLocked = p.isLocked,
+            entrance = p.entrance
+        }
+    end
+
+    return { success = true, properties = result }
+end)
+
+-- 3. RPC: Purchase Property Deed
+exports['nyx_core']:RegisterRPC("properties:buyProperty", function(src, propertyId)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return { success = false, error = "UNAUTHORIZED" } end
+
+    propertyId = tonumber(propertyId)
+    local prop = Nyx.Properties.Loaded[propertyId]
+    if not prop then return { success = false, error = "PROPERTY_NOT_FOUND" } end
+
+    if prop.ownerCitizenId ~= nil then
+        return { success = false, error = "PROPERTY_ALREADY_OWNED" }
+    end
+
+    local bankBal = player:getWallet("bank") or 0
+    if bankBal < prop.price then
+        return { success = false, error = "INSUFFICIENT_FUNDS" }
+    end
+
+    -- Deduct money from buyer and credit municipal treasury
+    player:removeMoney("bank", prop.price, string.format("Property Deed Purchase: %s", prop.label))
+    
+    local treasuryAccount = Config.Millage.TreasuryAccount or "gov:city:master"
+    exports['nyx_treasury']:EnsureAccount(treasuryAccount, "City Treasury", "department", 0.00)
+    MySQL.prepare([[
+        UPDATE `nyx_treasury_accounts` SET `balance` = `balance` + ? WHERE `account_id` = ?
+    ]], { prop.price, treasuryAccount })
+
+    -- Update database ownership
+    MySQL.prepare([[
+        UPDATE `nyx_properties`
+        SET `owner_citizen_id` = ?, `last_tax_billed_at` = NOW()
+        WHERE `property_id` = ?
+    ]], { player.citizenId, propertyId })
+
+    -- Issue Tier 4 (Owner) RFID Key
+    MySQL.prepare([[
+        INSERT INTO `nyx_property_keys` (`property_id`, `citizen_id`, `tier`, `label`)
+        VALUES (?, ?, 4, 'Tulajdonosi Mesterkártya')
+        ON DUPLICATE KEY UPDATE `tier` = 4
+    ]], { propertyId, player.citizenId })
+
+    -- Audit trail
+    MySQL.prepare([[
+        INSERT INTO `nyx_property_audit`
+            (`property_id`, `action`, `actor_citizen_id`, `amount`, `notes`)
+        VALUES (?, 'PURCHASE', ?, ?, 'Full deed ownership acquired')
+    ]], { propertyId, player.citizenId, prop.price })
+
+    -- Update in-memory state
+    prop.ownerCitizenId = player.citizenId
+
+    -- Register utility meter in nyx_services
+    if exports['nyx_services'] and exports['nyx_services'].RegisterMeter then
+        exports['nyx_services']:RegisterMeter(prop.meterId, player.citizenId, prop.linkedSubstation, prop.type)
+    end
+
+    return { success = true, propertyId = propertyId, label = prop.label }
+end)
+
+-- 4. RPC: Enter Property Interior (Virtual Routing Bucket Isolation)
+exports['nyx_core']:RegisterRPC("properties:enterProperty", function(src, propertyId)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return { success = false, error = "UNAUTHORIZED" } end
+
+    propertyId = tonumber(propertyId)
+    local prop = Nyx.Properties.Loaded[propertyId]
+    if not prop then return { success = false, error = "PROPERTY_NOT_FOUND" } end
+
+    -- Zero-Trust Distance Check
+    local ped = GetPlayerPed(tostring(src))
+    local pCoords = GetEntityCoords(ped)
+    local entVec = vector3(prop.entrance.x, prop.entrance.y, prop.entrance.z)
+
+    if #(pCoords - entVec) > 5.0 then
+        return { success = false, error = "TOO_FAR_FROM_ENTRANCE" }
+    end
+
+    -- Check access permission
+    local hasKey, tier = Nyx.Properties.HasKey(propertyId, player.citizenId)
+    if prop.isLocked and (not hasKey or tier < 2) then
+        return { success = false, error = "DOOR_LOCKED" }
+    end
+
+    -- Set OneSync Virtual Routing Bucket
+    SetPlayerRoutingBucket(tostring(src), prop.routingBucket)
+
+    -- Teleport Ped into Interior
+    SetEntityCoords(ped, prop.interior.x, prop.interior.y, prop.interior.z, false, false, false, true)
+    if prop.interior.h then
+        SetEntityHeading(ped, prop.interior.h)
+    end
+
+    -- Record utility consumption trigger (lights turned on in property)
+    if exports['nyx_services'] and exports['nyx_services'].RecordConsumption then
+        exports['nyx_services']:RecordConsumption(prop.meterId, 0.25, 0.05)
+    end
+
+    return {
+        success = true,
+        interiorCoords = prop.interior,
+        routingBucket = prop.routingBucket,
+        stashId = prop.stashId
+    }
+end)
+
+-- 5. RPC: Exit Property Interior (Restore World Routing Bucket 0)
+exports['nyx_core']:RegisterRPC("properties:exitProperty", function(src, propertyId)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return { success = false, error = "UNAUTHORIZED" } end
+
+    propertyId = tonumber(propertyId)
+    local prop = Nyx.Properties.Loaded[propertyId]
+    if not prop then return { success = false, error = "PROPERTY_NOT_FOUND" } end
+
+    local ped = GetPlayerPed(tostring(src))
+    local pCoords = GetEntityCoords(ped)
+    local intVec = vector3(prop.interior.x, prop.interior.y, prop.interior.z)
+
+    if #(pCoords - intVec) > 8.0 then
+        return { success = false, error = "TOO_FAR_FROM_EXIT" }
+    end
+
+    -- Reset to Default Shared World Routing Bucket 0
+    SetPlayerRoutingBucket(tostring(src), 0)
+
+    -- Teleport back to Street Entrance
+    SetEntityCoords(ped, prop.entrance.x, prop.entrance.y, prop.entrance.z, false, false, false, true)
+    if prop.entrance.h then
+        SetEntityHeading(ped, prop.entrance.h)
+    end
+
+    return { success = true, entranceCoords = prop.entrance }
+end)

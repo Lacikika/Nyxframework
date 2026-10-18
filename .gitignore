@@ -1,0 +1,29 @@
+# ==============================================================================
+#                      NYXFRAMEWORK .GITIGNORE
+# ==============================================================================
+
+# --- Strictly Protected Server Secrets & Licenses ---
+FiveM/server.cfg
+*.env
+.env
+*.key
+*.pem
+
+# --- Autonomous Agent Loop Runtime & Stop Signals ---
+agent_loop.log
+*.log
+STOP_LOOP
+
+# --- Local Obsidian Workspace & Caches ---
+.obsidian/
+
+# --- Operating System & Editor Artifacts ---
+__pycache__/
+*.py[cod]
+*$py.class
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/

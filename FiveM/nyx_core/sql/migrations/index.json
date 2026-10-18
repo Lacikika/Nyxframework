@@ -1,0 +1,14 @@
+[
+  "001_initial_kernel.sql",
+  "002_inventory_schema.sql",
+  "003_treasury_ledger.sql",
+  "004_logistics_schema.sql",
+  "005_parliament_governance.sql",
+  "006_judiciary_system.sql",
+  "007_factions_organizations.sql",
+  "008_services_infrastructure.sql",
+  "009_vehicles_persistence.sql",
+  "010_logistics_freight_board.sql",
+  "011_properties_schema.sql",
+  "012_mdt_dispatch.sql"
+]

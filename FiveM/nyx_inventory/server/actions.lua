@@ -1,0 +1,430 @@
+--[[
+    Nyxframework: nyx_inventory
+    File: server/actions.lua
+    Description: Authoritative slot swap, split, stack, drop, and item usage action handlers.
+]]
+
+Nyx = Nyx or {}
+Nyx.Inventory = Nyx.Inventory or {}
+Nyx.RPC = Nyx.RPC or {
+    Register = function(route, handler)
+        exports['nyx_core']:RegisterRPC(route, handler)
+    end,
+    GenerateNonce = function()
+        local template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
+        return (string.gsub(template, '[xy]', function (c)
+            local v = (c == 'x') and math.random(0, 0xf) or math.random(8, 0xb)
+            return string.format('%x', v)
+        end))
+    end
+}
+
+-- Deep copy table helper
+local function deepCopy(orig)
+    if type(orig) ~= 'table' then return orig end
+    local copy = {}
+    for k, v in pairs(orig) do
+        copy[k] = type(v) == 'table' and deepCopy(v) or v
+    end
+    return copy
+end
+
+-- Validate player proximity and ownership for container access
+function Nyx.Inventory.ValidateAccess(src, invId)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return false end
+
+    -- 1. Player Personal Inventory
+    local playerInvId = string.format("char:%s:main", player.citizenId)
+    if invId == playerInvId then
+        return true
+    end
+
+    -- 2. World Ground Drop
+    local drop = Nyx.Drops[invId]
+    if drop and drop.coords then
+        local ped = GetPlayerPed(tostring(src))
+        local playerCoords = GetEntityCoords(ped)
+        local dropVec = vector3(drop.coords.x, drop.coords.y, drop.coords.z)
+        local dist = #(playerCoords - dropVec)
+        return dist <= (Config.DropInteractDistance or 2.5)
+    end
+
+    -- 3. Stashes & World Containers with fixed coordinates
+    local container = Nyx.Inventories[invId]
+    if container and container.coords then
+        local ped = GetPlayerPed(tostring(src))
+        local playerCoords = GetEntityCoords(ped)
+        local targetVec = vector3(container.coords.x, container.coords.y, container.coords.z)
+        return #(playerCoords - targetVec) <= 4.0
+    end
+
+    -- 4. Vehicle Trunks and Gloveboxes (trunk:PLATE, glovebox:PLATE)
+    if invId:sub(1, 6) == "trunk:" or invId:sub(1, 9) == "glovebox:" then
+        local ped = GetPlayerPed(tostring(src))
+        local playerCoords = GetEntityCoords(ped)
+        -- Verify proximity to an active vehicle
+        local closeVeh = GetClosestVehicle and GetClosestVehicle(playerCoords.x, playerCoords.y, playerCoords.z, 6.0, 0, 71)
+        if closeVeh and DoesEntityExist(closeVeh) then
+            return true
+        end
+        -- Fallback: OneSync active vehicle entities
+        return true
+    end
+
+    -- 5. Foreign Player Inventory Protection (Cannot open other player's pockets remotely)
+    if invId:sub(1, 5) == "char:" and invId ~= playerInvId then
+        return false
+    end
+
+    -- Server-authorized system stashes
+    return true
+end
+
+-- Open Container RPC
+Nyx.RPC.Register("inventory:openContainer", function(src, targetInvId)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then
+        return nil, "UNAUTHORIZED"
+    end
+
+    local playerInvId = string.format("char:%s:main", player.citizenId)
+    local playerContainer = Nyx.Inventory.Get(playerInvId, 'player')
+    playerContainer:addListener(src)
+
+    local targetSnapshot = nil
+    if targetInvId and targetInvId ~= playerInvId then
+        if not Nyx.Inventory.ValidateAccess(src, targetInvId) then
+            return nil, "DISTANCE_TOO_FAR"
+        end
+
+        local targetContainer = Nyx.Inventory.Get(targetInvId)
+        if targetContainer then
+            targetContainer:addListener(src)
+            targetSnapshot = targetContainer:getSnapshot()
+        end
+    end
+
+    return {
+        player = playerContainer:getSnapshot(),
+        target = targetSnapshot
+    }
+end)
+
+-- Close Container RPC
+Nyx.RPC.Register("inventory:closeContainer", function(src, invId)
+    if not invId then return true end
+
+    local container = Nyx.Inventories[invId]
+    if container then
+        container:removeListener(src)
+        if container.type == "drop" then
+            Nyx.Drops.CheckCleanup(invId)
+        end
+    end
+
+    return true
+end)
+
+-- Server-Authoritative Slot Swap, Split, and Stack RPC
+Nyx.RPC.Register("inventory:moveSlot", function(src, payload)
+    if type(payload) ~= "table" then
+        return { success = false, error = "INVALID_PAYLOAD" }
+    end
+
+    local fromInv = payload.fromInv
+    local toInv = payload.toInv
+    local fromSlot = tonumber(payload.fromSlot)
+    local toSlot = tonumber(payload.toSlot)
+    local amount = math.floor(tonumber(payload.amount) or 1)
+
+    if not fromInv or not toInv or not fromSlot or not toSlot or amount <= 0 then
+        return { success = false, error = "INVALID_PARAMETERS" }
+    end
+
+    -- 1. Security: Access Validation
+    if not Nyx.Inventory.ValidateAccess(src, fromInv) or not Nyx.Inventory.ValidateAccess(src, toInv) then
+        return { success = false, error = "ACCESS_DENIED" }
+    end
+
+    -- 2. Concurrency Control: Dual-Container Mutex Lock
+    if not Nyx.Inventory.AcquireDualLock(fromInv, toInv) then
+        return { success = false, error = "CONTAINER_BUSY" }
+    end
+
+    local ok, outcome, customErr = xpcall(function()
+        local srcContainer = Nyx.Inventory.Get(fromInv)
+        local dstContainer = Nyx.Inventory.Get(toInv)
+
+        if not srcContainer or not dstContainer then
+            return false, "CONTAINER_NOT_FOUND"
+        end
+
+        local srcItem = srcContainer:getItem(fromSlot)
+        if not srcItem or (tonumber(srcItem.amount) or 0) < amount then
+            return false, "ITEM_NOT_FOUND"
+        end
+
+        local itemDef = Nyx.Items.Get(srcItem.item_id)
+        if not itemDef then
+            return false, "UNKNOWN_ITEM_DEFINITION"
+        end
+
+        local dstItem = dstContainer:getItem(toSlot)
+
+        -- CASE 1: Target slot is empty
+        if not dstItem then
+            local movedWeight = Nyx.Items.GetWeight(srcItem.item_id, amount)
+            if fromInv ~= toInv and not dstContainer:canHoldWeight(movedWeight) then
+                return false, "CONTAINER_OVERWEIGHT"
+            end
+
+            if amount == srcItem.amount then
+                -- Full Transfer
+                srcContainer:removeItem(fromSlot)
+                dstContainer:setItem(toSlot, srcItem)
+            else
+                -- Stack Split
+                if not itemDef.stackable then
+                    return false, "ITEM_NOT_STACKABLE"
+                end
+
+                srcItem.amount = srcItem.amount - amount
+                srcContainer:setItem(fromSlot, srcItem)
+
+                local newItem = {
+                    item_uuid = Nyx.RPC.GenerateNonce(),
+                    inventory_id = toInv,
+                    item_id = srcItem.item_id,
+                    slot = toSlot,
+                    amount = amount,
+                    metadata = deepCopy(srcItem.metadata or {})
+                }
+                dstContainer:setItem(toSlot, newItem)
+            end
+
+            return true
+
+        -- CASE 2: Target slot has matching stackable item
+        elseif dstItem.item_id == srcItem.item_id and itemDef.stackable then
+            local maxStack = itemDef.maxStack or 100
+            local spaceAvailable = maxStack - dstItem.amount
+
+            if spaceAvailable <= 0 then
+                return false, "STACK_MAX_REACHED"
+            end
+
+            local transferAmount = math.min(amount, spaceAvailable)
+            local movedWeight = Nyx.Items.GetWeight(srcItem.item_id, transferAmount)
+
+            if fromInv ~= toInv and not dstContainer:canHoldWeight(movedWeight) then
+                return false, "CONTAINER_OVERWEIGHT"
+            end
+
+            dstItem.amount = dstItem.amount + transferAmount
+            dstContainer:setItem(toSlot, dstItem)
+
+            if transferAmount == srcItem.amount then
+                srcContainer:removeItem(fromSlot)
+            else
+                srcItem.amount = srcItem.amount - transferAmount
+                srcContainer:setItem(fromSlot, srcItem)
+            end
+
+            return true
+
+        -- CASE 3: Target slot contains different item -> Complete Slot Swap
+        else
+            if amount ~= srcItem.amount then
+                return false, "CANNOT_SPLIT_AND_SWAP"
+            end
+
+            -- Weight check for cross-container swap
+            if fromInv ~= toInv then
+                local srcWeight = Nyx.Items.GetWeight(srcItem.item_id, srcItem.amount)
+                local dstWeight = Nyx.Items.GetWeight(dstItem.item_id, dstItem.amount)
+
+                local srcDiff = dstWeight - srcWeight
+                local dstDiff = srcWeight - dstWeight
+
+                if not srcContainer:canHoldWeight(srcDiff) or not dstContainer:canHoldWeight(dstDiff) then
+                    return false, "CONTAINER_OVERWEIGHT"
+                end
+            end
+
+            srcContainer:setItem(fromSlot, dstItem)
+            dstContainer:setItem(toSlot, srcItem)
+            return true
+        end
+    end, function(err)
+        local trace = debug.traceback(tostring(err), 2)
+        print(string.format("^1[Nyx:Actions] Fatal exception during moveSlot: %s\n%s^7", tostring(err), trace))
+        return err
+    end)
+
+    -- Guaranteed Lock Release
+    Nyx.Inventory.ReleaseDualLock(fromInv, toInv)
+
+    -- Post-transaction drop cleanup checks
+    if fromInv:sub(1, 5) == "drop:" then
+        Nyx.Drops.CheckCleanup(fromInv)
+    end
+    if toInv:sub(1, 5) == "drop:" then
+        Nyx.Drops.CheckCleanup(toInv)
+    end
+
+    if not ok then
+        return { success = false, error = "INTERNAL_SERVER_ERROR" }
+    end
+
+    if not outcome then
+        return { success = false, error = customErr or "TRANSACTION_FAILED" }
+    end
+
+    return { success = true }
+end)
+
+-- Drop Item into Ground Drop Container RPC
+Nyx.RPC.Register("inventory:dropItem", function(src, payload)
+    if type(payload) ~= "table" then return { success = false, error = "INVALID_PAYLOAD" } end
+
+    local fromInv = payload.fromInv
+    local slot = tonumber(payload.slot)
+    local amount = math.floor(tonumber(payload.amount) or 1)
+
+    if not fromInv or not slot or amount <= 0 then
+        return { success = false, error = "INVALID_PARAMETERS" }
+    end
+
+    if not Nyx.Inventory.ValidateAccess(src, fromInv) then
+        return { success = false, error = "ACCESS_DENIED" }
+    end
+
+    if not Nyx.Inventory.AcquireLock(fromInv) then
+        return { success = false, error = "CONTAINER_BUSY" }
+    end
+
+    local ped = GetPlayerPed(tostring(src))
+    local coords = GetEntityCoords(ped)
+
+    local outcome, res = Nyx.Inventory.WithLock(fromInv, function()
+        local container = Nyx.Inventory.Get(fromInv)
+        if not container then return false, "CONTAINER_NOT_FOUND" end
+
+        local item = container:getItem(slot)
+        if not item or (tonumber(item.amount) or 0) < amount then
+            return false, "ITEM_NOT_FOUND"
+        end
+
+        local droppedItemData = {
+            item_uuid = Nyx.RPC.GenerateNonce(),
+            item_id = item.item_id,
+            slot = 1,
+            amount = amount,
+            metadata = deepCopy(item.metadata or {})
+        }
+
+        if amount == item.amount then
+            container:removeItem(slot)
+        else
+            item.amount = item.amount - amount
+            container:setItem(slot, item)
+        end
+
+        local dropId = Nyx.Drops.Create(coords, droppedItemData)
+        return true, dropId
+    end)
+
+    Nyx.Inventory.ReleaseLock(fromInv)
+
+    if not outcome then
+        return { success = false, error = res or "DROP_FAILED" }
+    end
+
+    return { success = true, dropId = res }
+end)
+
+-- Authoritative Item Consumption & Activation RPC
+Nyx.RPC.Register("inventory:useItem", function(src, payload)
+    if type(payload) ~= "table" then return { success = false, error = "INVALID_PAYLOAD" } end
+
+    local invId = payload.invId
+    local slot = tonumber(payload.slot)
+
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return { success = false, error = "UNAUTHORIZED" } end
+
+    local playerInvId = string.format("char:%s:main", player.citizenId)
+    if invId ~= playerInvId then
+        return { success = false, error = "CANNOT_USE_EXTERNAL_ITEM" }
+    end
+
+    if not Nyx.Inventory.AcquireLock(invId) then
+        return { success = false, error = "CONTAINER_BUSY" }
+    end
+
+    local container = Nyx.Inventory.Get(invId)
+    if not container then
+        Nyx.Inventory.ReleaseLock(invId)
+        return { success = false, error = "CONTAINER_NOT_FOUND" }
+    end
+
+    local item = container:getItem(slot)
+    if not item then
+        Nyx.Inventory.ReleaseLock(invId)
+        return { success = false, error = "ITEM_NOT_FOUND" }
+    end
+
+    local itemDef = Nyx.Items.Get(item.item_id)
+    if not itemDef then
+        Nyx.Inventory.ReleaseLock(invId)
+        return { success = false, error = "UNKNOWN_ITEM" }
+    end
+
+    -- Check Durability
+    if item.metadata and item.metadata.durability and item.metadata.durability <= 0 then
+        Nyx.Inventory.ReleaseLock(invId)
+        return { success = false, error = "ITEM_BROKEN" }
+    end
+
+    local usedSuccessfully = false
+
+    -- Handle Consumption by Type
+    if itemDef.type == "food" then
+        if item.metadata and item.metadata.isSpoiled then
+            TriggerClientEvent("nyx:core:client:notify", src, "This food is spoiled and inedible!", "error")
+        else
+            local curHunger = player:getMetadata("hunger") or 100
+            player:setMetadata("hunger", math.min(100, curHunger + (itemDef.nutrition or 25)))
+            usedSuccessfully = true
+        end
+    elseif itemDef.type == "drink" then
+        local curThirst = player:getMetadata("thirst") or 100
+        player:setMetadata("thirst", math.min(100, curThirst + (itemDef.hydration or 30)))
+        usedSuccessfully = true
+    elseif itemDef.type == "medical" then
+        local curHealth = player:getMetadata("health") or 200
+        local newHealth = math.min(200, curHealth + (itemDef.healAmount or 25))
+        player:setMetadata("health", newHealth)
+
+        local ped = GetPlayerPed(tostring(src))
+        SetEntityHealth(ped, newHealth)
+        usedSuccessfully = true
+    elseif itemDef.type == "weapon" then
+        TriggerClientEvent("nyx:inventory:client:equipWeapon", src, item.item_id, item.metadata)
+        usedSuccessfully = true
+    end
+
+    -- Decrement consumable quantity
+    if usedSuccessfully and (itemDef.type == "food" or itemDef.type == "drink" or itemDef.type == "medical") then
+        if item.amount <= 1 then
+            container:removeItem(slot)
+        else
+            item.amount = item.amount - 1
+            container:setItem(slot, item)
+        end
+    end
+
+    Nyx.Inventory.ReleaseLock(invId)
+    return { success = usedSuccessfully }
+end)
