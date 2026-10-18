@@ -102,11 +102,41 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Armored Cash Transit & High-Value Banking Freight (`nyx_factions` & `nyx_treasury`)**
   - **Implementation:** Retail store registers accumulating excess cash generate physical armored cash box items requiring secure transit to central municipal bank vaults.
 
-- [ ] **Testing: End-to-End Stress Simulation Across All 14 Resources (`nyx_core/server/tests.lua`)**
+- [x] **Testing: End-to-End Stress Simulation Across All 14 Resources (`nyx_core/server/tests.lua`)**
   - **Implementation:** Automated test harness executing concurrent transactions across all systems to verify 0.00ms baseline idle performance, zero entity leaks, and perfect conservation.
+
+- [ ] **Feature: Municipal Utility Metering & Automated Grid Billing (`nyx_services` & `nyx_properties`)**
+  - **Implementation:** Meter residential and commercial properties for continuous kilowatt-hour and water consumption drawn from localized substations, with automated utility invoicing and power cut-off delinquency enforcement.
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Testing: End-to-End Stress Simulation Across All 14 Resources (`nyx_core/server/tests.lua`)**
+  - **Database Migration (`054_end_to_end_stress_simulation_audits.sql`)**:
+    - Created migration file and registered Step 54 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Created `nyx_core_stress_test_runs` table (`run_id` PK, `run_uuid` UNIQUE, `concurrency_level`, `total_transactions`, `resources_tested`, `idle_tick_ms`, `economic_conservation_delta`, `entity_leaks_count`, `mutex_leaks_count`, `duration_ms`, `status`, `diagnostics_json`, `created_at`) with indexes on `status` and `created_at`.
+  - **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_core/shared/stress_simulation.lua`)**:
+    - Defined complete canonical taxonomy and transaction contracts mapping all 14 modular framework resources across boot stages 1 through 6 (`nyx_core`, `nyx_treasury`, `nyx_inventory`, `nyx_logistics`, `nyx_vehicles`, `nyx_judiciary`, `nyx_parliament`, `nyx_factions`, `nyx_services`, `nyx_properties`, `nyx_press`, `nyx_mdt`, `nyx_interact`, `nyx_ui`).
+    - Implemented `Nyx.StressSimulation.SimulateMultiActorStress`: deterministic multi-actor concurrent stress test simulator executing round-robin transaction bursts across all 14 domains with Dijkstra dual-lock container swapping, double-entry transfers, fluid redistribution, substation loads, IRV ballots, and cryptographic evidence hashing.
+    - Implemented `Nyx.StressSimulation.VerifyEconomicConservation`: evaluates closed-circuit wealth conservation, guaranteeing net balance delta $\Delta \equiv 0.00$ to the exact cent ($|\Delta| < 0.001$).
+    - Implemented `Nyx.StressSimulation.VerifyInventoryConservation`: guarantees total physical item count conservation and enforces zero duplicate serial collisions.
+    - Implemented `Nyx.StressSimulation.VerifyResourceConservation`: guarantees fluid commodity volume (liters) conservation across extraction, transport, and consumption.
+    - Implemented `Nyx.StressSimulation.DetectEntityAndMutexLeaks`: scans entity handles and lock registries, verifying zero orphan world entities and 100% mutex lock release under high contention.
+    - Implemented `Nyx.StressSimulation.ProfileBaselineIdlePerformance`: analyzes tick execution latency over a sample window, validating that idle tick cost evaluates to 0.00ms floor ($\le 0.05$ms ceiling).
+    - Implemented `ValidateStressConfig`, `GenerateRunUuid` (`STR-RUN-...`), and `FormatStressReport` ASCII/ANSI telemetry formatter.
+  - **Authoritative Server Subsystem & RPCs (`FiveM/nyx_core/server/stress_simulation.lua`)**:
+    - Implemented authoritative execution engine `ExecuteRun`: profiles live/simulated idle tick latency, runs multi-actor stress load, evaluates conservation invariants, commits audit runs to `nyx_core_stress_test_runs`, and formats results.
+    - Registered RPC endpoints: `core:runStressSimulation` and `core:getLastStressRun`.
+    - Registered console and administrator command: `/nyx_stress_test [concurrency] [txPerActor]`.
+    - Exported public APIs in `FiveM/nyx_core/server/exports.lua`: `RunStressSimulation`, `GetLastStressRunResults`, `IsStressSimulationRunning`, and `ProfileBaselineIdlePerformance`.
+  - **Client Subsystem (`FiveM/nyx_core/client/stress_simulation.lua`)**:
+    - Registered player command: `/nyx_stress [concurrency] [txPerActor]` with rich chat and console notification.
+    - Exported client API in `FiveM/nyx_core/client/exports.lua`: `RunStressSimulation(options, cb)`.
+  - **Manifests & Verification**:
+    - Updated `FiveM/nyx_core/fxmanifest.lua` declaring `shared/stress_simulation.lua`, `server/stress_simulation.lua`, and `client/stress_simulation.lua`.
+    - Added in-engine integration test Test 49 (`Nyx.Tests.TestEndToEndStressSimulationAcross14Resources`) to `FiveM/nyx_core/server/tests.lua` and wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_end_to_end_stress_simulation.py` (12/12 tests passing).
+    - Full pytest suite: 453/453 passed (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 265 Lua files, 54 migrations (100% clean verification).
 - **[2026-10-18] Feature: Armored Cash Transit & High-Value Banking Freight (`nyx_factions` & `nyx_treasury`)**
   - **Database Migrations (`053_armored_cash_transit_and_banking_freight.sql`)**:
     - Created migration file and registered Step 53 in `FiveM/nyx_core/sql/migrations/index.json`.

@@ -25,3 +25,12 @@ end)
 exports("RegisterClientRPC", function(route, handler)
     Nyx.RPC.Register(route, handler)
 end)
+
+exports("RunStressSimulation", function(options, cb)
+    Nyx.RPC.Trigger("core:runStressSimulation", options or {}, function(response)
+        if cb then
+            cb(response)
+        end
+    end)
+end)
+

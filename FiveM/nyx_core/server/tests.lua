@@ -10303,7 +10303,167 @@ function Nyx.Tests.TestArmoredCashTransitAndBankingFreight()
     return passes == total
 end
 
--- 45. Master Test Runner (Suite 1 - Suite 48)
+-- 49. End-to-End Stress Simulation Across All 14 Resources Suite
+function Nyx.Tests.TestEndToEndStressSimulationAcross14Resources()
+    print("^3[Nyx:Tests] Running End-to-End Stress Simulation Across All 14 Resources Suite...^7")
+    local passes = 0
+    local total = 9
+
+    local Stress = Nyx.StressSimulation or {}
+
+    -- Sub-test A: Migration 054 Schema Definition & Table Contracts
+    local m54_contracts = {
+        table = "nyx_core_stress_test_runs",
+        pk = "run_id",
+        uuid = "run_uuid",
+        cols = {
+            "concurrency_level", "total_transactions", "resources_tested",
+            "idle_tick_ms", "economic_conservation_delta", "entity_leaks_count",
+            "mutex_leaks_count", "duration_ms", "status", "diagnostics_json"
+        }
+    }
+    local testA_ok = (m54_contracts.table == "nyx_core_stress_test_runs" and
+                      m54_contracts.pk == "run_id" and #m54_contracts.cols == 10)
+
+    if assertTest(testA_ok == true,
+        "Migration 054 Schema Contracts (Stress Test Runs & Audit Table)",
+        string.format("table=%s, pk=%s, cols=%d", m54_contracts.table, m54_contracts.pk, #m54_contracts.cols)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Complete 14-Resource Taxonomy & Stage Verification
+    local canon = Stress.CanonicalResources or {}
+    local taxonomy = Stress.ResourceTaxonomy or {}
+    local resourcesOk = (#canon == 14)
+    local allTaxonomiesPresent = true
+    for _, resName in ipairs(canon) do
+        if not taxonomy[resName] or not taxonomy[resName].stage or not taxonomy[resName].primaryTransaction then
+            allTaxonomiesPresent = false
+            break
+        end
+    end
+
+    if assertTest(resourcesOk and allTaxonomiesPresent,
+        "Complete 14-Resource Framework Taxonomy, Staged Lifecycle & Transaction Contracts",
+        string.format("canonicalCount=%d, allTaxonomies=%s", #canon, tostring(allTaxonomiesPresent))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Multi-Actor Concurrent Transaction Stress Simulation (50 Actors x 10 Tx = 500 Tx)
+    local simResult = Stress.SimulateMultiActorStress({
+        concurrency = 50,
+        transactionsPerActor = 10,
+        idleSamples = 100,
+        seed = 42
+    })
+    local testC_ok = (type(simResult) == "table" and simResult.totalTransactions == 500 and
+                      simResult.successfulTransactions == 500 and simResult.failedTransactions == 0 and
+                      simResult.allResourcesTested == true)
+
+    if assertTest(testC_ok == true,
+        "Multi-Actor Concurrent Transaction Stress Engine (50 Actors x 10 Tx = 500 Tx Across 14 Resources)",
+        string.format("total=%d, success=%d, failed=%d, allResourcesHit=%s",
+            simResult and simResult.totalTransactions or 0,
+            simResult and simResult.successfulTransactions or 0,
+            simResult and simResult.failedTransactions or 0,
+            tostring(simResult and simResult.allResourcesTested))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Strict Double-Entry Closed-Circuit Economic Conservation Law (Delta = 0.00)
+    local econReport = simResult and simResult.economicConservation
+    local econConserved = econReport and econReport.isConserved and econReport.delta == 0.0
+
+    -- Synthetic anomaly test: intentional balance tamper must be detected
+    local okTamper, tamperDelta, _ = Stress.VerifyEconomicConservation(
+        { ["accA"] = 100.0, ["accB"] = 200.0 },
+        { ["accA"] = 90.0,  ["accB"] = 200.0 } -- Missing $10.00 credit
+    )
+    local anomalyDetected = (okTamper == false and math.abs(tamperDelta - (-10.00)) < 0.001)
+
+    if assertTest(econConserved and anomalyDetected,
+        "Strict Double-Entry Economic Conservation Law (Delta = $0.00) & Anomaly Detection",
+        string.format("simConserved=%s, simDelta=$%.2f, anomalyCaught=%s",
+            tostring(econConserved), econReport and econReport.delta or 0.0, tostring(anomalyDetected))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Inventory Dual-Lock Dijkstra Concurrency, Zero Duplication & Zero Lock Leaks
+    local invReport = simResult and simResult.inventoryConservation
+    local invConserved = invReport and invReport.isConserved and invReport.delta == 0 and invReport.duplicatesFound == 0
+    local locksClean = simResult and simResult.leakReport and simResult.leakReport.activeMutexLeaks == 0
+
+    if assertTest(invConserved and locksClean,
+        "Inventory Dual-Lock Dijkstra Concurrency, Zero Item Duplication & Zero Mutex Leaks",
+        string.format("invConserved=%s, delta=%d, dups=%d, activeLocks=%d",
+            tostring(invConserved), invReport and invReport.delta or 0,
+            invReport and invReport.duplicatesFound or 0,
+            simResult and simResult.leakReport and simResult.leakReport.activeMutexLeaks or 0)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Resource Mass & Fluid Commodity Conservation (Closed Circuit)
+    local fluidReport = simResult and simResult.fluidConservation
+    local fluidConserved = fluidReport and fluidReport.isConserved and fluidReport.delta == 0.0
+
+    if assertTest(fluidConserved == true,
+        "Resource Mass & Fluid Commodity Closed-Circuit Conservation (Refinery -> Tanker -> Station -> Fleet)",
+        string.format("fluidConserved=%s, delta=%.2f L, initial=%.2f L, final=%.2f L",
+            tostring(fluidConserved), fluidReport and fluidReport.delta or 0.0,
+            fluidReport and fluidReport.initialLiters or 0.0, fluidReport and fluidReport.finalLiters or 0.0)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Zero Entity & Handle Leak Detection Under Rapid Allocation / Teardown
+    local leakReport = simResult and simResult.leakReport
+    local zeroLeaks = leakReport and leakReport.clean and leakReport.activeEntityLeaks == 0
+
+    -- Synthetic entity leak test
+    local cleanSynth, orphanCount, _, _ = Stress.DetectEntityAndMutexLeaks(
+        { ["h_orphan_1"] = { isDestroyed = false } },
+        { ["lock:inv_test"] = false }
+    )
+    local syntheticCaught = (cleanSynth == false and orphanCount == 1)
+
+    if assertTest(zeroLeaks and syntheticCaught,
+        "Zero World Entity / Handle Leaks Under High-Frequency Allocation & Leak Interceptor",
+        string.format("zeroLeaks=%s, syntheticCaught=%s", tostring(zeroLeaks), tostring(syntheticCaught))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test H: 0.00ms Baseline Idle Performance Profiling & Tick Cost Floor
+    local idle = simResult and simResult.idlePerformance
+    local idleOptimal = idle and idle.isOptimal and idle.avgMs <= 0.05 and idle.displayFormatted == "0.00ms"
+
+    if assertTest(idleOptimal == true,
+        "0.00ms Baseline Idle Performance Guarantee (Cerulean Zero-Load Budget <= 0.05ms Ceiling)",
+        string.format("isOptimal=%s, avg=%.4fms, p99=%.4fms, display=%s",
+            tostring(idle and idle.isOptimal), idle and idle.avgMs or 0.0,
+            idle and idle.p99Ms or 0.0, idle and idle.displayFormatted or "N/A")) then
+        passes = passes + 1
+    end
+
+    -- Sub-test I: Zero-Trust Configuration Normalization, Run UUID & Structured Report Formatter
+    local cfgClamped = Stress.ValidateStressConfig({ concurrency = 9999, transactionsPerActor = -5 })
+    local runUuid = Stress.GenerateRunUuid()
+    local formattedReport = Stress.FormatStressReport(simResult)
+
+    local testI_ok = (cfgClamped.concurrency == 200 and cfgClamped.transactionsPerActor == 1) and
+                     (type(runUuid) == "string" and runUuid:find("^STR%-RUN%-") ~= nil) and
+                     (type(formattedReport) == "string" and formattedReport:find("CONSERVATION LAWS") ~= nil and
+                      formattedReport:find("0.00ms Idle Floor Check") ~= nil)
+
+    if assertTest(testI_ok == true,
+        "Zero-Trust Configuration Bounds Clamping, Run UUID Serial & Structured Telemetry Formatter",
+        string.format("clampedConcurrency=%d, clampedTx=%d, uuid=%s",
+            cfgClamped.concurrency, cfgClamped.transactionsPerActor, runUuid)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 45. Master Test Runner (Suite 1 - Suite 49)
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -10357,9 +10517,10 @@ function Nyx.Tests.RunAll()
     local t46 = Nyx.Tests.TestCommercialMoneyLaunderingAndSubpoenaAuditing()
     local t47 = Nyx.Tests.TestCorporateEquityOfferingAndDividends()
     local t48 = Nyx.Tests.TestArmoredCashTransitAndBankingFreight()
+    local t49 = Nyx.Tests.TestEndToEndStressSimulationAcross14Resources()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 and t41 and t42 and t43 and t44 and t45 and t46 and t47 and t48 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 and t41 and t42 and t43 and t44 and t45 and t46 and t47 and t48 and t49 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

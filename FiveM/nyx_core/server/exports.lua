@@ -180,3 +180,32 @@ exports("DispatchBootloader", function(customStaggerMs)
     return false, "BOOTLOADER_NOT_LOADED"
 end)
 
+-- 14-Resource End-to-End Stress Simulation & Idle Benchmarking
+exports("RunStressSimulation", function(options)
+    if Nyx.StressSimulation and Nyx.StressSimulation.ExecuteRun then
+        return Nyx.StressSimulation.ExecuteRun(options)
+    end
+    return false, "STRESS_SIMULATION_NOT_LOADED"
+end)
+
+exports("GetLastStressRunResults", function()
+    if Nyx.StressSimulation and Nyx.StressSimulation.GetLastRunResults then
+        return Nyx.StressSimulation.GetLastRunResults()
+    end
+    return nil
+end)
+
+exports("IsStressSimulationRunning", function()
+    if Nyx.StressSimulation and Nyx.StressSimulation.IsRunning then
+        return Nyx.StressSimulation.IsRunning()
+    end
+    return false
+end)
+
+exports("ProfileBaselineIdlePerformance", function(samples)
+    if Nyx.StressSimulation and Nyx.StressSimulation.ProfileBaselineIdlePerformance then
+        return Nyx.StressSimulation.ProfileBaselineIdlePerformance(samples)
+    end
+    return nil
+end)
+

@@ -12,7 +12,8 @@ shared_scripts {
     'shared/math.lua',
     'shared/rpc.lua',
     'shared/weights.lua',
-    'shared/bootloader.lua'
+    'shared/bootloader.lua',
+    'shared/stress_simulation.lua'
 }
 
 server_scripts {
@@ -24,6 +25,7 @@ server_scripts {
     'server/buckets.lua',
     'server/main.lua',
     'server/exports.lua',
+    'server/stress_simulation.lua',
     'server/tests.lua'
 }
 
@@ -32,7 +34,8 @@ client_scripts {
     'client/spawn.lua',
     'client/main.lua',
     'client/movement.lua',
-    'client/exports.lua'
+    'client/exports.lua',
+    'client/stress_simulation.lua'
 }
 
 files {
