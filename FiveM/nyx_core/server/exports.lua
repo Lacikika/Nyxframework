@@ -45,6 +45,15 @@ exports("GetRoutingBucket", function(src)
     return Nyx.Buckets.Get(src)
 end)
 
+exports("SetEntityRoutingBucket", function(entity, bucketId)
+    return Nyx.Buckets.SetEntity(entity, bucketId)
+end)
+
+exports("GetEntityRoutingBucket", function(entity)
+    return Nyx.Buckets.GetEntity(entity)
+end)
+
+
 -- Player Inventory Weight Management
 exports("UpdatePlayerWeight", function(src, currentWeight, maxWeight, ratio)
     local player = Nyx.GetPlayer(src)

@@ -38,3 +38,19 @@ Config.DeliveryZones = {
     EquilibriumRatio = 1.0              -- S / D = 1.0 represents standard market equilibrium
 }
 
+-- High-Capacity Storage Warehouses & Physical 3D Shelf Matrix Configuration
+Config.Warehouse = {
+    SnapDistance = 0.85,                 -- Maximum 3D distance in meters to snap ghost prop to shelf node
+    SnapSearchRadius = 3.5,              -- Proximity radius around player to scan for shelf units
+    VirtualBucketBase = 3000,            -- Virtual routing bucket offset for isolated interiors
+    DoorInteractDistance = 3.0,          -- Proximity to warehouse doors for Third-Eye interaction
+    DefaultShelfModel = "prop_rub_cabinet02",
+    AvailableShelfModels = {
+        "prop_rub_cabinet02",
+        "prop_rack_01a",
+        "prop_shelf_01",
+        "prop_boxpile_06a"
+    }
+}
+
+

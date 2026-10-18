@@ -402,6 +402,36 @@ Nyx.RPC.Register("inventory:commitWorldPlacement", function(src, payload)
         heading = math.floor(heading * 100) / 100
     }
 
+    -- 3D Shelf Matrix Snapping Validation
+    local targetShelfNode = nil
+    local playerBucket = 0
+    if exports['nyx_core'] and exports['nyx_core'].GetRoutingBucket then
+        playerBucket = exports['nyx_core']:GetRoutingBucket(src) or 0
+    end
+    local targetBucket = tonumber(payload.routingBucket) or playerBucket or 0
+
+    if payload.shelfNodeId and exports['nyx_logistics'] and exports['nyx_logistics'].GetShelfNode then
+        local node = exports['nyx_logistics']:GetShelfNode(payload.shelfNodeId)
+        if node then
+            if node.occupiedDropId and node.occupiedDropId ~= payload.dropId then
+                return { success = false, error = "SHELF_SLOT_OCCUPIED" }
+            end
+            targetShelfNode = node
+            safeCoords = {
+                x = math.floor((node.worldCoords.x or safeCoords.x) * 100) / 100,
+                y = math.floor((node.worldCoords.y or safeCoords.y) * 100) / 100,
+                z = math.floor((node.worldCoords.z or safeCoords.z) * 100) / 100
+            }
+            safeRotation = {
+                x = 0.0,
+                y = 0.0,
+                z = math.floor(node.heading * 100) / 100,
+                heading = math.floor(node.heading * 100) / 100
+            }
+            targetBucket = tonumber(node.routingBucket) or targetBucket
+        end
+    end
+
     -- CASE 1: Reposition existing world drop container
     if payload.dropId then
         local dropId = tostring(payload.dropId)
@@ -415,14 +445,16 @@ Nyx.RPC.Register("inventory:commitWorldPlacement", function(src, payload)
             return { success = false, error = "DROP_OUT_OF_RANGE" }
         end
 
-        -- Check for Proximity Auto-Merge into another nearby drop container (within 1.5m)
-        local mergeTargetDropId = Nyx.Drops.FindAutoMergeTarget(safeCoords, nil, Config.DropAutoMergeDistance or 1.5, dropId)
-        if mergeTargetDropId then
-            if Nyx.Inventory.AcquireDualLock(dropId, mergeTargetDropId) then
-                local merged, mergeRes = Nyx.Drops.TryAutoMergeContainers(dropId, mergeTargetDropId)
-                Nyx.Inventory.ReleaseDualLock(dropId, mergeTargetDropId)
-                if merged then
-                    return { success = true, dropId = mergeTargetDropId, merged = true, coords = safeCoords, rotation = safeRotation }
+        -- Check for Proximity Auto-Merge into another nearby drop container (within 1.5m, only if not snapping to dedicated shelf node)
+        if not targetShelfNode then
+            local mergeTargetDropId = Nyx.Drops.FindAutoMergeTarget(safeCoords, nil, Config.DropAutoMergeDistance or 1.5, dropId)
+            if mergeTargetDropId then
+                if Nyx.Inventory.AcquireDualLock(dropId, mergeTargetDropId) then
+                    local merged, mergeRes = Nyx.Drops.TryAutoMergeContainers(dropId, mergeTargetDropId)
+                    Nyx.Inventory.ReleaseDualLock(dropId, mergeTargetDropId)
+                    if merged then
+                        return { success = true, dropId = mergeTargetDropId, merged = true, coords = safeCoords, rotation = safeRotation }
+                    end
                 end
             end
         end
@@ -431,14 +463,30 @@ Nyx.RPC.Register("inventory:commitWorldPlacement", function(src, payload)
             return { success = false, error = "CONTAINER_BUSY" }
         end
 
-        local ok, updateErr = Nyx.Drops.Update(dropId, safeCoords, safeRotation)
+        -- Clear old shelf node if moved away from previous shelf
+        if existingDrop.shelfNodeId and existingDrop.shelfNodeId ~= payload.shelfNodeId then
+            if exports['nyx_logistics'] and exports['nyx_logistics'].ClearShelfNode then
+                pcall(function()
+                    exports['nyx_logistics']:ClearShelfNode(existingDrop.shelfNodeId)
+                end)
+            end
+        end
+
+        local ok, updateErr = Nyx.Drops.Update(dropId, safeCoords, safeRotation, targetShelfNode and targetShelfNode.id or false)
         Nyx.Inventory.ReleaseLock(dropId)
 
         if not ok then
             return { success = false, error = updateErr or "UPDATE_FAILED" }
         end
 
-        return { success = true, dropId = dropId, coords = safeCoords, rotation = safeRotation }
+        -- Occupy new shelf node if snapped
+        if targetShelfNode and exports['nyx_logistics'] and exports['nyx_logistics'].SetShelfNodeOccupant then
+            pcall(function()
+                exports['nyx_logistics']:SetShelfNodeOccupant(targetShelfNode.id, dropId)
+            end)
+        end
+
+        return { success = true, dropId = dropId, coords = safeCoords, rotation = safeRotation, shelfNodeId = targetShelfNode and targetShelfNode.id or nil }
     end
 
     -- CASE 2: New placement from player's inventory
@@ -488,20 +536,37 @@ Nyx.RPC.Register("inventory:commitWorldPlacement", function(src, payload)
             container:setItem(slot, item)
         end
 
-        -- Check for Proximity Auto-Merge into nearby container (within 1.5m)
-        local mergeDropId = Nyx.Drops.FindAutoMergeTarget(safeCoords, droppedItemData)
-        if mergeDropId then
-            if Nyx.Inventory.AcquireLock(mergeDropId) then
-                local mergeOk, mergeRes = Nyx.Drops.MergeItem(mergeDropId, droppedItemData)
-                Nyx.Inventory.ReleaseLock(mergeDropId)
-                if mergeOk then
-                    isPlacementMerged = true
-                    return true, mergeDropId
+        -- Check for Proximity Auto-Merge into nearby container (within 1.5m, unless snapping to dedicated shelf node)
+        if not targetShelfNode then
+            local mergeDropId = Nyx.Drops.FindAutoMergeTarget(safeCoords, droppedItemData)
+            if mergeDropId then
+                if Nyx.Inventory.AcquireLock(mergeDropId) then
+                    local mergeOk, mergeRes = Nyx.Drops.MergeItem(mergeDropId, droppedItemData)
+                    Nyx.Inventory.ReleaseLock(mergeDropId)
+                    if mergeOk then
+                        isPlacementMerged = true
+                        return true, mergeDropId
+                    end
                 end
             end
         end
 
-        local newDropId = Nyx.Drops.Create(safeCoords, droppedItemData, safeRotation)
+        local newDropId = Nyx.Drops.Create(
+            safeCoords,
+            droppedItemData,
+            safeRotation,
+            nil,
+            targetBucket,
+            targetShelfNode and targetShelfNode.id or nil
+        )
+
+        -- Claim shelf node if placed onto a physical shelf matrix
+        if targetShelfNode and exports['nyx_logistics'] and exports['nyx_logistics'].SetShelfNodeOccupant then
+            pcall(function()
+                exports['nyx_logistics']:SetShelfNodeOccupant(targetShelfNode.id, newDropId, droppedItemData)
+            end)
+        end
+
         return true, newDropId
     end)
 
@@ -511,7 +576,15 @@ Nyx.RPC.Register("inventory:commitWorldPlacement", function(src, payload)
         return { success = false, error = res or "PLACEMENT_FAILED" }
     end
 
-    return { success = true, dropId = res, merged = isPlacementMerged, coords = safeCoords, rotation = safeRotation }
+    return {
+        success = true,
+        dropId = res,
+        merged = isPlacementMerged,
+        coords = safeCoords,
+        rotation = safeRotation,
+        shelfNodeId = targetShelfNode and targetShelfNode.id or nil,
+        routingBucket = targetBucket
+    }
 end)
 
 -- Authoritative Item Consumption & Activation RPC

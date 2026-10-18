@@ -16,5 +16,6 @@
   "015_judiciary_evidence_chain_of_custody.sql",
   "016_factions_vaults_and_signoff_rules.sql",
   "017_inventory_world_placement_rotation.sql",
-  "018_inventory_drop_models.sql"
+  "018_inventory_drop_models.sql",
+  "019_logistics_warehouses_and_shelf_matrices.sql"
 ]

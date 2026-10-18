@@ -18,6 +18,9 @@ function Nyx.Buckets.SetLimbo(src)
     SetPlayerRoutingBucket(tostring(sourceNum), virtualBucket)
     SetRoutingBucketPopulationEnabled(virtualBucket, false)
     SetRoutingBucketEntityWipe(virtualBucket, true)
+    if Player and Player(sourceNum) and Player(sourceNum).state then
+        Player(sourceNum).state.routingBucket = virtualBucket
+    end
 
     if Config.Debug then
         print(string.format("^4[Nyx:Buckets]^7 Assigned source %d to virtual limbo bucket %d^7", sourceNum, virtualBucket))
@@ -31,6 +34,9 @@ function Nyx.Buckets.SetDefault(src)
 
     local defaultBucket = Config.DefaultRoutingBucket or 0
     SetPlayerRoutingBucket(tostring(sourceNum), defaultBucket)
+    if Player and Player(sourceNum) and Player(sourceNum).state then
+        Player(sourceNum).state.routingBucket = defaultBucket
+    end
 
     if Config.Debug then
         print(string.format("^4[Nyx:Buckets]^7 Restored source %d to public routing bucket %d^7", sourceNum, defaultBucket))
@@ -44,6 +50,9 @@ function Nyx.Buckets.Set(src, bucketId)
     if not sourceNum or not bucketNum then return end
 
     SetPlayerRoutingBucket(tostring(sourceNum), bucketNum)
+    if Player and Player(sourceNum) and Player(sourceNum).state then
+        Player(sourceNum).state.routingBucket = bucketNum
+    end
 end
 
 -- Query current routing bucket
@@ -52,3 +61,26 @@ function Nyx.Buckets.Get(src)
     if not sourceNum then return 0 end
     return GetPlayerRoutingBucket(tostring(sourceNum))
 end
+
+-- Explicit custom entity routing bucket setter
+function Nyx.Buckets.SetEntity(entity, bucketId)
+    local bucketNum = tonumber(bucketId) or 0
+    if not entity or not DoesEntityExist(entity) then return false end
+    SetEntityRoutingBucket(entity, bucketNum)
+    return true
+end
+
+-- Query current entity routing bucket
+function Nyx.Buckets.GetEntity(entity)
+    if not entity or not DoesEntityExist(entity) then return 0 end
+    return GetEntityRoutingBucket(entity)
+end
+
+-- Configure properties of a virtual routing bucket
+function Nyx.Buckets.ConfigureBucket(bucketId, populationEnabled, entityWipe)
+    local bucketNum = tonumber(bucketId)
+    if not bucketNum then return end
+    SetRoutingBucketPopulationEnabled(bucketNum, populationEnabled == true)
+    SetRoutingBucketEntityWipe(bucketNum, entityWipe == true)
+end
+

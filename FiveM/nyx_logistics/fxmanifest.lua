@@ -20,7 +20,8 @@ shared_scripts {
     'shared/zones.lua',
     'shared/nodes.lua',
     'shared/recipes.lua',
-    'shared/contracts.lua'
+    'shared/contracts.lua',
+    'shared/warehouses.lua'
 }
 
 server_scripts {
@@ -31,6 +32,7 @@ server_scripts {
     'server/facilities.lua',
     'server/shelves.lua',
     'server/contracts.lua',
+    'server/warehouses.lua',
     'server/exports.lua'
 }
 
@@ -39,6 +41,7 @@ client_scripts {
     'client/harvesting.lua',
     'client/pallets.lua',
     'client/contracts.lua',
+    'client/warehouses.lua',
     'client/main.lua',
     'client/exports.lua'
 }

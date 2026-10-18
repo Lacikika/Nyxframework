@@ -14,6 +14,7 @@ Nyx.Placement.CurrentData = nil
 Nyx.Placement.CurrentCoords = nil
 Nyx.Placement.CurrentHeading = 0.0
 Nyx.Placement.OriginalDropEntity = nil
+Nyx.Placement.SnappedNode = nil
 
 -- Check if currently actively placing/rotating an item in the world
 function Nyx.Placement.IsPlacing()
@@ -33,6 +34,7 @@ function Nyx.Placement.Start(data)
     Nyx.Placement.CurrentData = data
     Nyx.Placement.CurrentHeading = 0.0
     Nyx.Placement.OriginalDropEntity = nil
+    Nyx.Placement.SnappedNode = nil
 
     -- Determine model hash (incorporating smart category and weight-tiered fallback)
     local modelHash = nil
@@ -160,10 +162,26 @@ function Nyx.Placement.Start(data)
                 targetCoords = playerCoords + (normDir * maxPlacementDist)
             end
 
+            -- 2b. Physical 3D Shelf Matrix Snapping
+            local snapNode = nil
+            if exports['nyx_logistics'] and exports['nyx_logistics'].GetNearbySnapNode then
+                local currentDropId = data and data.dropId
+                snapNode = exports['nyx_logistics']:GetNearbySnapNode(targetCoords, (Config.Placement and Config.Placement.ShelfSnapDistance) or 0.85, currentDropId)
+            end
+
+            if snapNode and snapNode.worldCoords then
+                targetCoords = vector3(snapNode.worldCoords.x, snapNode.worldCoords.y, snapNode.worldCoords.z)
+                Nyx.Placement.CurrentHeading = snapNode.heading or Nyx.Placement.CurrentHeading
+                Nyx.Placement.SnappedNode = snapNode
+            else
+                Nyx.Placement.SnappedNode = nil
+            end
+
             -- Update Ghost Entity Transform (Zero network traffic)
             Nyx.Placement.CurrentCoords = targetCoords
             SetEntityCoords(Nyx.Placement.GhostEntity, targetCoords.x, targetCoords.y, targetCoords.z, false, false, false, true)
             SetEntityHeading(Nyx.Placement.GhostEntity, Nyx.Placement.CurrentHeading)
+
 
             -- 3. Rotation Input Handling
             local step = IsDisabledControlPressed(0, 21) and fineStep or rotationStep
@@ -232,6 +250,9 @@ function Nyx.Placement.Commit()
             slot = data.slot,
             amount = data.amount,
             itemId = data.itemId,
+            shelfNodeId = Nyx.Placement.SnappedNode and Nyx.Placement.SnappedNode.id or nil,
+            warehouseId = Nyx.Placement.SnappedNode and Nyx.Placement.SnappedNode.warehouseId or nil,
+            routingBucket = Nyx.Placement.SnappedNode and Nyx.Placement.SnappedNode.routingBucket or nil,
             coords = {
                 x = math.floor(coords.x * 100) / 100,
                 y = math.floor(coords.y * 100) / 100,

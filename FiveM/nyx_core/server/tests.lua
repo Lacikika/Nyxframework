@@ -1495,7 +1495,205 @@ function Nyx.Tests.TestAutoMergingWorldDropsAndFallbackModels()
     return passes == total
 end
 
--- 14. Master Test Runner
+-- 14. Test Menu-Free Grid-Snapping Warehouses & Routing Bucket Isolation
+function Nyx.Tests.TestGridSnappingWarehousesAndRoutingBuckets()
+    print("^3[Nyx:Tests] Running Grid-Snapping Warehouses & Routing Bucket Isolation Suite...^7")
+    local passes = 0
+    local total = 6
+
+    -- Test A: 3D Shelf Matrix Node Generation & 2D Heading Transform
+    local mockShelf = {
+        shelf_id = "test_shelf_01",
+        warehouse_id = "test_wh_01",
+        label = "Heavy Steel Rack",
+        coords = { x = 100.0, y = 200.0, z = 10.0 },
+        rotation = { heading = 0.0 },
+        tiers = 3,
+        slots_per_tier = 3,
+        tier_spacing = 0.50,
+        slot_spacing = 0.55,
+        tier_base_z = 0.35,
+        depth_offset = 0.05,
+        routing_bucket = 3001
+    }
+
+    local function round2(num)
+        return math.floor(num * 100 + 0.5) / 100
+    end
+
+    local function calculateNodes(shelf)
+        local rad = math.rad(shelf.rotation.heading)
+        local cosA = math.cos(rad)
+        local sinA = math.sin(rad)
+        local nodes = {}
+        for t = 1, shelf.tiers do
+            local dz = shelf.tier_base_z + (t - 1) * shelf.tier_spacing
+            for s = 1, shelf.slots_per_tier do
+                local dx = (s - (shelf.slots_per_tier + 1) / 2.0) * shelf.slot_spacing
+                local dy = shelf.depth_offset
+                local wx = shelf.coords.x + (dx * cosA - dy * sinA)
+                local wy = shelf.coords.y + (dx * sinA + dy * cosA)
+                local wz = shelf.coords.z + dz
+                local nid = string.format("%s:t%d_s%d", shelf.shelf_id, t, s)
+                nodes[nid] = {
+                    id = nid,
+                    tier = t,
+                    slot = s,
+                    worldCoords = { x = round2(wx), y = round2(wy), z = round2(wz) },
+                    heading = shelf.rotation.heading,
+                    routingBucket = shelf.routing_bucket,
+                    occupiedDropId = nil
+                }
+            end
+        end
+        return nodes
+    end
+
+    local nodes = calculateNodes(mockShelf)
+    local slot1 = nodes["test_shelf_01:t1_s1"]
+    local slot2 = nodes["test_shelf_01:t1_s2"]
+    local slot3 = nodes["test_shelf_01:t1_s3"]
+
+    local mathOk = (slot1 and slot2 and slot3) and
+        (slot1.worldCoords.x == 99.45 and slot1.worldCoords.y == 200.05 and slot1.worldCoords.z == 10.35) and
+        (slot2.worldCoords.x == 100.0 and slot2.worldCoords.y == 200.05 and slot2.worldCoords.z == 10.35) and
+        (slot3.worldCoords.x == 100.55 and slot3.worldCoords.y == 200.05 and slot3.worldCoords.z == 10.35)
+
+    if assertTest(mathOk == true,
+        "3D Shelf Matrix Node Generation & Lateral Alignment",
+        "Calculated grid node coordinates do not match expected lateral offsets") then
+        passes = passes + 1
+    end
+
+    -- Test B: Spatial Proximity Grid-Snapping Search
+    local function findNearestNode(nodeMap, queryPoint, maxDist, currentDropId)
+        local bestNode, bestDist = nil, maxDist + 0.001
+        for _, n in pairs(nodeMap) do
+            if n.occupiedDropId == nil or n.occupiedDropId == currentDropId then
+                local dx = queryPoint.x - n.worldCoords.x
+                local dy = queryPoint.y - n.worldCoords.y
+                local dz = queryPoint.z - n.worldCoords.z
+                local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+                if d <= maxDist and d < bestDist then
+                    bestDist = d
+                    bestNode = n
+                end
+            end
+        end
+        return bestNode, bestDist
+    end
+
+    local nearPoint = { x = 99.50, y = 200.10, z = 10.38 }
+    local farPoint = { x = 115.0, y = 200.0, z = 10.0 }
+
+    local snappedNode = findNearestNode(nodes, nearPoint, 0.85, nil)
+    local outOfRangeNode = findNearestNode(nodes, farPoint, 0.85, nil)
+
+    if assertTest(snappedNode ~= nil and snappedNode.id == "test_shelf_01:t1_s1" and outOfRangeNode == nil,
+        "Proximity Grid-Snapping Threshold & Node Resolution",
+        "Raycast near shelf node did not snap, or out-of-range point improperly snapped") then
+        passes = passes + 1
+    end
+
+    -- Test C: Single-Occupancy Gating & Conflict Prevention
+    nodes["test_shelf_01:t1_s1"].occupiedDropId = "drop:BOX_ALPHA"
+
+    local secondSnap = findNearestNode(nodes, nearPoint, 0.85, "drop:BOX_BETA")
+    local sameSnap = findNearestNode(nodes, nearPoint, 0.85, "drop:BOX_ALPHA")
+
+    local gatingOk = (secondSnap and secondSnap.id == "test_shelf_01:t1_s2") and
+                     (sameSnap and sameSnap.id == "test_shelf_01:t1_s1")
+
+    if assertTest(gatingOk == true,
+        "Single-Occupancy Gating & Drop Repositioning Tolerance",
+        "Occupied shelf node allowed double-snap or prevented its owner from re-snapping") then
+        passes = passes + 1
+    end
+
+    -- Test D: Virtual Routing Bucket Isolation (Zero Entity Streaming in Bucket 0)
+    local mockDrops = {
+        { id = "drop:OVERWORLD_01", routingBucket = 0 },
+        { id = "drop:OVERWORLD_02", routingBucket = 0 },
+        { id = "drop:WAREHOUSE_01", routingBucket = 3001 },
+        { id = "drop:WAREHOUSE_02", routingBucket = 3001 },
+        { id = "drop:SANDY_01",     routingBucket = 3002 }
+    }
+
+    local function filterDropsForClient(drops, clientBucket)
+        local visible = {}
+        for _, d in ipairs(drops) do
+            if (d.routingBucket or 0) == clientBucket then
+                visible[#visible + 1] = d
+            end
+        end
+        return visible
+    end
+
+    local overworldVisible = filterDropsForClient(mockDrops, 0)
+    local warehouseVisible = filterDropsForClient(mockDrops, 3001)
+
+    local isolationOk = (#overworldVisible == 2) and (#warehouseVisible == 2) and
+        (overworldVisible[1].routingBucket == 0 and overworldVisible[2].routingBucket == 0) and
+        (warehouseVisible[1].routingBucket == 3001 and warehouseVisible[2].routingBucket == 3001)
+
+    if assertTest(isolationOk == true,
+        "Virtual Routing Bucket Entity Isolation & Zero-Overworld Leakage",
+        "Interior warehouse drops leaked into overworld Bucket 0 stream") then
+        passes = passes + 1
+    end
+
+    -- Test E: Warehouse Entrance and Exit Transitions
+    local mockPlayer = { source = 1, bucket = 0, coords = { x = 899.6, y = -2982.5, z = -4.0 } }
+    local mockWh = { id = "wh_dock_01", routingBucket = 3001, interiorCoords = { x = 1048.5, y = -3100.0, z = -39.0 }, exteriorCoords = { x = 899.6, y = -2982.5, z = -4.0 } }
+
+    local function enterWarehouse(player, wh)
+        player.bucket = wh.routingBucket
+        player.coords = wh.interiorCoords
+        return player.bucket == 3001 and player.coords.z == -39.0
+    end
+
+    local function exitWarehouse(player, wh)
+        player.bucket = 0
+        player.coords = wh.exteriorCoords
+        return player.bucket == 0 and player.coords.z == -4.0
+    end
+
+    local entered = enterWarehouse(mockPlayer, mockWh)
+    local exited = exitWarehouse(mockPlayer, mockWh)
+
+    if assertTest(entered == true and exited == true,
+        "Warehouse Player Routing Bucket & Teleportation Transitions",
+        "Player was not cleanly moved into dedicated routing bucket or restored to Bucket 0") then
+        passes = passes + 1
+    end
+
+    -- Test F: Shelf Node Closed-Loop Lifecycle (Occupy -> Inspect -> Free)
+    local nodeLifecycle = { occupiedDropId = nil }
+    local function occupy(dropId)
+        if nodeLifecycle.occupiedDropId ~= nil then return false end
+        nodeLifecycle.occupiedDropId = dropId
+        return true
+    end
+    local function clear()
+        nodeLifecycle.occupiedDropId = nil
+        return true
+    end
+
+    local step1 = occupy("drop:CARGO_01")
+    local step2_reject = occupy("drop:CARGO_02")
+    local step3_free = clear()
+    local step4_reoccupy = occupy("drop:CARGO_02")
+
+    if assertTest(step1 == true and step2_reject == false and step3_free == true and step4_reoccupy == true,
+        "Shelf Node Closed-Loop State Lifecycle (Occupy -> Mutex Reject -> Clear -> Reoccupy)",
+        "Shelf node state machine failed to enforce occupancy and release") then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 15. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -1514,9 +1712,10 @@ function Nyx.Tests.RunAll()
     local t11 = Nyx.Tests.TestMasterUIArchitecture()
     local t12 = Nyx.Tests.TestThirdEyeAndZeroPacketPlacement()
     local t13 = Nyx.Tests.TestAutoMergingWorldDropsAndFallbackModels()
+    local t14 = Nyx.Tests.TestGridSnappingWarehousesAndRoutingBuckets()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

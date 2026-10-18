@@ -37,7 +37,7 @@ local function sanitizeRotation(rotation)
 end
 
 -- Register and spawn a new physical ground drop container
-function Nyx.Drops.Create(coords, itemData, rotation, modelOverride)
+function Nyx.Drops.Create(coords, itemData, rotation, modelOverride, routingBucket, shelfNodeId)
     local dropUuid = Nyx.RPC.GenerateNonce():sub(1, 8)
     local dropId = string.format("drop:%s", dropUuid)
 
@@ -47,6 +47,8 @@ function Nyx.Drops.Create(coords, itemData, rotation, modelOverride)
         z = math.floor(((coords.z or 70.0) + (Config.DropZOffset or -0.95)) * 100) / 100
     }
     local safeRotation = sanitizeRotation(rotation)
+    local safeBucket = tonumber(routingBucket) or 0
+    local safeShelfNode = (shelfNodeId and shelfNodeId ~= "") and tostring(shelfNodeId) or nil
 
     local container = Nyx.Inventory.NewContainer(
         dropId,
@@ -72,10 +74,12 @@ function Nyx.Drops.Create(coords, itemData, rotation, modelOverride)
 
     container:save()
 
-    -- Persist rotation and model to database
-    MySQL.query("UPDATE `nyx_inventories` SET `rotation` = ?, `model` = ? WHERE `id` = ?", {
+    -- Persist rotation, model, routing_bucket, and shelf_node_id to database
+    MySQL.query("UPDATE `nyx_inventories` SET `rotation` = ?, `model` = ?, `routing_bucket` = ?, `shelf_node_id` = ? WHERE `id` = ?", {
         json.encode(safeRotation),
         model,
+        safeBucket,
+        safeShelfNode,
         dropId
     })
 
@@ -83,22 +87,24 @@ function Nyx.Drops.Create(coords, itemData, rotation, modelOverride)
         id = dropId,
         coords = safeCoords,
         rotation = safeRotation,
-        model = model
+        model = model,
+        routingBucket = safeBucket,
+        shelfNodeId = safeShelfNode
     }
 
     -- Broadcast to clients within streaming range
-    TriggerClientEvent("nyx:inventory:client:dropCreated", -1, dropId, safeCoords, safeRotation, model)
+    TriggerClientEvent("nyx:inventory:client:dropCreated", -1, dropId, safeCoords, safeRotation, model, safeBucket, safeShelfNode)
 
     if Config.Debug then
-        print(string.format("^2[Nyx:Drops] Created world drop '%s' [%s] at (%.2f, %.2f, %.2f) h:%.1f^7",
-            dropId, model, safeCoords.x, safeCoords.y, safeCoords.z, safeRotation.heading))
+        print(string.format("^2[Nyx:Drops] Created world drop '%s' [%s] at (%.2f, %.2f, %.2f) h:%.1f bucket:%d shelf:%s^7",
+            dropId, model, safeCoords.x, safeCoords.y, safeCoords.z, safeRotation.heading, safeBucket, tostring(safeShelfNode)))
     end
 
     return dropId
 end
 
 -- Update spatial coordinates and orientation of an existing drop (zero-packet placement release)
-function Nyx.Drops.Update(dropId, coords, rotation)
+function Nyx.Drops.Update(dropId, coords, rotation, shelfNodeId)
     local drop = Nyx.Drops[dropId]
     if not drop then return false, "DROP_NOT_FOUND" end
 
@@ -109,6 +115,14 @@ function Nyx.Drops.Update(dropId, coords, rotation)
     }
     local safeRotation = sanitizeRotation(rotation or drop.rotation)
 
+    if shelfNodeId ~= nil then
+        if shelfNodeId == false then
+            drop.shelfNodeId = nil
+        else
+            drop.shelfNodeId = tostring(shelfNodeId)
+        end
+    end
+
     drop.coords = safeCoords
     drop.rotation = safeRotation
 
@@ -118,18 +132,19 @@ function Nyx.Drops.Update(dropId, coords, rotation)
     end
 
     -- Update database record
-    MySQL.query("UPDATE `nyx_inventories` SET `coords` = ?, `rotation` = ? WHERE `id` = ?", {
+    MySQL.query("UPDATE `nyx_inventories` SET `coords` = ?, `rotation` = ?, `shelf_node_id` = ? WHERE `id` = ?", {
         json.encode(safeCoords),
         json.encode(safeRotation),
+        drop.shelfNodeId,
         dropId
     })
 
     -- Broadcast position update to all clients
-    TriggerClientEvent("nyx:inventory:client:dropMoved", -1, dropId, safeCoords, safeRotation)
+    TriggerClientEvent("nyx:inventory:client:dropMoved", -1, dropId, safeCoords, safeRotation, drop.shelfNodeId)
 
     if Config.Debug then
-        print(string.format("^2[Nyx:Drops] Moved world drop '%s' to (%.2f, %.2f, %.2f) h:%.1f^7",
-            dropId, safeCoords.x, safeCoords.y, safeCoords.z, safeRotation.heading))
+        print(string.format("^2[Nyx:Drops] Moved world drop '%s' to (%.2f, %.2f, %.2f) h:%.1f shelf:%s^7",
+            dropId, safeCoords.x, safeCoords.y, safeCoords.z, safeRotation.heading, tostring(drop.shelfNodeId)))
     end
 
     return true
@@ -351,6 +366,13 @@ function Nyx.Drops.Remove(dropId)
     local drop = Nyx.Drops[dropId]
     if not drop then return end
 
+    -- Free up shelf node if drop was resting on a shelf matrix
+    if drop.shelfNodeId and exports['nyx_logistics'] and exports['nyx_logistics'].ClearShelfNode then
+        pcall(function()
+            exports['nyx_logistics']:ClearShelfNode(drop.shelfNodeId)
+        end)
+    end
+
     Nyx.Drops[dropId] = nil
     Nyx.Inventories[dropId] = nil
     Nyx.DirtyInventories[dropId] = nil
@@ -385,12 +407,19 @@ function Nyx.Drops.CheckCleanup(dropId)
     end
 end
 
--- Synchronize active drops to connecting or streaming clients
+-- Synchronize active drops to connecting or streaming clients, strictly isolated by Routing Bucket
 RegisterNetEvent("nyx:inventory:server:requestDrops", function()
     local src = source
+    local playerBucket = 0
+    if exports['nyx_core'] and exports['nyx_core'].GetRoutingBucket then
+        playerBucket = exports['nyx_core']:GetRoutingBucket(src) or 0
+    end
+
     local dropList = {}
     for id, data in pairs(Nyx.Drops) do
-        dropList[#dropList + 1] = data
+        if (data.routingBucket or 0) == playerBucket then
+            dropList[#dropList + 1] = data
+        end
     end
     TriggerClientEvent("nyx:inventory:client:syncDrops", src, dropList)
 end)
@@ -401,7 +430,7 @@ CreateThread(function()
         Wait(100)
     end
 
-    local rows = MySQL.query.await("SELECT `id`, `coords`, `rotation`, `model` FROM `nyx_inventories` WHERE `type` = 'drop'")
+    local rows = MySQL.query.await("SELECT `id`, `coords`, `rotation`, `model`, `routing_bucket`, `shelf_node_id` FROM `nyx_inventories` WHERE `type` = 'drop'")
     if rows then
         for _, row in ipairs(rows) do
             if row.coords then
@@ -415,11 +444,16 @@ CreateThread(function()
                         dropModel = (Nyx.Drops.ResolveModel and container) and Nyx.Drops.ResolveModel(container) or (Config.DropModel or "prop_paper_bag_small")
                     end
 
+                    local bucket = tonumber(row.routing_bucket) or 0
+                    local shelfNode = (row.shelf_node_id and row.shelf_node_id ~= "") and row.shelf_node_id or nil
+
                     Nyx.Drops[row.id] = {
                         id = row.id,
                         coords = parsedCoords,
                         rotation = (okRot and parsedRot and parsedRot.heading) and parsedRot or { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 },
-                        model = dropModel or Config.DropModel or "prop_paper_bag_small"
+                        model = dropModel or Config.DropModel or "prop_paper_bag_small",
+                        routingBucket = bucket,
+                        shelfNodeId = shelfNode
                     }
                     -- Preload container
                     Nyx.Inventory.Get(row.id)
@@ -429,3 +463,4 @@ CreateThread(function()
         print(string.format("^2[Nyx:Drops] Recovered %d persistent world drops from database.^7", #rows))
     end
 end)
+

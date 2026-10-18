@@ -12,10 +12,14 @@ local defaultDropModelHash = GetHashKey(Config.DropModel or "prop_paper_bag_smal
 
 -- Target options generator for world drop entities
 function Nyx.Drops.GetTargetOptions(dropId)
+    local drop = Nyx.Drops[dropId]
+    local openLabel = (drop and drop.shelfNodeId) and "Open Shelf Storage" or "Open Ground Loot"
+    local moveLabel = (drop and drop.shelfNodeId) and "Reposition / Pick Up Box" or "Reposition / Move"
+
     return {
         {
             icon = "fa-solid fa-box-open",
-            label = "Open Ground Loot",
+            label = openLabel,
             event = "nyx:inventory:client:openTargetDrop",
             args = { dropId = dropId },
             canInteract = function(entity, dist)
@@ -24,7 +28,7 @@ function Nyx.Drops.GetTargetOptions(dropId)
         },
         {
             icon = "fa-solid fa-arrows-up-down-left-right",
-            label = "Reposition / Move",
+            label = moveLabel,
             event = "nyx:inventory:client:grabTargetDrop",
             args = { dropId = dropId },
             canInteract = function(entity, dist)
@@ -116,36 +120,60 @@ end)
 
 -- Sync entire drop table from server
 RegisterNetEvent("nyx:inventory:client:syncDrops", function(dropList)
+    -- Despawn any drops not in new list or mismatched bucket
+    local newIds = {}
     for _, d in ipairs(dropList) do
         if d and d.id and d.coords then
+            newIds[d.id] = true
+            local existing = Nyx.Drops[d.id]
             Nyx.Drops[d.id] = {
                 id = d.id,
                 coords = vector3(d.coords.x, d.coords.y, d.coords.z),
                 rotation = d.rotation or { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 },
                 model = d.model or Config.DropModel or "prop_paper_bag_small",
-                entity = nil
+                routingBucket = tonumber(d.routingBucket) or 0,
+                shelfNodeId = d.shelfNodeId,
+                entity = existing and existing.entity or nil
             }
+        end
+    end
+
+    -- Clean up removed drops
+    for dropId, drop in pairs(Nyx.Drops) do
+        if not newIds[dropId] then
+            if drop.entity and DoesEntityExist(drop.entity) then
+                if exports['nyx_interact'] and exports['nyx_interact'].RemoveTargetEntity then
+                    exports['nyx_interact']:RemoveTargetEntity(drop.entity)
+                end
+                DeleteEntity(drop.entity)
+            end
+            Nyx.Drops[dropId] = nil
         end
     end
 end)
 
 -- Receive single newly created drop
-RegisterNetEvent("nyx:inventory:client:dropCreated", function(dropId, coords, rotation, model)
+RegisterNetEvent("nyx:inventory:client:dropCreated", function(dropId, coords, rotation, model, routingBucket, shelfNodeId)
     Nyx.Drops[dropId] = {
         id = dropId,
         coords = vector3(coords.x, coords.y, coords.z),
         rotation = rotation or { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 },
         model = model or Config.DropModel or "prop_paper_bag_small",
+        routingBucket = tonumber(routingBucket) or 0,
+        shelfNodeId = shelfNodeId,
         entity = nil
     }
 end)
 
 -- Receive position and rotation update when drop is moved/repositioned
-RegisterNetEvent("nyx:inventory:client:dropMoved", function(dropId, coords, rotation)
+RegisterNetEvent("nyx:inventory:client:dropMoved", function(dropId, coords, rotation, shelfNodeId)
     local drop = Nyx.Drops[dropId]
     if drop then
         drop.coords = vector3(coords.x, coords.y, coords.z)
         drop.rotation = rotation or drop.rotation
+        if shelfNodeId ~= nil then
+            drop.shelfNodeId = (shelfNodeId and shelfNodeId ~= "") and shelfNodeId or nil
+        end
         if drop.entity and DoesEntityExist(drop.entity) then
             SetEntityCoords(drop.entity, drop.coords.x, drop.coords.y, drop.coords.z, false, false, false, true)
             SetEntityHeading(drop.entity, drop.rotation.heading or 0.0)
@@ -157,6 +185,8 @@ RegisterNetEvent("nyx:inventory:client:dropMoved", function(dropId, coords, rota
             coords = vector3(coords.x, coords.y, coords.z),
             rotation = rotation or { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 },
             model = Config.DropModel or "prop_paper_bag_small",
+            routingBucket = 0,
+            shelfNodeId = shelfNodeId,
             entity = nil
         }
     end
@@ -238,23 +268,36 @@ CreateThread(function()
         local ped = PlayerPedId()
         local playerCoords = GetEntityCoords(ped)
         local cullDist = Config.DropCullDistance or 25.0
+        local currentBucket = (LocalPlayer and LocalPlayer.state and LocalPlayer.state.routingBucket) or 0
 
         for dropId, drop in pairs(Nyx.Drops) do
-            local dist = #(playerCoords - drop.coords)
+            local dropBucket = tonumber(drop.routingBucket) or 0
 
-            -- In range: spawn visual prop
-            if dist <= cullDist then
-                local targetModel = drop.model or Config.DropModel or "prop_paper_bag_small"
-                local modelHash = (type(targetModel) == "number") and targetModel or GetHashKey(targetModel)
-
-                -- If existing entity has outdated model hash (e.g. upgraded box after merge), despawn it
-                if drop.entity and DoesEntityExist(drop.entity) and GetEntityModel(drop.entity) ~= modelHash then
+            if dropBucket ~= currentBucket then
+                -- Despawn if in mismatched virtual routing bucket
+                if drop.entity and DoesEntityExist(drop.entity) then
                     if exports['nyx_interact'] and exports['nyx_interact'].RemoveTargetEntity then
                         exports['nyx_interact']:RemoveTargetEntity(drop.entity)
                     end
                     DeleteEntity(drop.entity)
                     drop.entity = nil
                 end
+            else
+                local dist = #(playerCoords - drop.coords)
+
+                -- In range: spawn visual prop
+                if dist <= cullDist then
+                    local targetModel = drop.model or Config.DropModel or "prop_paper_bag_small"
+                    local modelHash = (type(targetModel) == "number") and targetModel or GetHashKey(targetModel)
+
+                    -- If existing entity has outdated model hash (e.g. upgraded box after merge), despawn it
+                    if drop.entity and DoesEntityExist(drop.entity) and GetEntityModel(drop.entity) ~= modelHash then
+                        if exports['nyx_interact'] and exports['nyx_interact'].RemoveTargetEntity then
+                            exports['nyx_interact']:RemoveTargetEntity(drop.entity)
+                        end
+                        DeleteEntity(drop.entity)
+                        drop.entity = nil
+                    end
 
                 if not drop.entity or not DoesEntityExist(drop.entity) then
                     RequestModel(modelHash)
@@ -291,6 +334,7 @@ CreateThread(function()
                     DeleteEntity(drop.entity)
                     drop.entity = nil
                 end
+            end
             end
         end
 
