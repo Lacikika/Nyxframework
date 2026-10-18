@@ -20,6 +20,7 @@ shared_scripts {
     '@nyx_services/shared/metering.lua',
     'config.lua',
     'shared/taxation.lua',
+    'shared/commercial_leases.lua',
     'shared/inactivity.lua',
     'shared/portal_ui.lua'
 }
@@ -30,6 +31,7 @@ server_scripts {
     'server/locks.lua',
     'server/taxation.lua',
     'server/auction.lua',
+    'server/leases.lua',
     'server/inactivity.lua',
     'server/billing.lua',
     'server/exports.lua'
@@ -39,6 +41,7 @@ client_scripts {
     'client/main.lua',
     'client/locks.lua',
     'client/taxation.lua',
+    'client/leases.lua',
     'client/inactivity.lua',
     'client/interact.lua',
     'client/portal_ui.lua',

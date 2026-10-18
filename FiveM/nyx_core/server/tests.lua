@@ -11036,7 +11036,216 @@ function Nyx.Tests.TestAuditablePublicTreasuryLedgerAndDepartmentMonitor()
     return passes == total
 end
 
--- 45. Master Test Runner (Suite 1 - Suite 52)
+-- 53. Test Commercial Real Estate Leasing & Public Storefront Cycles
+function Nyx.Tests.TestCommercialRealEstateLeasingAndStorefrontCycles()
+    print("^3[Nyx:Tests] Running Commercial Real Estate Leasing & Public Storefront Cycles Suite...^7")
+    local passes = 0
+    local total = 8
+
+    -- Shared domain loader
+    local CommercialLeases = Nyx.CommercialLeases
+    if not CommercialLeases then
+        local chunk = nil
+        if LoadResourceFile then
+            chunk = LoadResourceFile("nyx_properties", "shared/commercial_leases.lua")
+        end
+        if not chunk and io and io.open then
+            local f = io.open("FiveM/nyx_properties/shared/commercial_leases.lua", "r")
+            if f then
+                chunk = f:read("*a")
+                f:close()
+            end
+        end
+        if chunk then
+            local fn = load(chunk, "nyx_properties/shared/commercial_leases.lua")
+            if fn then fn() end
+        end
+        CommercialLeases = Nyx.CommercialLeases
+    end
+
+    if not CommercialLeases then
+        print("^1[Nyx:Test:FAIL] Could not load nyx_properties/shared/commercial_leases.lua^7")
+        return false
+    end
+
+    -- Sub-test A: Commercial Zoning Taxonomy & Statutory Constraints Integrity
+    local zonings = CommercialLeases.ZoningTypes
+    local testA_ok = (zonings ~= nil) and
+                     (zonings["retail_storefront"] ~= nil and zonings["retail_storefront"].allowedRegisterCount == 4) and
+                     (zonings["corporate_office"] ~= nil and zonings["corporate_office"].rateMultiplier > 1.0) and
+                     (zonings["industrial_warehouse"] ~= nil and zonings["industrial_warehouse"].allowedStashCapacityKg >= 10000) and
+                     (zonings["hospitality_venue"] ~= nil) and
+                     (zonings["medical_clinic"] ~= nil) and
+                     (CommercialLeases.DefaultRentalTaxRate == 0.0500) and
+                     (CommercialLeases.DefaultLatePenaltyRate == 0.1000)
+
+    if assertTest(testA_ok == true,
+        "Commercial Zoning Types Taxonomy & Statutory Constants Integrity",
+        "Zoning types taxonomy or statutory constraints missing or corrupted") then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Initial Lease Costs & Zero-Cent Conservation Law
+    local initialCosts = CommercialLeases.CalculateLeaseInitialCosts(3500.00, 1, 0.0500)
+    local testB_ok = (initialCosts.cycleRent == 3500.00) and
+                     (initialCosts.securityDeposit == 3500.00) and
+                     (initialCosts.municipalTax == 175.00) and
+                     (initialCosts.netToLessor == 3325.00) and
+                     (initialCosts.totalUpfrontRequired == 7000.00) and
+                     (math.abs((initialCosts.netToLessor + initialCosts.municipalTax) - initialCosts.cycleRent) < 0.001)
+
+    if assertTest(testB_ok == true,
+        "Initial Commercial Lease Upfront Costs & Zero-Cent Economic Conservation",
+        string.format("rent=%.2f, deposit=%.2f, net=%.2f, tax=%.2f, total=%.2f",
+            initialCosts.cycleRent, initialCosts.securityDeposit, initialCosts.netToLessor, initialCosts.municipalTax, initialCosts.totalUpfrontRequired)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Recurring Lease Rent Split & Municipal Rental Tax Conservation
+    local rentSplit = CommercialLeases.CalculateRecurringRentSplit(6500.00, 0.0500)
+    local testC_ok = (rentSplit.grossRent == 6500.00) and
+                     (rentSplit.municipalTax == 325.00) and
+                     (rentSplit.netToLessor == 6175.00) and
+                     (math.abs((rentSplit.netToLessor + rentSplit.municipalTax) - rentSplit.grossRent) < 0.001)
+
+    if assertTest(testC_ok == true,
+        "Recurring Commercial Lease Rent Split & Municipal Tax Exact Cent Conservation",
+        string.format("gross=%.2f, netToLessor=%.2f, tax=%.2f",
+            rentSplit.grossRent, rentSplit.netToLessor, rentSplit.municipalTax)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: 4-Tier Delinquency State Machine Progression & Eviction Trigger
+    local now = 1000000
+    local stateSolvent = CommercialLeases.EvaluateDelinquencyState(0, 0.00, nil, nil, now)
+    local stateGrace = CommercialLeases.EvaluateDelinquencyState(1, 3500.00, now + 172800, now + 259200, now)
+    local stateLapsed = CommercialLeases.EvaluateDelinquencyState(2, 7000.00, now - 100, now + 100000, now)
+    local stateEvictedCycles = CommercialLeases.EvaluateDelinquencyState(4, 14000.00, now - 200, now + 100, now)
+    local stateEvictedDeadline = CommercialLeases.EvaluateDelinquencyState(2, 7000.00, now - 200, now - 10, now)
+
+    local testD_ok = (stateSolvent.tier == 0 and stateSolvent.status == "active" and stateSolvent.isLockedOut == false) and
+                     (stateGrace.tier == 1 and stateGrace.status == "grace_period" and stateGrace.isLockedOut == false) and
+                     (stateLapsed.tier == 2 and stateLapsed.status == "lapsed" and stateLapsed.isLockedOut == true and stateLapsed.isRegistersDisabled == true) and
+                     (stateEvictedCycles.tier == 4 and stateEvictedCycles.status == "evicted" and stateEvictedCycles.isEvictionDue == true) and
+                     (stateEvictedDeadline.tier == 4 and stateEvictedDeadline.status == "evicted")
+
+    if assertTest(testD_ok == true,
+        "4-Tier Delinquency State Machine Progression, Lockouts & Eviction Triggers",
+        string.format("solvent=%s, grace=%s, lapsed=%s, evictedCycles=%s, evictedDeadline=%s",
+            stateSolvent.status, stateGrace.status, stateLapsed.status, stateEvictedCycles.status, stateEvictedDeadline.status)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Late Surcharge & Arrears Settlement Calculation (10% Late Penalty)
+    local arrearsSettlement = CommercialLeases.CalculateArrearsSettlement(5000.00, 0.1000)
+    local testE_ok = (arrearsSettlement.arrearsBalance == 5000.00) and
+                     (arrearsSettlement.penaltyAmount == 500.00) and
+                     (arrearsSettlement.totalSettlementDue == 5500.00) and
+                     (arrearsSettlement.penaltyRate == 0.1000)
+
+    if assertTest(testE_ok == true,
+        "Statutory Late Surcharge & Arrears Settlement Calculation (10% Penalty)",
+        string.format("arrears=%.2f, penalty=%.2f, total=%.2f",
+            arrearsSettlement.arrearsBalance, arrearsSettlement.penaltyAmount, arrearsSettlement.totalSettlementDue)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Electronic Maglock Authorization & Delinquency Lockout Enforcement
+    local mockProp = { id = 101, ownerCitizenId = "LANDLORD_CIT_01", type = "commercial" }
+    local mockActiveLease = {
+        lease_status = "active",
+        delinquency_tier = 0,
+        lessee_type = "faction",
+        lessee_id = "corp_vanilla_unicorn",
+        authorized_signer_citizen_id = "CIT_SIGNER_01"
+    }
+    local mockLapsedLease = {
+        lease_status = "lapsed",
+        delinquency_tier = 2,
+        lessee_type = "faction",
+        lessee_id = "corp_vanilla_unicorn",
+        authorized_signer_citizen_id = "CIT_SIGNER_01"
+    }
+
+    local authActiveMember, _ = CommercialLeases.EvaluateDoorlockAuthorization(mockProp, mockActiveLease, "CIT_EMPLOYEE", "unemployed", "corp_vanilla_unicorn", { ["warehouse:access"] = true }, false)
+    local authLapsedMember, lapsedReason = CommercialLeases.EvaluateDoorlockAuthorization(mockProp, mockLapsedLease, "CIT_EMPLOYEE", "unemployed", "corp_vanilla_unicorn", { ["warehouse:access"] = true }, false)
+    local authPoliceWarrant, _ = CommercialLeases.EvaluateDoorlockAuthorization(mockProp, mockLapsedLease, "POLICE_CIT_01", "police", nil, nil, true)
+    local authLandlord, _ = CommercialLeases.EvaluateDoorlockAuthorization(mockProp, mockActiveLease, "LANDLORD_CIT_01", "unemployed", nil, nil, false)
+
+    local testF_ok = (authActiveMember == true) and
+                     (authLapsedMember == false and lapsedReason == "LOCK_OFFLINE_LEASE_LAPSED") and
+                     (authPoliceWarrant == true) and
+                     (authLandlord == true)
+
+    if assertTest(testF_ok == true,
+        "Doorlock Multi-Tier Key Authorization & Delinquency Lockout Interlock",
+        string.format("activeMember=%s, lapsedMember=%s (reason=%s), policeWarrant=%s, landlord=%s",
+            tostring(authActiveMember), tostring(authLapsedMember), tostring(lapsedReason), tostring(authPoliceWarrant), tostring(authLandlord))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Commercial Register Operation Evaluation
+    local regActive, _ = CommercialLeases.EvaluateRegisterOperation(mockProp, mockActiveLease)
+    local regLapsed, lapsedRegReason = CommercialLeases.EvaluateRegisterOperation(mockProp, mockLapsedLease)
+    local regNil, _ = CommercialLeases.EvaluateRegisterOperation(mockProp, nil)
+
+    local testG_ok = (regActive == true) and
+                     (regLapsed == false and lapsedRegReason == "REGISTER_DISABLED_LEASE_LAPSED") and
+                     (regNil == false)
+
+    if assertTest(testG_ok == true,
+        "Point-of-Sale Register Operation Evaluation & Delinquency Interlocks",
+        string.format("activeReg=%s, lapsedReg=%s (reason=%s), nilReg=%s",
+            tostring(regActive), tostring(regLapsed), tostring(lapsedRegReason), tostring(regNil))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test H: Proposal Sanitization, Unique Lease IDs & ASCII Receipt Formatting
+    local validPropPayload = {
+        propertyId = 2,
+        lesseeType = "faction",
+        lesseeId = "corp_vanilla_unicorn",
+        authorizedSignerCitizenId = "CIT_SIGNER_01",
+        zoningUsage = "retail_storefront",
+        cycleRent = 3500.00,
+        leaseTermCycles = 8
+    }
+    local okProp, cleanProp = CommercialLeases.ValidateLeaseProposal(validPropPayload)
+    local leaseId = CommercialLeases.GenerateLeaseId("store_vinewood_24", "corp_vanilla_unicorn")
+    local leaseUuid = CommercialLeases.GenerateLeaseUuid()
+    local receipt = CommercialLeases.FormatLeaseReceipt({
+        leaseId = leaseId,
+        propertyId = 2,
+        property_code = "store_vinewood_24",
+        zoningUsage = "retail_storefront",
+        lessorAccountId = "gov:city:master",
+        lesseeId = "corp_vanilla_unicorn",
+        lesseeType = "faction",
+        authorizedSignerCitizenId = "CIT_SIGNER_01",
+        cycleRent = 3500.00,
+        securityDeposit = 3500.00,
+        arrearsBalance = 0.00,
+        leaseStatus = "active"
+    })
+
+    local testH_ok = (okProp == true) and
+                     (cleanProp.cycleRent == 3500.00) and
+                     (leaseId:find("lease:store_vinewood_24") ~= nil) and
+                     (#leaseUuid == 36) and
+                     (receipt:find("MUNICIPAL COMMERCIAL LEASE AGREEMENT") ~= nil) and
+                     (receipt:find("corp_vanilla_unicorn") ~= nil)
+
+    if assertTest(testH_ok == true,
+        "Commercial Lease Proposal Sanitization, Unique Serial Hashing & ASCII Receipt Export",
+        string.format("okProp=%s, leaseId=%s, uuidLen=%d, hasReceipt=%s",
+            tostring(okProp), leaseId, #leaseUuid, tostring(receipt:find("MUNICIPAL COMMERCIAL") ~= nil))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 45. Master Test Runner (Suite 1 - Suite 53)
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -11094,6 +11303,7 @@ function Nyx.Tests.RunAll()
     local t50 = Nyx.Tests.TestMunicipalUtilityMeteringAndGridBilling()
     local t51 = Nyx.Tests.TestDemocraticParliamentaryElectionsAndRecallReferendums()
     local t52 = Nyx.Tests.TestAuditablePublicTreasuryLedgerAndDepartmentMonitor()
+    local t53 = Nyx.Tests.TestCommercialRealEstateLeasingAndStorefrontCycles()
 
     print("^5--------------------------------------------------^7")
     local suites1to50Passed = false
@@ -11101,7 +11311,7 @@ function Nyx.Tests.RunAll()
         suites1to50Passed = true
     end
 
-    if suites1to50Passed and t51 and t52 then
+    if suites1to50Passed and t51 and t52 and t53 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

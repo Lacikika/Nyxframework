@@ -114,8 +114,45 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Auditable Public Treasury Ledger & Department Allocation Monitor (`nyx_treasury` & `nyx_ui`)**
   - **Implementation:** Real-time read-only webview showing open municipal balance sheets, categorized transaction logs, automated percentage splits (emergency services, infrastructure, social dividend), and fiscal crisis threshold telemetry.
 
+- [x] **Feature: Commercial Real Estate Leasing & Public Storefront Lease Cycles (`nyx_properties` & `nyx_factions`)**
+  - **Implementation:** Structured commercial lease contracts for businesses and storefronts, security deposit escrow held in municipal pools, statutory rental tax splits (5%), 4-tier delinquency interlocks (grace notice, doorlock lockouts, register suspension), and automated eviction sweeps relisting defaulted storefronts into public lease cycles.
+
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Commercial Real Estate Leasing & Public Storefront Lease Cycles (`nyx_properties` & `nyx_factions`)**
+  - **Database Migration (`058_commercial_real_estate_leasing_and_storefront_cycles.sql`)**:
+    - Created migration file and registered Step 58 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Mirrored migration to `FiveM/nyx_properties/sql/migrations/058_commercial_real_estate_leasing_and_storefront_cycles.sql` and `FiveM/nyx_factions/sql/migrations/058_commercial_real_estate_leasing_and_storefront_cycles.sql`.
+    - Created `nyx_treasury_accounts` municipal lease escrow pool (`pool:property:lease_escrow`).
+    - Extended `nyx_properties` with commercial leasing columns: `is_leased`, `active_lease_id`, `commercial_zoning` ENUM('retail_storefront','corporate_office','industrial_warehouse','hospitality_venue','medical_clinic','none'), `base_rental_rate`, and `lease_status`.
+    - Created `nyx_property_commercial_leases` table (`lease_id` PK, `lease_uuid` UNIQUE, `property_id`, `lessor_type`, `lessor_account_id`, `lessee_type`, `lessee_id`, `lessee_account_id`, `authorized_signer_citizen_id`, `zoning_usage`, `cycle_rent`, `security_deposit_held`, `rental_tax_rate`, `lease_term_cycles`, `cycles_completed`, `consecutive_missed_cycles`, `delinquency_tier`, `arrears_balance`, `late_penalty_rate`, `lease_status`, `next_billing_due_at`, `grace_period_expires_at`, `eviction_deadline_at`, `last_billed_at`, `last_settled_at`, `escrow_deposit_tx_id`, timestamps) with B-tree lookup indexes.
+    - Created `nyx_property_lease_audits` immutable audit ledger (`audit_id` PK, `audit_uuid` UNIQUE, `lease_id`, `property_id`, `action` ENUM('LEASE_SIGNED','RENT_DEBITED','RENT_PAID_MANUAL','TAX_REMITTED','GRACE_ENTERED','LEASE_LAPSED_LOCKOUT','ARREARS_SETTLED','EVICTION_EXECUTED','DEPOSIT_FORFEITED','DEPOSIT_REFUNDED','LEASE_EXPIRED_RELISTED'), `actor_citizen_id`, `amount`, `tax_amount`, `treasury_tx_uuid`, `notes`, `created_at`).
+    - Seeded canonical commercial properties (`store_vinewood_24`, `wh_elysian_04`) into available lease catalog.
+  - **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_properties/shared/commercial_leases.lua`)**:
+    - Created commercial zoning taxonomy: `retail_storefront` (4 registers, 1.5t stash), `corporate_office` (1 register, 800kg stash, 1.15x multiplier), `industrial_warehouse` (2 registers, 10t stash, 0.90x multiplier), `hospitality_venue` (3 registers, 2.5t stash, 1.25x multiplier), `medical_clinic` (2 registers, 1.2t stash, 1.10x multiplier).
+    - Defined statutory constants: `StandardSecurityDepositMultiplier` (1 cycle), `DefaultRentalTaxRate` (5.0%), `DefaultLatePenaltyRate` (10.0%), `DefaultGracePeriodHours` (48h), `DefaultEvictionDeadlineHours` (72h).
+    - Implemented `CalculateLeaseInitialCosts` strictly asserting zero-cent closed-loop conservation ($\text{NetLessor} + \text{MunicipalTax} \equiv \text{CycleRent}$, $\Delta \equiv 0.00$) and total upfront requirements.
+    - Implemented `CalculateRecurringRentSplit` with exact cent distribution between lessor and municipal commercial lease tax pool.
+    - Implemented `CalculateArrearsSettlement` applying statutory 10% late penalty to overdue rent.
+    - Implemented `EvaluateDelinquencyState` 4-tier state machine (`active`, `grace_period`, `lapsed`, `evicted`) modeling lockouts, register suspension, and eviction due dates.
+    - Implemented `EvaluateDoorlockAuthorization` multi-tier key resolution, landlord inspection access, police search warrant bypass, and delinquency lockouts (`LOCK_OFFLINE_LEASE_LAPSED`).
+    - Implemented `EvaluateRegisterOperation` interlock disabling registers on lapsed/delinquent leases.
+    - Implemented `ValidateLeaseProposal`, `GenerateLeaseId`, `GenerateLeaseUuid`, `FormatStatusBadge`, and ASCII `FormatLeaseReceipt`.
+  - **Authoritative Server Subsystems & RPCs (`nyx_properties`)**:
+    - `FiveM/nyx_properties/server/leases.lua`: In-memory lease cache hydration (`HydrateCommercialLeases`), lease signing engine (`SignCommercialLease`) with double-entry security deposit escrow (`pool:property:lease_escrow`) and first-period rent transfers via `nyx_treasury`, background recurring billing sweeper (`ProcessLeaseBillingCycles`) automatically executing rent sweeps, advancing delinquency tiers, enforcing doorlock lockouts, and forfeiting security deposits upon eviction relisting, manual arrears settlement (`PayLeaseRentManual`), and voluntary lease termination with escrow refund (`TerminateCommercialLease`).
+    - `FiveM/nyx_properties/server/locks.lua`: Integrated commercial lease tenant authorization into `HasKey` and enforced `LOCK_OFFLINE_LEASE_LAPSED` in `properties:toggleLock`.
+    - `FiveM/nyx_properties/server/main.lua`: Hydrated leasing attributes on startup, exposed them in `properties:getProperties`, and registered RPCs: `properties:getCommercialLeases`, `properties:getAvailableStorefronts`, `properties:getLeaseDetails`, `properties:signCommercialLease`, `properties:payLeaseRent`, and `properties:terminateCommercialLease`.
+    - `FiveM/nyx_properties/server/exports.lua`: Exported public server helpers `GetCommercialLease`, `GetCommercialLeaseByProperty`, `GetCommercialLeasesByLessee`, `GetAvailableCommercialProperties`, `SignCommercialLease`, `ProcessLeaseBillingCycles`, `PayLeaseRentManual`, `TerminateCommercialLease`, and `IsPropertyLeaseLapsed`.
+  - **Client Subsystem & Third-Eye Spatial Targets (`nyx_properties`)**:
+    - `FiveM/nyx_properties/client/leases.lua`: Registered player commands `/leaseinfo [propertyId]`, `/paylease [leaseId]`, and `/availableleases`, network listeners for `nyx:properties:client:leaseUpdated`, and client exports `ViewCommercialLeaseInfo`, `PayCommercialLeaseRent`, and `GetAvailableStorefronts`.
+  - **Manifest Declarations**:
+    - Declared `shared/commercial_leases.lua`, `server/leases.lua`, and `client/leases.lua` in `FiveM/nyx_properties/fxmanifest.lua`.
+    - Declared `@nyx_properties/shared/commercial_leases.lua` in `FiveM/nyx_factions/fxmanifest.lua`.
+  - **Verification & Test Coverage**:
+    - Added in-engine integration test Test 53 (`Nyx.Tests.TestCommercialRealEstateLeasingAndStorefrontCycles`) to `FiveM/nyx_core/server/tests.lua` (8 sub-tests covering zoning taxonomy, upfront costs conservation, recurring rent splits, delinquency state machine, arrears penalties, doorlock authorization, register interlocks, and receipt formatting) and wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_commercial_real_estate_leasing_and_storefront_cycles.py` (11/11 tests passing).
+    - Verified entire test suite: 498/498 tests passing; `scripts/validator.py` and `scripts/verify.ps1` clean across all 14 resources and 58 migrations.
+
 - **[2026-10-18] Feature: Auditable Public Treasury Ledger & Department Allocation Monitor (`nyx_treasury` & `nyx_ui`)**
   - **Database Migration (`057_auditable_public_treasury_ledger_and_department_monitor.sql`)**:
     - Created migration file and registered Step 57 in `FiveM/nyx_core/sql/migrations/index.json`.

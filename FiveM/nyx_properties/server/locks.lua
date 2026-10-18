@@ -22,6 +22,26 @@ function Nyx.Properties.HasKey(propertyId, citizenId, minTier)
         return (row.tier >= minTier), row.tier
     end
 
+    -- Check commercial lease tenant authorization
+    local prop = Nyx.Properties.Loaded and Nyx.Properties.Loaded[propertyId]
+    if prop and (prop.activeLeaseId or prop.isLeased) then
+        local lease = Nyx.Properties.GetCommercialLease and Nyx.Properties.GetCommercialLease(prop.activeLeaseId)
+        if lease then
+            if lease.leaseStatus == "lapsed" or lease.leaseStatus == "evicted" or (lease.delinquencyTier and lease.delinquencyTier >= 2) then
+                return false, 0
+            end
+            if lease.lesseeType == "citizen" and (lease.lesseeId == citizenId or lease.authorizedSignerCitizenId == citizenId) then
+                return true, 4
+            elseif lease.lesseeType == "faction" then
+                local player = exports['nyx_core']:GetPlayerByCitizenId(citizenId)
+                local job = player and player:getMetadata("job")
+                if job == lease.lesseeId or (citizenId == lease.authorizedSignerCitizenId) then
+                    return true, 3
+                end
+            end
+        end
+    end
+
     -- Check if citizen has enforcement override (Police Chief / High Court Judge)
     local player = exports['nyx_core']:GetPlayerByCitizenId(citizenId)
     if player and player.hasPermission and player.hasPermission("emergency_enforcement") then
@@ -39,6 +59,18 @@ exports['nyx_core']:RegisterRPC("properties:toggleLock", function(src, propertyI
     propertyId = tonumber(propertyId)
     local prop = Nyx.Properties.Loaded[propertyId]
     if not prop then return { success = false, error = "PROPERTY_NOT_FOUND" } end
+
+    -- Check commercial lease delinquency lockout
+    if prop.activeLeaseId or prop.isLeased then
+        local lease = Nyx.Properties.GetCommercialLease and Nyx.Properties.GetCommercialLease(prop.activeLeaseId)
+        if lease and (lease.leaseStatus == 'lapsed' or lease.leaseStatus == 'evicted' or (lease.delinquencyTier and lease.delinquencyTier >= 2)) then
+            return {
+                success = false,
+                error = "LOCK_OFFLINE_LEASE_LAPSED",
+                message = "Az ingatlan elektronikus zárszerkezete bérleti díj hátralék miatt lezárva!"
+            }
+        end
+    end
 
     -- Check permission (Tier 2: Resident / Employee or higher)
     local hasKey, tier = Nyx.Properties.HasKey(propertyId, player.citizenId, 2)

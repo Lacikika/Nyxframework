@@ -114,6 +114,11 @@ MySQL.ready(function()
                 alarmStatus = r.alarm_status or "armed",
                 isUtilitySuspended = (tonumber(r.is_utility_suspended) == 1),
                 utilityStatus = r.utility_status or "normal",
+                isLeased = (tonumber(r.is_leased) == 1),
+                activeLeaseId = r.active_lease_id,
+                commercialZoning = r.commercial_zoning or "none",
+                baseRentalRate = tonumber(r.base_rental_rate) or 0.00,
+                leaseStatus = r.lease_status or "not_leased",
                 stashId = r.stash_inventory_id,
                 meterId = r.utility_meter_id,
                 linkedSubstation = r.linked_substation_id
@@ -168,6 +173,11 @@ exports['nyx_core']:RegisterRPC("properties:getProperties", function(src, filter
             entrance = p.entrance,
             isUtilitySuspended = p.isUtilitySuspended or false,
             utilityStatus = p.utilityStatus or "normal",
+            isLeased = p.isLeased or false,
+            activeLeaseId = p.activeLeaseId,
+            commercialZoning = p.commercialZoning or "none",
+            baseRentalRate = p.baseRentalRate or 0.00,
+            leaseStatus = p.leaseStatus or "not_leased",
             meterId = p.meterId
         }
     end
@@ -379,4 +389,94 @@ exports['nyx_core']:RegisterRPC("properties:exitProperty", function(src, propert
     end
 
     return { success = true, entranceCoords = prop.entrance }
+end)
+
+-- 6. RPC: Query Active Commercial Leases
+exports['nyx_core']:RegisterRPC("properties:getCommercialLeases", function(src, filter)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return { success = false, error = "UNAUTHORIZED" } end
+
+    local leases = {}
+    if Nyx.Properties.CommercialLeases then
+        for _, lease in pairs(Nyx.Properties.CommercialLeases) do
+            if not filter or not filter.lesseeId or lease.lesseeId == filter.lesseeId then
+                table.insert(leases, lease)
+            end
+        end
+    end
+
+    return { success = true, leases = leases }
+end)
+
+-- 7. RPC: Query Available Commercial Storefronts & Warehouses
+exports['nyx_core']:RegisterRPC("properties:getAvailableStorefronts", function(src)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return { success = false, error = "UNAUTHORIZED" } end
+
+    local available = Nyx.Properties.GetAvailableCommercialProperties()
+    return { success = true, properties = available }
+end)
+
+-- 8. RPC: Get Specific Commercial Lease Details
+exports['nyx_core']:RegisterRPC("properties:getLeaseDetails", function(src, leaseId)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return { success = false, error = "UNAUTHORIZED" } end
+
+    local lease = Nyx.Properties.GetCommercialLease(leaseId)
+    if not lease then
+        return { success = false, error = "LEASE_NOT_FOUND" }
+    end
+
+    local audits = MySQL.query.await([[
+        SELECT * FROM `nyx_property_lease_audits`
+        WHERE `lease_id` = ?
+        ORDER BY `created_at` DESC LIMIT 15
+    ]], { leaseId }) or {}
+
+    return {
+        success = true,
+        lease = lease,
+        audits = audits
+    }
+end)
+
+-- 9. RPC: Sign Commercial Real Estate Lease
+exports['nyx_core']:RegisterRPC("properties:signCommercialLease", function(src, payload)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return { success = false, error = "UNAUTHORIZED" } end
+
+    local ok, res = Nyx.Properties.SignCommercialLease(src, payload)
+    if not ok then
+        return { success = false, error = res }
+    end
+
+    return { success = true, lease = res }
+end)
+
+-- 10. RPC: Pay Commercial Lease Rent & Settle Arrears
+exports['nyx_core']:RegisterRPC("properties:payLeaseRent", function(src, leaseId)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return { success = false, error = "UNAUTHORIZED" } end
+
+    local ok, res = Nyx.Properties.PayLeaseRentManual(src, leaseId)
+    if not ok then
+        return { success = false, error = res }
+    end
+
+    return { success = true, result = res }
+end)
+
+-- 11. RPC: Terminate Commercial Lease
+exports['nyx_core']:RegisterRPC("properties:terminateCommercialLease", function(src, payload)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return { success = false, error = "UNAUTHORIZED" } end
+
+    local leaseId = payload and payload.leaseId
+    local reason = payload and payload.reason
+    local ok, res = Nyx.Properties.TerminateCommercialLease(src, leaseId, reason)
+    if not ok then
+        return { success = false, error = res }
+    end
+
+    return { success = true, result = res }
 end)

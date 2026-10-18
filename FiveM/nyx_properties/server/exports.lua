@@ -130,3 +130,66 @@ exports('IsPropertyUtilitySuspended', function(propertyId)
     return prop and prop.isUtilitySuspended or false
 end)
 
+exports('GetCommercialLease', function(leaseId)
+    if Nyx.Properties.GetCommercialLease then
+        return Nyx.Properties.GetCommercialLease(leaseId)
+    end
+    return nil
+end)
+
+exports('GetCommercialLeaseByProperty', function(propertyId)
+    if Nyx.Properties.GetCommercialLeaseByProperty then
+        return Nyx.Properties.GetCommercialLeaseByProperty(propertyId)
+    end
+    return nil
+end)
+
+exports('GetCommercialLeasesByLessee', function(lesseeId)
+    if Nyx.Properties.GetCommercialLeasesByLessee then
+        return Nyx.Properties.GetCommercialLeasesByLessee(lesseeId)
+    end
+    return {}
+end)
+
+exports('GetAvailableCommercialProperties', function()
+    if Nyx.Properties.GetAvailableCommercialProperties then
+        return Nyx.Properties.GetAvailableCommercialProperties()
+    end
+    return {}
+end)
+
+exports('SignCommercialLease', function(src, payload)
+    if Nyx.Properties.SignCommercialLease then
+        return Nyx.Properties.SignCommercialLease(src, payload)
+    end
+    return false, "UNAVAILABLE"
+end)
+
+exports('ProcessLeaseBillingCycles', function()
+    if Nyx.Properties.ProcessLeaseBillingCycles then
+        return Nyx.Properties.ProcessLeaseBillingCycles()
+    end
+    return nil
+end)
+
+exports('PayLeaseRentManual', function(src, leaseId)
+    if Nyx.Properties.PayLeaseRentManual then
+        return Nyx.Properties.PayLeaseRentManual(src, leaseId)
+    end
+    return false, "UNAVAILABLE"
+end)
+
+exports('TerminateCommercialLease', function(src, leaseId, reason)
+    if Nyx.Properties.TerminateCommercialLease then
+        return Nyx.Properties.TerminateCommercialLease(src, leaseId, reason)
+    end
+    return false, "UNAVAILABLE"
+end)
+
+exports('IsPropertyLeaseLapsed', function(propertyId)
+    if Nyx.Properties.IsPropertyLeaseLapsed then
+        return Nyx.Properties.IsPropertyLeaseLapsed(propertyId)
+    end
+    return false
+end)
+

@@ -20,7 +20,8 @@ shared_scripts {
     'shared/succession.lua',
     'shared/laundering.lua',
     'shared/equity.lua',
-    '@nyx_treasury/shared/cash_transit.lua'
+    '@nyx_treasury/shared/cash_transit.lua',
+    '@nyx_properties/shared/commercial_leases.lua'
 }
 
 server_scripts {

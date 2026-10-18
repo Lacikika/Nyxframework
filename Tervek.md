@@ -45,7 +45,7 @@ created: 2026-09-20
 - [x] **Self-Adjusting Paychecks:** If treasury reserves drop below defined thresholds ($T_{\text{crit}}$), municipal paychecks scale down logarithmically:
   $$\text{Payout} = \text{BaseWage} \times \left(\frac{\text{CurrentBalance}}{\text{TargetReserve}}\right)$$
 - [x] **Infrastructure Degradation Mode:** Zero-balance treasury disables public NPC services (e.g., auto-repair stations, municipal impound lots, AI dispatchers).
-- [ ] **Auditable Public Ledger UI:** Read-only webview showing real-time balance sheets, transaction history, outgoing payrolls, and official allocations.
+- [x] **Auditable Public Ledger UI:** Read-only webview showing real-time balance sheets, transaction history, outgoing payrolls, and official allocations.
 
 ---
 
@@ -115,7 +115,7 @@ created: 2026-09-20
 - [ ] **Shareholding & Automated Dividends:** Revenue automatically splits across member wallets based on defined equity ownership percentages.
 
 ### 5.2 Dynamic Territory & Property Charters
-- [ ] **Commercial Real Estate Leasing:** Physical storefronts enter public lease cycles if rental taxes lapse.
+- [x] **Commercial Real Estate Leasing:** Physical storefronts enter public lease cycles if rental taxes lapse.
 - [ ] **Warehousing & Storage Networks:** Organizations deploy secured stashes, workbenches, and pallet drop zones bound to customized access levels.
 
 ---
