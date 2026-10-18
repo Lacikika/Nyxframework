@@ -10463,7 +10463,190 @@ function Nyx.Tests.TestEndToEndStressSimulationAcross14Resources()
     return passes == total
 end
 
--- 45. Master Test Runner (Suite 1 - Suite 49)
+-- 50. Test Municipal Utility Metering & Automated Grid Billing
+function Nyx.Tests.TestMunicipalUtilityMeteringAndGridBilling()
+    print("^3[Nyx:Tests] Running Municipal Utility Metering & Automated Grid Billing Suite...^7")
+    local passes = 0
+    local total = 7
+
+    local Metering = Nyx.Metering or (exports['nyx_services'] and exports['nyx_services'].GetUtilityMeter and Nyx.Metering)
+    if not Metering then
+        -- Fallback require/load from nyx_services shared module
+        local chunk = LoadResourceFile("nyx_services", "shared/metering.lua")
+        if chunk then
+            local fn, err = load(chunk, "nyx_services/shared/metering.lua")
+            if fn then fn() end
+        end
+        Metering = Nyx.Metering
+    end
+
+    if not Metering then
+        print("^1[Nyx:Tests] Failed to load Nyx.Metering domain engine!^7")
+        return false
+    end
+
+    -- Sub-test A: Continuous Consumption Delta & Weather Multipliers
+    local kwhRes, waterRes = Metering.CalculateConsumptionDelta("residential", 150.00, 2, "CLEAR", 1.0)
+    local kwhStorm, waterStorm = Metering.CalculateConsumptionDelta("residential", 150.00, 2, "THUNDER", 1.0)
+    local kwhInd, waterInd = Metering.CalculateConsumptionDelta("industrial", 1250.00, 5, "CLEAR", 1.0)
+
+    local testA_ok = (kwhRes == 150.00 and waterRes == 100.00) and
+                     (kwhStorm == 210.00 and waterStorm == 140.00) and
+                     (kwhInd > 2000.00 and waterInd > 1000.00)
+
+    if assertTest(testA_ok == true,
+        "Continuous Kilowatt-Hour & Water Consumption Modeling with Environmental Stress",
+        string.format("kwhRes=%.2f, waterRes=%.2f, kwhStorm=%.2f, waterStorm=%.2f, kwhInd=%.2f",
+            kwhRes, waterRes, kwhStorm, waterStorm, kwhInd)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Real-Time Substation Grid Draw & Overload Tripping Invariant
+    local mockConnected = {
+        { propertyType = "residential", isUtilitySuspended = false, hasBackupGenerator = false, occupancyCount = 2 },
+        { propertyType = "commercial", isUtilitySuspended = false, hasBackupGenerator = false, occupancyCount = 5 },
+        { propertyType = "industrial", isUtilitySuspended = false, hasBackupGenerator = false, occupancyCount = 10 },
+        { propertyType = "industrial", isUtilitySuspended = true, hasBackupGenerator = false, occupancyCount = 0 },   -- Disconnected -> ghost draw (0.1 kW)
+        { propertyType = "commercial", isUtilitySuspended = false, hasBackupGenerator = true, occupancyCount = 3 }     -- Generator -> 0 kW off grid
+    }
+
+    local loadMwNormal, metricsNormal = Metering.CalculateSubstationGridDraw("grid_central_ls", mockConnected, 75.00)
+    local _, metricsOverload = Metering.CalculateSubstationGridDraw("grid_central_ls", mockConnected, 0.10) -- Artificially low ceiling
+
+    local testB_ok = (loadMwNormal > 0.10 and loadMwNormal < 1.00) and
+                     (metricsNormal.totalMeters == 5 and metricsNormal.activeMeters == 3 and
+                      metricsNormal.suspendedMeters == 1 and metricsNormal.generatorBackedMeters == 1) and
+                     (metricsNormal.isOverloaded == false and metricsOverload.isOverloaded == true)
+
+    if assertTest(testB_ok == true,
+        "Substation Grid Load Aggregation, Capacity Utilization & Transformer Overload Tripping",
+        string.format("loadMw=%.4f, total=%d, active=%d, suspended=%d, backed=%d, overloadNormal=%s, overloadSmall=%s",
+            loadMwNormal, metricsNormal.totalMeters, metricsNormal.activeMeters,
+            metricsNormal.suspendedMeters, metricsNormal.generatorBackedMeters,
+            tostring(metricsNormal.isOverloaded), tostring(metricsOverload.isOverloaded))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Delinquency State Machine & Statutory Cut-off Boundaries
+    local t0, s0, susp0 = Metering.EvaluateDelinquencyTier(0, 0.00, 2500.00)
+    local t1, s1, susp1 = Metering.EvaluateDelinquencyTier(1, 150.00, 2500.00)
+    local t2, s2, susp2 = Metering.EvaluateDelinquencyTier(2, 600.00, 2500.00)
+    local t3_amt, s3_amt, susp3_amt = Metering.EvaluateDelinquencyTier(1, 2600.00, 2500.00) -- Exceeds threshold immediately
+    local t3_cyc, s3_cyc, susp3_cyc = Metering.EvaluateDelinquencyTier(3, 800.00, 2500.00)  -- 3 missed cycles
+    local t4, s4, susp4 = Metering.EvaluateDelinquencyTier(5, 8000.00, 2500.00)              -- Extreme lien arrears
+
+    local testC_ok = (t0 == 0 and s0 == "active" and susp0 == false) and
+                     (t1 == 1 and s1 == "grace_notice" and susp1 == false) and
+                     (t2 == 2 and s2 == "late_warning" and susp2 == false) and
+                     (t3_amt == 3 and s3_amt == "disconnected" and susp3_amt == true) and
+                     (t3_cyc == 3 and s3_cyc == "disconnected" and susp3_cyc == true) and
+                     (t4 == 4 and s4 == "lien_referred" and susp4 == true)
+
+    if assertTest(testC_ok == true,
+        "Delinquency State Machine Progression & Power Cut-off Threshold Enforcement",
+        string.format("Tiers: [%d:%s, %d:%s, %d:%s, %d:%s, %d:%s, %d:%s]",
+            t0, s0, t1, s1, t2, s2, t3_amt, s3_amt, t3_cyc, s3_cyc, t4, s4)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Exact Zero-Cent Closed-Loop Balance Conservation Law
+    local bill1 = Metering.CalculateUtilityBill({
+        kwhConsumed = 333.33,
+        waterConsumed = 177.77,
+        kwhTariff = 0.1500,
+        waterTariff = 0.0500,
+        unpaidArrears = 1420.55,
+        missedCycles = 2,
+        isReconnecting = false,
+        gridStressMultiplier = 1.25
+    })
+
+    local bill2 = Metering.CalculateUtilityBill({
+        kwhConsumed = 1200.00,
+        waterConsumed = 650.00,
+        kwhTariff = 0.1500,
+        waterTariff = 0.0500,
+        unpaidArrears = 3200.00,
+        missedCycles = 3,
+        isReconnecting = true,
+        gridStressMultiplier = 1.00
+    })
+
+    local expected1 = bill1.energyCharge + bill1.waterCharge + bill1.unpaidArrears + bill1.latePenalty + bill1.reconnectFee
+    local delta1 = math.abs(bill1.totalDue - expected1)
+
+    local expected2 = bill2.energyCharge + bill2.waterCharge + bill2.unpaidArrears + bill2.latePenalty + bill2.reconnectFee
+    local delta2 = math.abs(bill2.totalDue - expected2)
+
+    local testD_ok = (delta1 < 0.001 and delta2 < 0.001) and
+                     (bill1.delinquencyTier == 2 and bill1.latePenalty > 0.00 and bill1.shouldSuspend == false) and
+                     (bill2.delinquencyTier == 3 and bill2.reconnectFee == 150.00 and bill2.shouldSuspend == true)
+
+    if assertTest(testD_ok == true,
+        "Statutory Tariff Assessment & Strict Zero-Cent Closed-Loop Invariant Conservation (delta = 0.00)",
+        string.format("delta1=%.4f, total1=%.2f, delta2=%.4f, total2=%.2f",
+            delta1, bill1.totalDue, delta2, bill2.totalDue)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Arrears Settlement & Reconnection Eligibility
+    local setPartial = Metering.CalculatePaymentSettlement(3000.00, 200.00, true, 2500.00)  -- Remaining 2800 >= 2500 -> stays suspended
+    local setReconn = Metering.CalculatePaymentSettlement(3000.00, 1000.00, true, 2500.00) -- Remaining 2000 < 2500 -> restored!
+    local setFull = Metering.CalculatePaymentSettlement(1200.00, 1200.00, false, 2500.00)   -- Fully cleared -> active
+
+    local testE_ok = (setPartial.remainingArrears == 2800.00 and setPartial.isSuspended == true and setPartial.canReconnect == false) and
+                     (setReconn.remainingArrears == 2000.00 and setReconn.isSuspended == false and setReconn.canReconnect == true) and
+                     (setFull.remainingArrears == 0.00 and setFull.newTier == 0 and setFull.newStatus == "active")
+
+    if assertTest(testE_ok == true,
+        "Arrears Settlement Debt Reduction & Automated Reconnection Threshold Evaluation",
+        string.format("partialRem=%.2f (susp=%s, recn=%s), reconnRem=%.2f (susp=%s, recn=%s)",
+            setPartial.remainingArrears, tostring(setPartial.isSuspended), tostring(setPartial.canReconnect),
+            setReconn.remainingArrears, tostring(setReconn.isSuspended), tostring(setReconn.canReconnect))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Electronic Maglock Failure on Utility Cut-off & Backup Generator Overrides
+    local pGridOn, lockGridOn, _ = Metering.EvaluateEffectiveDoorlockPower("commercial", true, true, false, false)
+    local pCutOff, lockCutOff, _ = Metering.EvaluateEffectiveDoorlockPower("commercial", true, true, true, false) -- Utility cut off!
+    local pGen, lockGen, _ = Metering.EvaluateEffectiveDoorlockPower("commercial", true, false, true, true)       -- Generator active!
+    local pResCut, lockResCut, _ = Metering.EvaluateEffectiveDoorlockPower("residential", true, true, true, false) -- Residential physical keys
+
+    local testF_ok = (pGridOn == true and lockGridOn == true) and
+                     (pCutOff == false and lockCutOff == false) and
+                     (pGen == true and lockGen == true) and
+                     (pResCut == false and lockResCut == true)
+
+    if assertTest(testF_ok == true,
+        "Doorlock Magnetic De-Energization on Utility Cut-off & Backup Generator Resilience",
+        string.format("GridOn=[%s,%s], CutOff=[%s,%s], Gen=[%s,%s], Res=[%s,%s]",
+            tostring(pGridOn), tostring(lockGridOn), tostring(pCutOff), tostring(lockCutOff),
+            tostring(pGen), tostring(lockGen), tostring(pResCut), tostring(lockResCut))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Serial Generators, Status Badges & ASCII Invoice Telemetry
+    local invUuid = Metering.GenerateInvoiceUuid("meter:prop:apt101", 1770000000, 1234)
+    local logUuid = Metering.GenerateLogUuid("POWER_CUTOFF_ENFORCED", 1770000000, 5678)
+    local badge, badgeLabel, color = Metering.FormatMeterStatusBadge("disconnected")
+    local invoiceReport = Metering.FormatInvoiceReport(bill1)
+
+    local testG_ok = (type(invUuid) == "string" and invUuid:find("^INV%-UTIL%-") ~= nil) and
+                     (type(logUuid) == "string" and logUuid:find("^LOG%-UTIL%-POWE%-") ~= nil) and
+                     (badgeLabel == "Közmű Felfüggesztve (Lekapcsolva)" and color == "red") and
+                     (type(invoiceReport) == "string" and invoiceReport:find("FŐVÁROSI KÖZMŰVEK") ~= nil)
+
+    if assertTest(testG_ok == true,
+        "Unique Serial Generation, Status Taxonomy Badges & Formatted Invoice Report Output",
+        string.format("invUuid=%s, logUuid=%s, label=%s, color=%s",
+            invUuid, logUuid, badgeLabel, color)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 45. Master Test Runner (Suite 1 - Suite 50)
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -10518,9 +10701,15 @@ function Nyx.Tests.RunAll()
     local t47 = Nyx.Tests.TestCorporateEquityOfferingAndDividends()
     local t48 = Nyx.Tests.TestArmoredCashTransitAndBankingFreight()
     local t49 = Nyx.Tests.TestEndToEndStressSimulationAcross14Resources()
+    local t50 = Nyx.Tests.TestMunicipalUtilityMeteringAndGridBilling()
 
     print("^5--------------------------------------------------^7")
+    local suites1to49Passed = false
     if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 and t41 and t42 and t43 and t44 and t45 and t46 and t47 and t48 and t49 then
+        suites1to49Passed = true
+    end
+
+    if suites1to49Passed and t50 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

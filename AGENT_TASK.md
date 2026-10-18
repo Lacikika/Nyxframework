@@ -105,11 +105,55 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Testing: End-to-End Stress Simulation Across All 14 Resources (`nyx_core/server/tests.lua`)**
   - **Implementation:** Automated test harness executing concurrent transactions across all systems to verify 0.00ms baseline idle performance, zero entity leaks, and perfect conservation.
 
-- [ ] **Feature: Municipal Utility Metering & Automated Grid Billing (`nyx_services` & `nyx_properties`)**
+- [x] **Feature: Municipal Utility Metering & Automated Grid Billing (`nyx_services` & `nyx_properties`)**
   - **Implementation:** Meter residential and commercial properties for continuous kilowatt-hour and water consumption drawn from localized substations, with automated utility invoicing and power cut-off delinquency enforcement.
+
+- [ ] **Feature: Democratic Parliamentary Elections & Recall Referendums (`nyx_parliament` & `nyx_ui`)**
+  - **Implementation:** Candidate registration with signatures and collateral deposits, physical voting booth terminal interaction, and automated term limit expiration with citizen recall referendums.
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Municipal Utility Metering & Automated Grid Billing (`nyx_services` & `nyx_properties`)**
+  - **Database Migration (`055_municipal_utility_metering_and_automated_grid_billing.sql`)**:
+    - Created migration file and registered Step 55 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Mirrored migration to `FiveM/nyx_services/sql/migrations/` and `FiveM/nyx_properties/sql/migrations/`.
+    - Extended `nyx_services_utility_meters` with property bindings (`property_id`), billing timestamps (`last_billed_at`), reading meters (`last_reading_kwh`, `last_reading_water`), missed cycle tracking (`consecutive_unpaid_cycles`), delinquency tiers (`delinquency_tier`), status taxonomy (`meter_status`), and cut-off timestamps (`disconnection_notice_at`, `disconnected_at`, `reconnected_at`).
+    - Created `nyx_services_utility_invoices` immutable audit ledger (`invoice_id` PK, `invoice_uuid` UNIQUE, `meter_id`, `property_id`, `owner_citizen_id`, `substation_id`, `cycle_period_start`, `cycle_period_end`, `kwh_consumed`, `water_consumed`, `kwh_tariff`, `water_tariff`, `energy_charge`, `water_charge`, `late_penalty`, `reconnect_fee`, `total_due`, `amount_paid`, `status`, `treasury_tx_uuid`, `paid_at`, `created_at`) with indexes on `meter_id`, `owner_citizen_id`, `status`, and `created_at`.
+    - Created `nyx_services_utility_delinquency_logs` immutable audit ledger (`log_id` PK, `log_uuid` UNIQUE, `meter_id`, `property_id`, `owner_citizen_id`, `action`, `arrears_amount`, `actor_citizen_id`, `notes`, `created_at`).
+    - Extended `nyx_properties` with utility disconnection status columns: `is_utility_suspended` (TINYINT default 0) and `utility_status` (ENUM('normal', 'cut_off', 'backup_power') default 'normal').
+    - Extended `nyx_property_audit.action` enum with `'UTILITY_BILL_PAID'`, `'UTILITY_CUTOFF_ENFORCED'`, and `'UTILITY_RECONNECTED'`.
+    - Linked default properties (`apt_integrity_101`, `store_vinewood_24`, `wh_elysian_04`) to valid canonical substations (`grid_central_ls`, `grid_port_ls`).
+  - **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_services/shared/metering.lua`)**:
+    - Defined statutory constants and baseline consumption profiles: `residential` (120 kWh, 80 Gal, 8.5 kW), `commercial` (450 kWh, 200 Gal, 35.0 kW), and `industrial` (1200 kWh, 650 Gal, 120.0 kW).
+    - Configured environmental weather load stress multipliers (`THUNDER` 1.40x, `RAIN` 1.15x, `EXTRASUNNY` 1.25x).
+    - Implemented `CalculateConsumptionDelta` modeling continuous power and water draw with square-root land area footprint scaling and dynamic occupancy increments.
+    - Implemented `CalculateSubstationGridDraw` aggregating connected property loads (kW -> MW), modeling ghost idle draw for disconnected meters (0.1 kW), generator isolation (0 kW), and evaluating transformer overload tripping against rated capacity (`MaxRatedCapacityMw`).
+    - Implemented `EvaluateDelinquencyTier` 5-tier state machine (`active`, `grace_notice`, `late_warning`, `disconnected`, `lien_referred`) with statutory debt cutoff boundary ($2,500.00) and consecutive missed cycles threshold.
+    - Implemented `CalculateUtilityBill` strictly satisfying exact zero-cent closed-loop economic conservation ($\Delta \equiv 0.00$) between tariffs, arrears, late surcharges (10%), and reconnection fees.
+    - Implemented `CalculatePaymentSettlement` evaluating debt reduction and automated reconnection eligibility when arrears drop below statutory cutoff.
+    - Implemented `EvaluateEffectiveDoorlockPower` enforcing electronic magnetic lock failure on unpowered commercial/industrial properties while preserving mechanical residential access and backup generator resilience.
+    - Implemented unique serial generators (`GenerateInvoiceUuid`, `GenerateLogUuid`), status badge formatters, and ASCII invoice receipt formatters.
+  - **Authoritative Server Subsystems & RPCs**:
+    - `FiveM/nyx_services/server/billing.lua`: Authoritative automated billing cycle processor (`ProcessUtilityBillingCycle`), executing double-entry treasury transfers (`nyx_treasury`) to `gov:dept:works`, creating invoice records, advancing delinquency tiers, and executing statutory power cut-off interlocks. Authoritative arrears payment engine (`PayUtilityBill`), debt settlement, and reconnection restore logic. Substation grid load analyzer (`GetSubstationGridLoad`) protecting transformers against peak overload.
+    - `FiveM/nyx_services/server/main.lua`: Registered RPC endpoints `services:getMeter`, `services:getMeterByPropertyId`, `services:getUtilityInvoices`, `services:getSubstationGridLoad`, `services:enforcePowerCutoff`, and `services:reconnectUtility`.
+    - `FiveM/nyx_services/server/exports.lua`: Exported public APIs `GetUtilityMeter`, `GetMeterByPropertyId`, `GetUtilityInvoices`, `GetSubstationGridLoad`, `ProcessUtilityBillingCycle`, `PayUtilityBill`, `EnforcePowerCutoff`, and `ReconnectUtility`.
+  - **Properties Integration & Interlocks (`nyx_properties`)**:
+    - `FiveM/nyx_properties/server/main.lua`: Hydrated `is_utility_suspended` and `utility_status`, linked meters with `property_id` on deed purchase, exposed utility status in `properties:getProperties`, and enforced interior power blackout checks on `properties:enterProperty`.
+    - `FiveM/nyx_properties/server/locks.lua`: Enforced power cut-off lock failure (`LOCK_OFFLINE_UTILITY_CUTOFF`) on commercial and industrial electronic magnetic locks unless backup generator is active.
+    - `FiveM/nyx_properties/server/exports.lua`: Exported `IsPropertyUtilitySuspended`.
+    - `FiveM/nyx_properties/client/interact.lua`: Registered entrance Third-Eye targets "Közműóra Ellenőrzése (Villany & Víz)" and "Közműszámla / Hátralék Befizetése".
+    - `FiveM/nyx_properties/config.lua`: Updated default properties to canonical substation IDs (`grid_central_ls`, `grid_port_ls`).
+  - **Client Implementations (`FiveM/nyx_services/client/metering.lua` & `client/exports.lua`)**:
+    - Network listeners for `nyx:services:client:utilityCutoffEnforced` and `nyx:services:client:utilityReconnected` with audio buzzer/breaker sounds and notification banners.
+    - Player commands `/checkmeter [meterId]` and `/payutility [meterId] [amount]`.
+    - Public client exports: `GetMeterStatus` and `PayUtilityBill`.
+  - **Manifests & Verification**:
+    - Updated `fxmanifest.lua` in `nyx_services` declaring `shared/metering.lua` and `client/metering.lua`.
+    - Updated `fxmanifest.lua` in `nyx_properties` declaring `@nyx_services/shared/metering.lua`.
+    - Added in-engine integration test Test 50 (`Nyx.Tests.TestMunicipalUtilityMeteringAndGridBilling`) to `FiveM/nyx_core/server/tests.lua` and wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_municipal_utility_metering_and_grid_billing.py` (11/11 tests passing).
+    - Full pytest suite: 464/464 passed (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 267 Lua files, 55 migrations (100% clean verification).
 - **[2026-10-18] Testing: End-to-End Stress Simulation Across All 14 Resources (`nyx_core/server/tests.lua`)**
   - **Database Migration (`054_end_to_end_stress_simulation_audits.sql`)**:
     - Created migration file and registered Step 54 in `FiveM/nyx_core/sql/migrations/index.json`.

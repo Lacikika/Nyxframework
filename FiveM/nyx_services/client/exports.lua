@@ -35,3 +35,19 @@ end)
 exports("IsSabotaging", function()
     return isSabotaging or false
 end)
+
+exports("GetMeterStatus", function(meterId, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPC then
+        exports['nyx_core']:TriggerRPC("services:getMeter", function(res)
+            if cb then cb(res and res.success, res and res.meter) end
+        end, meterId)
+    end
+end)
+
+exports("PayUtilityBill", function(meterId, amount, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPC then
+        exports['nyx_core']:TriggerRPC("services:payUtilityBill", function(res)
+            if cb then cb(res and res.success, res and res.data, res and res.error) end
+        end, meterId, amount)
+    end
+end)

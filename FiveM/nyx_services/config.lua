@@ -89,11 +89,15 @@ Config.Billing = {
     WaterTariff = 0.05,                   -- $0.05 per gallon
     BillingCycleInterval = 1800,          -- 30 minutes per automated meter billing cycle
     SuspensionThreshold = 2500.00,        -- Debt threshold at which property electricity/water cuts off
+    LatePenaltyRate = 0.10,               -- 10% late surcharge on missed billing cycle
+    ReconnectFee = 150.00,                -- Administrative reconnection fee
+    LienThreshold = 7500.00,              -- Extreme debt threshold referring to municipal lien
+    MaxDelinquencyCyclesBeforeCutoff = 3, -- Missed cycles threshold triggering cutoff
     PublicWorksAccount = "gov:dept:works",-- Municipal treasury account collecting utility revenues
     ConsumptionProfiles = {
-        ['residential'] = { kwh = 120.0, water = 80.0 },
-        ['commercial'] = { kwh = 450.0, water = 200.0 },
-        ['industrial'] = { kwh = 1200.0, water = 650.0 }
+        ['residential'] = { kwh = 120.0, water = 80.0, continuousKw = 8.5 },
+        ['commercial'] = { kwh = 450.0, water = 200.0, continuousKw = 35.0 },
+        ['industrial'] = { kwh = 1200.0, water = 650.0, continuousKw = 120.0 }
     }
 }
 

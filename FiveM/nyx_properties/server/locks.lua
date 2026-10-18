@@ -46,14 +46,19 @@ exports['nyx_core']:RegisterRPC("properties:toggleLock", function(src, propertyI
         return { success = false, error = "INSUFFICIENT_KEY_TIER" }
     end
 
-    -- Check electrical power status for electronic maglocks
+    -- Check electrical power status for electronic maglocks & utility delinquency cut-off
     local isPowered = true
     if exports['nyx_services'] and exports['nyx_services'].IsCoordsPowered then
         isPowered = exports['nyx_services']:IsCoordsPowered(prop.entrance)
     end
+    if prop.isUtilitySuspended and not prop.hasBackupGenerator then
+        isPowered = false
+    end
 
     if not isPowered and not prop.hasBackupGenerator and (prop.type == 'commercial' or prop.type == 'industrial') then
-        return { success = false, error = "LOCK_OFFLINE_NO_POWER", message = "A mágneszár áramellátás hiányában nem működtethető!" }
+        local errReason = prop.isUtilitySuspended and "LOCK_OFFLINE_UTILITY_CUTOFF" or "LOCK_OFFLINE_NO_POWER"
+        local errMsg = prop.isUtilitySuspended and "A mágneszár közműtartozás miatti áramlekapcsolás okán offline!" or "A mágneszár áramellátás hiányában nem működtethető!"
+        return { success = false, error = errReason, message = errMsg }
     end
 
     -- Toggle state

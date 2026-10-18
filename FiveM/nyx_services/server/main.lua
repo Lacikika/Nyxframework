@@ -109,6 +109,48 @@ CreateThread(function()
             return { success = (m ~= nil), meter = m }
         end)
 
+        -- Query utility meter by property ID
+        exports['nyx_core']:RegisterRPC("services:getMeterByPropertyId", function(src, propertyId)
+            local m = Nyx.Services.GetMeterByPropertyId(propertyId)
+            return { success = (m ~= nil), meter = m }
+        end)
+
+        -- Query utility invoice history
+        exports['nyx_core']:RegisterRPC("services:getUtilityInvoices", function(src, payload)
+            local meterId = type(payload) == "table" and payload.meterId or payload
+            local limit = type(payload) == "table" and payload.limit or 10
+            local invoices = Nyx.Services.GetUtilityInvoices(meterId, limit)
+            return { success = true, invoices = invoices }
+        end)
+
+        -- Query dynamic substation grid load telemetry
+        exports['nyx_core']:RegisterRPC("services:getSubstationGridLoad", function(src, substationId)
+            local mw, metrics = Nyx.Services.GetSubstationGridLoad(substationId)
+            return { success = true, loadMw = mw, metrics = metrics }
+        end)
+
+        -- Administrative Power Cut-off Enforcement
+        exports['nyx_core']:RegisterRPC("services:enforcePowerCutoff", function(src, payload)
+            local player = Nyx.GetPlayer(src)
+            if not player or not player.hasPermission or not player.hasPermission("admin") then
+                return { success = false, error = "UNAUTHORIZED" }
+            end
+            local meterId = type(payload) == "table" and payload.meterId or payload
+            local reason = type(payload) == "table" and payload.reason or "Admin manual cutoff"
+            local ok, res = Nyx.Services.EnforcePowerCutoff(meterId, reason, player.citizenId)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- Administrative Utility Reconnection
+        exports['nyx_core']:RegisterRPC("services:reconnectUtility", function(src, meterId)
+            local player = Nyx.GetPlayer(src)
+            if not player or not player.hasPermission or not player.hasPermission("admin") then
+                return { success = false, error = "UNAUTHORIZED" }
+            end
+            local ok, res = Nyx.Services.ReconnectUtility(meterId, player.citizenId)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
         -- Query substation diagnostics telemetry
         exports['nyx_core']:RegisterRPC("services:getDiagnostics", function(src, substationId)
             local diag = Nyx.Services.GetSubstationDiagnostics(substationId)

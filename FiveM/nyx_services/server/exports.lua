@@ -52,13 +52,45 @@ exports("HydrateSubstationRecord", function(subId, dbRow, cfgSub)
     return Nyx.Services.HydrateSubstationRecord(subId, dbRow, cfgSub)
 end)
 
--- Metered Utility Billing
-exports("RegisterUtilityMeter", function(meterId, ownerCitId, substationId, propertyType)
-    return Nyx.Services.RegisterMeter(meterId, ownerCitId, substationId, propertyType)
+-- Metered Utility Billing & Grid Load
+exports("RegisterUtilityMeter", function(meterId, ownerCitId, substationId, propertyType, propertyId)
+    return Nyx.Services.RegisterMeter(meterId, ownerCitId, substationId, propertyType, propertyId)
 end)
 
 exports("RecordUtilityConsumption", function(meterId, kwh, water)
     return Nyx.Services.RecordConsumption(meterId, kwh, water)
+end)
+
+exports("GetUtilityMeter", function(meterId)
+    return Nyx.Services.GetMeter(meterId)
+end)
+
+exports("GetMeterByPropertyId", function(propertyId)
+    return Nyx.Services.GetMeterByPropertyId(propertyId)
+end)
+
+exports("GetUtilityInvoices", function(meterId, limit)
+    return Nyx.Services.GetUtilityInvoices(meterId, limit)
+end)
+
+exports("GetSubstationGridLoad", function(substationId)
+    return Nyx.Services.GetSubstationGridLoad(substationId)
+end)
+
+exports("ProcessUtilityBillingCycle", function()
+    return Nyx.Services.ProcessUtilityBillingCycle()
+end)
+
+exports("PayUtilityBill", function(src, meterId, amount)
+    return Nyx.Services.PayUtilityBill(src, meterId, amount)
+end)
+
+exports("EnforcePowerCutoff", function(meterId, reason, actorCitizenId)
+    return Nyx.Services.EnforcePowerCutoff(meterId, reason, actorCitizenId)
+end)
+
+exports("ReconnectUtility", function(meterId, actorCitizenId)
+    return Nyx.Services.ReconnectUtility(meterId, actorCitizenId)
 end)
 
 -- Healthcare & Hospitals

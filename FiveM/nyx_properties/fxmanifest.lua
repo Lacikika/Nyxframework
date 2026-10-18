@@ -17,6 +17,7 @@ version '1.1.0'
 
 shared_scripts {
     '@nyx_services/shared/sabotage.lua',
+    '@nyx_services/shared/metering.lua',
     'config.lua',
     'shared/taxation.lua',
     'shared/inactivity.lua',

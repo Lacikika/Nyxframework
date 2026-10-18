@@ -112,6 +112,8 @@ MySQL.ready(function()
                 hasAlarm = (tonumber(r.has_alarm) == 1 or r.has_alarm == nil),
                 hasBackupGenerator = (tonumber(r.has_backup_generator) == 1),
                 alarmStatus = r.alarm_status or "armed",
+                isUtilitySuspended = (tonumber(r.is_utility_suspended) == 1),
+                utilityStatus = r.utility_status or "normal",
                 stashId = r.stash_inventory_id,
                 meterId = r.utility_meter_id,
                 linkedSubstation = r.linked_substation_id
@@ -128,7 +130,7 @@ MySQL.ready(function()
 
             -- Register meter in nyx_services if owned
             if r.owner_citizen_id and exports['nyx_services'] and exports['nyx_services'].RegisterMeter then
-                exports['nyx_services']:RegisterMeter(propData.meterId, r.owner_citizen_id, propData.linkedSubstation, r.type)
+                exports['nyx_services']:RegisterMeter(propData.meterId, r.owner_citizen_id, propData.linkedSubstation, r.type, r.property_id)
             end
         end
         print(string.format("^2[Nyx:Properties] Loaded %d real estate properties into server memory.^7", #rows))
@@ -163,7 +165,10 @@ exports['nyx_core']:RegisterRPC("properties:getProperties", function(src, filter
             hasKey = hasKey,
             keyTier = tier or 0,
             isLocked = p.isLocked,
-            entrance = p.entrance
+            entrance = p.entrance,
+            isUtilitySuspended = p.isUtilitySuspended or false,
+            utilityStatus = p.utilityStatus or "normal",
+            meterId = p.meterId
         }
     end
 
@@ -239,7 +244,7 @@ exports['nyx_core']:RegisterRPC("properties:buyProperty", function(src, property
 
     -- Register utility meter in nyx_services
     if exports['nyx_services'] and exports['nyx_services'].RegisterMeter then
-        exports['nyx_services']:RegisterMeter(prop.meterId, player.citizenId, prop.linkedSubstation, prop.type)
+        exports['nyx_services']:RegisterMeter(prop.meterId, player.citizenId, prop.linkedSubstation, prop.type, propertyId)
     end
 
     return { success = true, propertyId = propertyId, label = prop.label }
@@ -271,10 +276,13 @@ exports['nyx_core']:RegisterRPC("properties:enterProperty", function(src, proper
         return { success = false, error = "TOO_FAR_FROM_ENTRANCE" }
     end
 
-    -- Check sector electrical power status
+    -- Check sector electrical power status & utility delinquency cut-off
     local isPowered, blackoutSubId = true, nil
     if exports['nyx_services'] and exports['nyx_services'].IsCoordsPowered then
         isPowered, blackoutSubId = exports['nyx_services']:IsCoordsPowered(prop.entrance)
+    end
+    if prop.isUtilitySuspended and not prop.hasBackupGenerator then
+        isPowered = false
     end
 
     local effectiveLocked, lockStateDesc, isBreached = false, "ONLINE", false

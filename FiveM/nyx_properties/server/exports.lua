@@ -125,3 +125,8 @@ exports('GetAuctionBidsHistory', function(auctionId, citizenId)
     return {}
 end)
 
+exports('IsPropertyUtilitySuspended', function(propertyId)
+    local prop = Nyx.Properties.Loaded and Nyx.Properties.Loaded[tonumber(propertyId)]
+    return prop and prop.isUtilitySuspended or false
+end)
+

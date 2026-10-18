@@ -99,7 +99,7 @@ Config.DefaultProperties = {
         initialCondition = 100.00,
         entrance = { x = -269.4, y = -955.3, z = 31.2, h = 205.0 },
         interior = { x = -266.3, y = -960.2, z = -20.0, h = 0.0 }, -- Virtual Shell / MLO coords
-        linkedSubstation = "substation_central"
+        linkedSubstation = "grid_central_ls"
     },
     {
         code = "store_vinewood_24",
@@ -112,7 +112,7 @@ Config.DefaultProperties = {
         initialCondition = 100.00,
         entrance = { x = 373.8, y = 325.8, z = 103.5, h = 255.0 },
         interior = { x = 378.1, y = 330.2, z = -20.0, h = 0.0 },
-        linkedSubstation = "substation_north"
+        linkedSubstation = "grid_central_ls"
     },
     {
         code = "wh_elysian_04",
@@ -125,6 +125,6 @@ Config.DefaultProperties = {
         initialCondition = 100.00,
         entrance = { x = 145.2, y = -3105.8, z = 5.9, h = 90.0 },
         interior = { x = 150.5, y = -3110.2, z = -20.0, h = 0.0 },
-        linkedSubstation = "substation_south"
+        linkedSubstation = "grid_port_ls"
     }
 }

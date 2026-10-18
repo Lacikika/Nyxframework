@@ -75,6 +75,25 @@ CreateThread(function()
                             end
                         },
                         {
+                            label = "Közműóra Ellenőrzése (Villany & Víz)",
+                            icon = "fa-solid fa-gauge-high",
+                            action = function()
+                                local targetId = prop.meterId or prop.code or prop.id
+                                ExecuteCommand(string.format("checkmeter %s", tostring(targetId)))
+                            end
+                        },
+                        {
+                            label = "Közműszámla / Hátralék Befizetése",
+                            icon = "fa-solid fa-bolt",
+                            action = function()
+                                local meterId = prop.meterId or string.format("meter:prop:%s", prop.code)
+                                ExecuteCommand(string.format("payutility %s", tostring(meterId)))
+                            end,
+                            canInteract = function()
+                                return prop.isOwnedByMe or prop.isUtilitySuspended
+                            end
+                        },
+                        {
                             label = "Árverési Információ",
                             icon = "fa-solid fa-gavel",
                             action = function()

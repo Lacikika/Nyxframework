@@ -19,7 +19,8 @@ shared_scripts {
     'shared/trauma.lua',
     'shared/medical.lua',
     'shared/agriculture.lua',
-    'shared/sabotage.lua'
+    'shared/sabotage.lua',
+    'shared/metering.lua'
 }
 
 server_scripts {
@@ -39,6 +40,7 @@ client_scripts {
     'client/blackout.lua',
     'client/substations.lua',
     'client/sabotage.lua',
+    'client/metering.lua',
     'client/repair_stations.lua',
     'client/trauma.lua',
     'client/agriculture.lua',
