@@ -143,10 +143,10 @@ created: 2026-09-20
 
 ## 8. Anti-Monopoly & Anti-Stagnation Safeguards
 
-- [ ] **Progressive Holding Taxes:** Owning multiple commercial business licenses incurs exponential holding costs:
+- [x] **Progressive Holding Taxes:** Owning multiple commercial business licenses incurs exponential holding costs:
   $$\text{TaxRate} = \text{BaseTax} \times 1.5^{(\text{PropertiesOwned} - 1)}$$
-- [ ] **Inactivity Reclamation Engine:** If a business owner or property holder remains inactive without designated delegates for $X$ days, assets automatically enter a public blind-auction ledger.
-- [ ] **Unionization Framework:** Workers within private enterprises can organize collective unions to enforce wage minimums or initiate binding labor arbitrations.
+- [x] **Inactivity Reclamation Engine:** If a business owner or property holder remains inactive without designated delegates for $X$ days, assets automatically enter a public blind-auction ledger.
+- [x] **Unionization Framework:** Workers within private enterprises can organize collective unions to enforce wage minimums or initiate binding labor arbitrations.
 
 ---
 

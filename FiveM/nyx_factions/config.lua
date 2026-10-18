@@ -117,3 +117,12 @@ Config.Unions = {
         ['civil'] = "Civil Administration & Municipal Staff"
     }
 }
+
+-- Inactivity Succession & Liquidation Parameters
+Config.Succession = {
+    FounderInactivityThresholdSeconds = 14 * 86400,
+    StewardMaxExtensionSeconds = 16 * 86400,
+    GracePeriodSeconds = 3 * 86400,
+    MunicipalMasterSplitRatio = 0.85,
+    PublicWorksSplitRatio = 0.15
+}

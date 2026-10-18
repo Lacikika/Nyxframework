@@ -15,7 +15,8 @@ version '1.0.0'
 
 shared_scripts {
     'config.lua',
-    'shared/unions.lua'
+    'shared/unions.lua',
+    'shared/succession.lua'
 }
 
 server_scripts {
@@ -27,6 +28,7 @@ server_scripts {
     'server/dividends.lua',
     'server/unions.lua',
     'server/cba.lua',
+    'server/inactivity.lua',
     'server/fleet.lua',
     'server/main.lua',
     'server/exports.lua'

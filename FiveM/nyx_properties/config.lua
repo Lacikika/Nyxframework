@@ -68,6 +68,15 @@ Config.Taxation = {
     }
 }
 
+Config.Inactivity = {
+    SweeperIntervalSeconds = 300,                  -- Check inactivity every 5 minutes
+    OwnerInactivityThresholdSeconds = 14 * 86400,  -- 14 days without login
+    StewardMaxExtensionSeconds = 16 * 86400,       -- +16 days if steward active (total 30 days)
+    GracePeriodSeconds = 3 * 86400,                -- 72 hours warning countdown
+    AuctionMinBidDiscount = 0.50,                  -- 50% starting bid
+    AbsoluteMinBidFloor = 1000.00
+}
+
 Config.Keys = {
     Tiers = {
         GUEST = 1,          -- Read-only entry when door is unlocked or buzzed

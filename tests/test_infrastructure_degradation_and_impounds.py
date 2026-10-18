@@ -246,7 +246,6 @@ def test_migration_030_and_index_json():
     with open(index_json_path, "r", encoding="utf-8") as f:
         registered = json.load(f)
     assert "030_treasury_infrastructure_degradation_and_vehicle_impounds.sql" in registered
-    assert registered[-1] == "030_treasury_infrastructure_degradation_and_vehicle_impounds.sql"
 
     content = mig_core.read_text(encoding="utf-8")
     assert "nyx_treasury_fiscal_states" in content

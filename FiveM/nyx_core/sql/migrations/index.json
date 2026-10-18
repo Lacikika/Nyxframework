@@ -28,5 +28,6 @@
   "027_properties_progressive_millage_and_maintenance_taxation.sql",
   "028_factions_trade_unions_and_collective_bargaining.sql",
   "029_judiciary_subpoenas_and_warrant_tracking.sql",
-  "030_treasury_infrastructure_degradation_and_vehicle_impounds.sql"
+  "030_treasury_infrastructure_degradation_and_vehicle_impounds.sql",
+  "031_inactivity_reclamation_and_stewardship.sql"
 ]

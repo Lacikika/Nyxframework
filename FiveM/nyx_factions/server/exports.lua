@@ -210,3 +210,27 @@ end)
 exports("ExecuteArbitrationAward", function(arbitratorCitId, strikeId, underpaidHours, hourlyDeficit, penaltyRate, revisedWageFloor)
     return Nyx.Factions.ExecuteArbitrationAward(arbitratorCitId, strikeId, underpaidHours, hourlyDeficit, penaltyRate, revisedWageFloor)
 end)
+
+-- Inactivity & Succession Exports
+exports("CheckFactionInactivity", function()
+    if Nyx.Factions.CheckFactionInactivity then
+        return Nyx.Factions.CheckFactionInactivity()
+    end
+    return nil
+end)
+
+exports("SetFactionStewardDelegate", function(src, factionId, delegateCitizenId)
+    if Nyx.Factions.SetFactionStewardDelegate then
+        return Nyx.Factions.SetFactionStewardDelegate(src, factionId, delegateCitizenId)
+    end
+    return false, "UNAVAILABLE"
+end)
+
+exports("GetFactionInactivityStatus", function(factionId)
+    return MySQL.single.await([[
+        SELECT `faction_id`, `legal_name`, `founder_citizen_id`, `steward_delegate_citizen_id`,
+               `inactivity_status`, `inactivity_warning_at`, `is_active`
+        FROM `nyx_factions_registry`
+        WHERE `faction_id` = ?
+    ]], { factionId })
+end)

@@ -83,6 +83,13 @@ CreateThread(function()
                             canInteract = function()
                                 return prop.reclaimedForAuction == true
                             end
+                        },
+                        {
+                            label = "Gondnoksági Áttekintés",
+                            icon = "fa-solid fa-user-shield",
+                            action = function()
+                                Nyx.Properties.ShowStewardshipOverview()
+                            end
                         }
                     },
                     distance = 2.0

@@ -70,10 +70,37 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] Feature: Trade unionization framework, collective bargaining agreements & binding labor arbitration (`nyx_factions` / `nyx_treasury` / `nyx_judiciary`)
 - [x] Feature: Judicial subpoenas, probable cause warrants & live MDT dispatch tracking integration (`nyx_judiciary` / `nyx_mdt`)
 - [x] Feature: Municipal infrastructure degradation mode, civic impound reclamation & vehicle registration revenue (`nyx_treasury` / `nyx_vehicles` / `nyx_services`)
-
+- [x] Feature: Anti-monopoly inactivity reclamation engine, stewardship delegates & public blind-auction liquidation (`nyx_properties` / `nyx_factions` / `nyx_treasury`)
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Anti-monopoly inactivity reclamation engine, stewardship delegates & public blind-auction liquidation (`nyx_properties` / `nyx_factions` / `nyx_treasury`)**
+  - **Database Migration & Schema Extensions (`031_inactivity_reclamation_and_stewardship.sql`, `index.json`)**:
+    - Extended `nyx_characters` with `last_active_at` tracking timestamp on save and batch flush.
+    - Extended `nyx_properties` with `steward_delegate_citizen_id`, `inactivity_status` (`active`, `delegated`, `grace_period`, `reclaimed_for_auction`), `inactivity_warning_at`, and `reclaimed_at`.
+    - Extended `nyx_factions_registry` with `founder_citizen_id`, `steward_delegate_citizen_id`, `inactivity_status` (`active`, `delegated`, `grace_period`, `succession_pending`, `liquidated`), `inactivity_warning_at`, and `liquidated_at`.
+    - Created `nyx_stewardship_delegates` table for formal proxy authorizations (`owner_citizen_id`, `delegate_citizen_id`, `scope` [`all`, `properties`, `factions`], `is_active`, `authorized_at`, `revoked_at`).
+    - Created `nyx_inactivity_reclamation_logs` table maintaining an immutable audit history of issued grace period warnings, warning clearances, blind auction forfeitures, democratic succession executions, and charter liquidations with double-entry treasury transaction references.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 31) and mirrored to `nyx_properties` and `nyx_factions`.
+  - **Pure Lua 5.4 Shared Engines (`nyx_properties/shared/inactivity.lua`, `nyx_factions/shared/succession.lua`, `fxmanifest.lua`)**:
+    - *Stewardship Delegate Authorization Validator (`Nyx.Inactivity.ValidateDelegation`)*: Validates citizen presence, rejects self-delegation attempts, and validates scope limits (`all`, `properties`, `factions`).
+    - *Dormancy & Stewardship State Machine Evaluator (`Nyx.Inactivity.EvaluateStewardshipStatus`)*: Evaluates owner active presence within 14-day threshold ($1,209,600\text{s}$); grants active delegate protection up to a 30-day total ceiling ($2,592,000\text{s}$); initiates a 72-hour grace period ($259,200\text{s}$) upon dormancy, and transitions expired grace periods to `forfeited`.
+    - *Blind-Auction Minimum Bid Floor Clamping (`Nyx.Inactivity.CalculateAuctionMinimumBid`)*: Calculates starting bid at 50% valuation with a statutory $1,000.00 floor.
+    - *Democratic Organization Succession Evaluator (`Nyx.Succession.DetermineSuccessor`)*: Filters active members within 14 days, ranking by highest equity shares, hourly wage, and hiring seniority; falls back to `liquidation` if no active members remain.
+    - *Closed-Loop Corporate Charter Treasury Distribution (`Nyx.Succession.CalculateCharterLiquidationDistribution`)*: Enforces exact double-entry treasury conservation ($\Delta = 0.00$, $\sum \text{Credits} == \text{TotalLiquidated}$) splitting abandoned funds between City Master Reserve (85%) and Public Works (15%).
+  - **Authoritative Server Inactivity Sweepers & Succession Subsystems (`nyx_properties/server/inactivity.lua`, `nyx_factions/server/inactivity.lua`, `nyx_properties/server/exports.lua`, `nyx_factions/server/exports.lua`, `nyx_core/server/player.lua`)**:
+    - *Automatic Activity Tracking*: Injected `last_active_at = NOW()` into character saves and batch flush queries in `nyx_core/server/player.lua`.
+    - *Periodic Property Inactivity Sweeper*: Runs a background sweeper checking owned real estate; clears warnings if owner or steward connects; issues formal 72h grace period notices; executes forfeiture to `nyx_property_auctions` with key revoking and audit logging upon grace expiration.
+    - *Cross-Resource Faction Inactivity Sweeper*: Sweeps registered enterprises; detects founder dormancy; triggers democratic succession promoting top active equity holders to CEO; executes charter dissolution and closed-loop treasury balance transfers to `gov:city:master` and `gov:dept:works`.
+    - *RPC Endpoints & Server Exports*: Registered `properties:registerStewardDelegate`, `properties:revokeStewardDelegate`, `properties:assignPropertySteward`, `properties:getMyStewardship`, `properties:getInactivityAuditLogs`, `factions:setFactionStewardDelegate`, and `factions:getFactionInactivityStatus`.
+  - **Client UI & Third-Eye (`LALT`) Integration (`nyx_properties/client/inactivity.lua`, `client/interact.lua`)**:
+    - Added Third-Eye option at property entrances: "Gondnoksági Áttekintés" (`fa-solid fa-user-shield`).
+    - Added player commands: `/setdelegate <citizenId> [scope]`, `/revokedelegate <citizenId>`, `/assignsteward <propertyId> <citizenId>`, and `/mystewardship`.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestInactivityReclamationAndStewardship()` (Test 25) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created standalone Python test suite `tests/test_inactivity_reclamation_engine.py` validating 10 distinct test scenarios (stewardship validation, self-delegation guards, owner active presence, delegate protection windows, 72h grace period math, blind auction minimum bid clamping, democratic succession selection, double-entry liquidation conservation, state machine transition rules, and SQL migration/manifest integrity).
+    - Full pytest suite: 205/205 tests passing (100% pass rate).
+    - Verified clean passes across all 13 resources, 194 Lua files, and all 31 SQL migrations via `scripts/validator.py` and `scripts/verify.ps1`.
 - **[2026-10-18] Feature: Municipal infrastructure degradation mode, civic impound reclamation & vehicle registration revenue (`nyx_treasury` / `nyx_vehicles` / `nyx_services`)**
   - **Database Migration & Schema Extensions (`030_treasury_infrastructure_degradation_and_vehicle_impounds.sql`, `index.json`)**:
     - Created `nyx_treasury_fiscal_states` table tracking municipal solvency states (`master_account_id`, `liquid_balance`, `fiscal_tier` [`solvent`, `fiscal_stress`, `degraded`, `bankrupt`], `auto_repair_status`, `impound_lot_status`, `ai_dispatch_latency_sec`, `notes`, `evaluated_at`).

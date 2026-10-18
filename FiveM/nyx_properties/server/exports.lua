@@ -75,3 +75,38 @@ exports('SettleAuction', function(auctionId)
     end
     return false, "UNAVAILABLE"
 end)
+
+exports('RegisterStewardshipDelegate', function(ownerCitizenId, delegateCitizenId, scope, notes)
+    if Nyx.Properties.RegisterStewardshipDelegate then
+        return Nyx.Properties.RegisterStewardshipDelegate(ownerCitizenId, delegateCitizenId, scope, notes)
+    end
+    return false, "UNAVAILABLE"
+end)
+
+exports('RevokeStewardshipDelegate', function(ownerCitizenId, delegateCitizenId, scope)
+    if Nyx.Properties.RevokeStewardshipDelegate then
+        return Nyx.Properties.RevokeStewardshipDelegate(ownerCitizenId, delegateCitizenId, scope)
+    end
+    return false, "UNAVAILABLE"
+end)
+
+exports('AssignPropertySteward', function(propertyId, ownerCitizenId, delegateCitizenId)
+    if Nyx.Properties.AssignPropertySteward then
+        return Nyx.Properties.AssignPropertySteward(propertyId, ownerCitizenId, delegateCitizenId)
+    end
+    return false, "UNAVAILABLE"
+end)
+
+exports('GetCitizenStewardshipOverview', function(citizenId)
+    if Nyx.Properties.GetCitizenStewardshipOverview then
+        return Nyx.Properties.GetCitizenStewardshipOverview(citizenId)
+    end
+    return nil
+end)
+
+exports('SweepPropertyInactivity', function()
+    if Nyx.Properties.SweepPropertyInactivity then
+        return Nyx.Properties.SweepPropertyInactivity()
+    end
+    return nil
+end)

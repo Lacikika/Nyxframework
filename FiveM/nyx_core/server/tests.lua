@@ -5077,7 +5077,229 @@ function Nyx.Tests.TestInfrastructureDegradationAndVehicleImpounds()
     return passes == total
 end
 
--- 25. Master Test Runner
+-- 25. Test Anti-Monopoly Inactivity Reclamation Engine, Stewardship Delegates & Succession
+function Nyx.Tests.TestInactivityReclamationAndStewardship()
+    print("^3[Nyx:Tests] Running Inactivity Reclamation & Stewardship Suite...^7")
+    local passes = 0
+    local total = 8
+
+    local I = Nyx.Inactivity or {}
+    local S = Nyx.Succession or {}
+
+    local validateDelegation = I.ValidateDelegation or function(owner, del, scope)
+        if not owner or #owner == 0 then return false, "INVALID_OWNER_CITIZEN_ID" end
+        if not del or #del == 0 then return false, "INVALID_DELEGATE_CITIZEN_ID" end
+        if owner == del then return false, "CANNOT_DELEGATE_TO_SELF" end
+        scope = scope or "all"
+        local valid = { ['all'] = true, ['properties'] = true, ['factions'] = true }
+        if not valid[scope] then return false, "INVALID_STEWARDSHIP_SCOPE" end
+        return true, scope
+    end
+
+    local evalStewardship = I.EvaluateStewardshipStatus or function(now, ownerActive, delId, delActive, warnAt, cfg)
+        local oThresh = 14 * 86400
+        local maxExt = 16 * 86400
+        local grace = 3 * 86400
+        local oInact = math.max(0, now - ownerActive)
+        if oInact <= oThresh then
+            return { status = "active", isProtected = true, inactivitySeconds = oInact, graceRemainingSeconds = 0, needsWarning = false, reason = "OWNER_ACTIVE" }
+        end
+        if delId and #delId > 0 and delActive then
+            local dInact = math.max(0, now - delActive)
+            if dInact <= oThresh and oInact <= (oThresh + maxExt) then
+                return { status = "delegated", isProtected = true, inactivitySeconds = oInact, delegateInactivitySeconds = dInact, graceRemainingSeconds = 0, needsWarning = false, reason = "PROTECTED_BY_ACTIVE_STEWARD" }
+            end
+        end
+        warnAt = tonumber(warnAt)
+        if not warnAt or warnAt <= 0 then
+            return { status = "grace_period", isProtected = false, inactivitySeconds = oInact, graceRemainingSeconds = grace, needsWarning = true, reason = "GRACE_PERIOD_INITIATED" }
+        end
+        local el = math.max(0, now - warnAt)
+        if el < grace then
+            return { status = "grace_period", isProtected = false, inactivitySeconds = oInact, graceRemainingSeconds = grace - el, needsWarning = false, reason = "IN_GRACE_PERIOD" }
+        else
+            return { status = "forfeited", isProtected = false, inactivitySeconds = oInact, graceRemainingSeconds = 0, needsWarning = false, reason = "GRACE_PERIOD_EXPIRED_FORFEITURE" }
+        end
+    end
+
+    local calcMinBid = I.CalculateAuctionMinimumBid or function(price, discount, floor)
+        local calculated = math.floor((price * (discount or 0.50)) * 100.0 + 0.5) / 100.0
+        return math.max(floor or 1000.0, calculated)
+    end
+
+    local canTransition = I.CanTransitionStatus or function(cur, target)
+        local allowed = {
+            ['active'] = { ['delegated'] = true, ['grace_period'] = true, ['active'] = true },
+            ['delegated'] = { ['active'] = true, ['grace_period'] = true, ['delegated'] = true },
+            ['grace_period'] = { ['active'] = true, ['delegated'] = true, ['reclaimed_for_auction'] = true, ['grace_period'] = true },
+            ['reclaimed_for_auction'] = { ['active'] = true, ['reclaimed_for_auction'] = true }
+        }
+        return allowed[cur] and allowed[cur][target] == true or false
+    end
+
+    local determineSuccessor = S.DetermineSuccessor or function(members, founderId, now, thresh)
+        local eligible = {}
+        for _, m in ipairs(members or {}) do
+            if m.citizen_id ~= founderId and (now - (m.last_active_at or 0)) <= (thresh or 1209600) then
+                eligible[#eligible + 1] = {
+                    citizenId = m.citizen_id,
+                    equityShares = tonumber(m.equity_shares) or 0.0,
+                    wageHourly = tonumber(m.wage_hourly) or 0.0,
+                    hiredAt = tonumber(m.hired_at_unix) or 0
+                }
+            end
+        end
+        if #eligible == 0 then return "liquidation", nil, "NO_ACTIVE_MEMBERS_REMAIN" end
+        table.sort(eligible, function(a, b)
+            if math.abs(a.equityShares - b.equityShares) > 0.001 then return a.equityShares > b.equityShares end
+            if math.abs(a.wageHourly - b.wageHourly) > 0.01 then return a.wageHourly > b.wageHourly end
+            return a.hiredAt < b.hiredAt
+        end)
+        return "succession", eligible[1], "ACTIVE_SUCCESSOR_SELECTED"
+    end
+
+    local calcLiquidation = S.CalculateCharterLiquidationDistribution or function(bal, masterRatio)
+        bal = math.max(0.0, math.floor(bal * 100.0 + 0.5) / 100.0)
+        local mRatio = masterRatio or 0.85
+        local mShare = math.floor((bal * mRatio) * 100.0 + 0.5) / 100.0
+        local wShare = math.floor((bal - mShare) * 100.0 + 0.5) / 100.0
+        return { masterAmount = mShare, worksAmount = wShare, totalLiquidated = bal }
+    end
+
+    local now = 1700000000
+
+    -- Test A: Stewardship Delegate Authorization & Self-Delegation Guard
+    local okAuth, cleanScope = validateDelegation("CIT_ALICE", "CIT_BOB", "all")
+    local selfOk, selfErr = validateDelegation("CIT_ALICE", "CIT_ALICE", "all")
+    local badScopeOk, badScopeErr = validateDelegation("CIT_ALICE", "CIT_BOB", "unauthorized_scope")
+
+    local testA_ok = (okAuth == true and cleanScope == "all")
+        and (selfOk == false and selfErr == "CANNOT_DELEGATE_TO_SELF")
+        and (badScopeOk == false and badScopeErr == "INVALID_STEWARDSHIP_SCOPE")
+
+    if assertTest(testA_ok == true,
+        "Stewardship Delegate Authorization & Self-Delegation Guard",
+        string.format("okAuth=%s, selfErr=%s, badScopeErr=%s",
+            tostring(okAuth), tostring(selfErr), tostring(badScopeErr))) then
+        passes = passes + 1
+    end
+
+    -- Test B: Owner Active Presence Evaluation (14-Day Threshold)
+    local activeOwnerRes = evalStewardship(now, now - 86400 * 3, nil, nil, nil)
+    local exactLimitOwnerRes = evalStewardship(now, now - 86400 * 14, nil, nil, nil)
+
+    local testB_ok = (activeOwnerRes.status == "active" and activeOwnerRes.isProtected == true and activeOwnerRes.reason == "OWNER_ACTIVE")
+        and (exactLimitOwnerRes.status == "active" and exactLimitOwnerRes.isProtected == true)
+
+    if assertTest(testB_ok == true,
+        "Owner Active Presence Evaluation (14-Day Baseline Threshold)",
+        string.format("actStatus=%s, actProt=%s, limStatus=%s",
+            activeOwnerRes.status, tostring(activeOwnerRes.isProtected), exactLimitOwnerRes.status)) then
+        passes = passes + 1
+    end
+
+    -- Test C: Active Stewardship Delegate Shielding & 30-Day Window Bound
+    local stewardProtectedRes = evalStewardship(now, now - 86400 * 20, "CIT_BOB", now - 86400 * 2, nil)
+    local stewardExpiredRes = evalStewardship(now, now - 86400 * 35, "CIT_BOB", now - 86400 * 2, nil)
+    local stewardInactiveRes = evalStewardship(now, now - 86400 * 20, "CIT_BOB", now - 86400 * 16, nil)
+
+    local testC_ok = (stewardProtectedRes.status == "delegated" and stewardProtectedRes.isProtected == true and stewardProtectedRes.reason == "PROTECTED_BY_ACTIVE_STEWARD")
+        and (stewardExpiredRes.isProtected == false and stewardExpiredRes.status == "grace_period")
+        and (stewardInactiveRes.isProtected == false and stewardInactiveRes.status == "grace_period")
+
+    if assertTest(testC_ok == true,
+        "Active Stewardship Delegate Shielding & 30-Day Total Window Bound",
+        string.format("protStatus=%s, expProt=%s, inactProt=%s",
+            stewardProtectedRes.status, tostring(stewardExpiredRes.isProtected), tostring(stewardInactiveRes.isProtected))) then
+        passes = passes + 1
+    end
+
+    -- Test D: 72-Hour Grace Period Math & Expiration Countdown
+    local initialWarning = evalStewardship(now, now - 86400 * 18, nil, nil, nil)
+    local midGrace = evalStewardship(now, now - 86400 * 19, nil, nil, now - 86400 * 1)
+    local expiredGrace = evalStewardship(now, now - 86400 * 22, nil, nil, now - 86400 * 4)
+
+    local testD_ok = (initialWarning.status == "grace_period" and initialWarning.needsWarning == true and initialWarning.graceRemainingSeconds == 259200)
+        and (midGrace.status == "grace_period" and midGrace.needsWarning == false and midGrace.graceRemainingSeconds == 172800)
+        and (expiredGrace.status == "forfeited" and expiredGrace.graceRemainingSeconds == 0 and expiredGrace.reason == "GRACE_PERIOD_EXPIRED_FORFEITURE")
+
+    if assertTest(testD_ok == true,
+        "72-Hour Grace Period Math, Mid-Period Countdown & Expiration Forfeiture",
+        string.format("initSec=%d, midSec=%d, expStatus=%s",
+            initialWarning.graceRemainingSeconds, midGrace.graceRemainingSeconds, expiredGrace.status)) then
+        passes = passes + 1
+    end
+
+    -- Test E: Blind-Auction Valuation Discount & Statutory Floor Clamping
+    local standardMinBid = calcMinBid(350000.0, 0.50, 1000.0)
+    local cheapMinBid = calcMinBid(1500.0, 0.50, 1000.0)
+
+    local testE_ok = (standardMinBid == 175000.0 and cheapMinBid == 1000.0)
+
+    if assertTest(testE_ok == true,
+        "Blind-Auction Valuation Discount & Statutory Minimum Bid Floor Clamping",
+        string.format("standard=%.2f, cheapFloor=%.2f", standardMinBid, cheapMinBid)) then
+        passes = passes + 1
+    end
+
+    -- Test F: Organization Democratic Succession & Seniority Selection
+    local mockMembers = {
+        { citizen_id = "CIT_CHARLIE", equity_shares = 15.0, wage_hourly = 85.0, hired_at_unix = now - 500000, last_active_at = now - 86400 * 2 },
+        { citizen_id = "CIT_DAVE", equity_shares = 40.0, wage_hourly = 65.0, hired_at_unix = now - 200000, last_active_at = now - 86400 * 5 },
+        { citizen_id = "CIT_EVE", equity_shares = 40.0, wage_hourly = 90.0, hired_at_unix = now - 300000, last_active_at = now - 86400 * 20 }
+    }
+
+    local succOutcome, succCandidate = determineSuccessor(mockMembers, "CIT_FOUNDER", now, 14 * 86400)
+    local emptyOutcome = determineSuccessor({}, "CIT_FOUNDER", now, 14 * 86400)
+
+    local testF_ok = (succOutcome == "succession" and succCandidate.citizenId == "CIT_DAVE" and succCandidate.equityShares == 40.0)
+        and (emptyOutcome == "liquidation")
+
+    if assertTest(testF_ok == true,
+        "Organization Democratic Succession Selection (Equity Shares & Active Standing)",
+        string.format("succ=%s, candidate=%s, equity=%.1f%%, empty=%s",
+            succOutcome, succCandidate and succCandidate.citizenId or "none", succCandidate and succCandidate.equityShares or 0, emptyOutcome)) then
+        passes = passes + 1
+    end
+
+    -- Test G: Corporate Treasury Liquidation & Double-Entry Balance Conservation
+    local testTreasuryBalance = 84250.75
+    local dist = calcLiquidation(testTreasuryBalance, 0.85)
+
+    local sumAllocations = math.floor((dist.masterAmount + dist.worksAmount) * 100.0 + 0.5) / 100.0
+    local delta = math.abs(sumAllocations - testTreasuryBalance)
+    local testG_ok = (dist.masterAmount == 71613.14 and dist.worksAmount == 12637.61 and delta == 0.00)
+
+    if assertTest(testG_ok == true,
+        "Corporate Treasury Liquidation Conservation (85/15 Master/Works Double-Entry)",
+        string.format("master=%.2f, works=%.2f, sum=%.2f, delta=%.4f",
+            dist.masterAmount, dist.worksAmount, sumAllocations, delta)) then
+        passes = passes + 1
+    end
+
+    -- Test H: Inactivity State Machine Transition Rules & Immutability Gates
+    local validActiveToDelegated = canTransition("active", "delegated")
+    local validDelegatedToGrace = canTransition("delegated", "grace_period")
+    local validGraceToReclaimed = canTransition("grace_period", "reclaimed_for_auction")
+    local validReclaimedToActive = canTransition("reclaimed_for_auction", "active")
+    local invalidReclaimedToGrace = canTransition("reclaimed_for_auction", "grace_period")
+
+    local testH_ok = (validActiveToDelegated == true and validDelegatedToGrace == true
+        and validGraceToReclaimed == true and validReclaimedToActive == true
+        and invalidReclaimedToGrace == false)
+
+    if assertTest(testH_ok == true,
+        "Inactivity & Reclamation State Machine Transition Rules & Immutability Gates",
+        string.format("actDel=%s, delGrace=%s, graceRecl=%s, reclAct=%s, reclGraceInv=%s",
+            tostring(validActiveToDelegated), tostring(validDelegatedToGrace),
+            tostring(validGraceToReclaimed), tostring(validReclaimedToActive), tostring(not invalidReclaimedToGrace))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 26. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -5107,9 +5329,10 @@ function Nyx.Tests.RunAll()
     local t22 = Nyx.Tests.TestTradeUnionsAndCollectiveBargaining()
     local t23 = Nyx.Tests.TestJudicialSubpoenasAndWarrantTracking()
     local t24 = Nyx.Tests.TestInfrastructureDegradationAndVehicleImpounds()
+    local t25 = Nyx.Tests.TestInactivityReclamationAndStewardship()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

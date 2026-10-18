@@ -102,12 +102,13 @@ function Nyx.Factions.CreateCharter(src, legalName, charterType, initialDeposit)
     -- Step 4: Persist faction registry row
     local insertOk = MySQL.prepare.await([[
         INSERT INTO `nyx_factions_registry`
-            (`faction_id`, `legal_name`, `charter_type`, `treasury_account_id`, `primary_stash_id`,
-             `multisig_threshold_amount`, `multisig_required_signatures`)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+            (`faction_id`, `legal_name`, `founder_citizen_id`, `charter_type`, `treasury_account_id`, `primary_stash_id`,
+             `multisig_threshold_amount`, `multisig_required_signatures`, `inactivity_status`)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')
     ]], {
         factionId,
         legalName,
+        player.citizenId,
         charterType,
         corpTreasuryAcc,
         corpStashId,

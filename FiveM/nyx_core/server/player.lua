@@ -292,7 +292,8 @@ function PlayerObject:save()
         SET `wallets` = ?,
             `position` = ?,
             `metadata` = ?,
-            `is_dead` = ?
+            `is_dead` = ?,
+            `last_active_at` = NOW()
         WHERE `char_id` = ?
     ]]
 
@@ -366,7 +367,7 @@ CreateThread(function()
             for _, player in ipairs(dirtyList) do
                 player:getPosition()
                 queries[#queries + 1] = {
-                    query = "UPDATE `nyx_characters` SET `wallets` = ?, `position` = ?, `metadata` = ?, `is_dead` = ? WHERE `char_id` = ?",
+                    query = "UPDATE `nyx_characters` SET `wallets` = ?, `position` = ?, `metadata` = ?, `is_dead` = ?, `last_active_at` = NOW() WHERE `char_id` = ?",
                     values = {
                         json.encode(player.wallets),
                         json.encode(player.position),
