@@ -135,6 +135,11 @@ function Nyx.UI.SanitizePayload(data)
     if data.durationMinutes and type(data.durationMinutes) == "number" then sanitized.durationMinutes = math.max(10, math.min(1440, math.floor(data.durationMinutes))) end
     if data.dispatchId and (type(data.dispatchId) == "string" or type(data.dispatchId) == "number") then sanitized.dispatchId = tonumber(data.dispatchId) or tostring(data.dispatchId) end
     if data.temperatureZone and type(data.temperatureZone) == "string" then sanitized.temperatureZone = string.sub(data.temperatureZone, 1, 20) end
+    -- Vehicle Diagnostics & Civic Impound Terminal parameters
+    if data.vin and type(data.vin) == "string" then sanitized.vin = string.sub(data.vin, 1, 32) end
+    if data.plate and type(data.plate) == "string" then sanitized.plate = string.sub(data.plate, 1, 16) end
+    if data.serviceType and type(data.serviceType) == "string" then sanitized.serviceType = string.sub(data.serviceType, 1, 32) end
+    if data.lotId and type(data.lotId) == "string" then sanitized.lotId = string.sub(data.lotId, 1, 64) end
     if data.payload and type(data.payload) == "table" then
         sanitized.payload = Nyx.UI.SanitizePayload(data.payload)
     end
@@ -801,6 +806,68 @@ Nyx.UI.SafeNUICallback("logistics:reserveNode", function(data, cb)
         return cb(res or { success = false })
     end
     cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+-- Vehicle Diagnostics & Civic Impound Terminal NUI Callbacks
+Nyx.UI.SafeNUICallback("closeVehicleTerminal", function(_, cb)
+    Nyx.UI.SetFocus(false, false)
+    cb({ success = true })
+end)
+
+Nyx.UI.SafeNUICallback("vehicle:getOverview", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("vehicles:getDiagnosticsOverview", data and (data.vin or data.plate))
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("vehicle:scanOBD", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("vehicles:scanVehicle", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("vehicle:performService", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("vehicles:performCertifiedService", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("vehicle:resetTrip", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("vehicles:resetTrip", data and (data.vin or data.plate))
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("vehicle:releaseImpound", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("vehicles:releaseImpoundedVehicle", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("vehicle:renewRegistration", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("vehicles:renewRegistration", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("vehicle:getImpoundLots", function(_, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("vehicles:getCivicImpoundLots")
+        return cb(res or { success = false, lots = {} })
+    end
+    cb({ success = false, lots = {} })
 end)
 
 

@@ -57,7 +57,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: 3D Warehouse Matrix & Elastic Market Monitor (`nyx_ui` & `nyx_logistics`)**
   - **Implementation:** Interactive 3D shelf visualizer for warehouse container matrices and real-time regional supply/demand pricing charts for logistics haulers.
 
-- [ ] **Feature: Mechanical Diagnostics & Civic Impound Terminal (`nyx_ui` & `nyx_vehicles`)**
+- [x] **Feature: Mechanical Diagnostics & Civic Impound Terminal (`nyx_ui` & `nyx_vehicles`)**
   - **Implementation:** Vehicle wear inspection interface (oil, brake pads, gearbox, suspension telemetry) and automated civic impound lot release terminal.
 
 - [ ] **Feature: Citizen OS Master Smartphone Framework (`nyx_ui`)**
@@ -107,6 +107,43 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Mechanical Diagnostics & Civic Impound Terminal (`nyx_ui` & `nyx_vehicles`)**
+  - **Database Migration (`039_vehicles_diagnostics_and_civic_impound_terminal.sql`, `index.json`)**:
+    - Created `nyx_vehicles_diagnostic_scans` table (`scan_id`, `scan_uuid`, `vin`, `inspector_citizen_id`, `mileage`, `engine_health`, `overall_grade`, `composite_score`, `dtc_codes_json`, `is_roadworthy`, `scanned_at`) for immutable OBD-II diagnostic scan logging.
+    - Extended `nyx_vehicles_wear` table with `inspection_status` (ENUM 'uninspected', 'passed', 'failed', 'conditional' DEFAULT 'uninspected'), `last_inspection_at` (INT UNSIGNED NULL), `inspector_citizen_id` (VARCHAR(64) NULL), and `inspection_notes` (VARCHAR(255) NULL).
+    - Extended `nyx_vehicles_impound_lots` with `capacity` (INT UNSIGNED DEFAULT 50) and `is_automated_kiosk` (TINYINT(1) DEFAULT 1).
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 39) and mirrored to `FiveM/nyx_vehicles/sql/migrations/`.
+  - **Shared Pure Lua 5.4 Logic Engine (`nyx_vehicles/shared/diagnostics.lua`, `fxmanifest.lua`)**:
+    - Implemented `Nyx.VehicleDiagnostics.CalculateOverallGrade` computing composite mechanical score ($0.25 \times \text{oil} + 0.25 \times \text{pads} + 0.20 \times \text{trans} + 0.15 \times \text{susp} + 0.15 \times \text{eng}$) and 5-tier taxonomy (`pristine`, `good`, `fair`, `poor`, `critical`).
+    - Enforced Roadworthiness Invariant: `isRoadworthy = false` if composite score $< 25.0$ or if critical component wear (oil or brake pads) $\le 10.0\%$.
+    - Implemented `Nyx.VehicleDiagnostics.GenerateDiagnosticCodes` generating standard OBD-II Diagnostic Trouble Codes (`P0524`, `P0198`, `C0035`, `C0040`, `P0730`, `P0700`, `C1100`, `C1105`, `P0300`, `P0217`) based on component degradation thresholds.
+    - Implemented `Nyx.VehicleDiagnostics.CalculateServiceEstimate` resolving restorative targets (100.0%) and base costs across service types (`oil_change`, `brake_replacement`, `transmission_overhaul`, `suspension_tune`, `full_service`).
+    - Implemented `Nyx.VehicleDiagnostics.ValidateServicePayload` enforcing zero-trust VIN formats and whitelist service types.
+    - Implemented `Nyx.VehicleDiagnostics.FormatWearBadge` providing UI badge styling (`badge-success`, `badge-info`, `badge-warning`, `badge-danger`).
+    - Implemented `Nyx.VehicleDiagnostics.CalculateImpoundTotals` calculating base fees, storage duration, daily fees, and municipal treasury fiscal crisis surcharges (`solvent` +0%, `fiscal_stress` +15%, `degraded` +35%, `bankrupt` +60%).
+    - Implemented `Nyx.VehicleDiagnostics.FilterVehiclesCatalog` and `FormatCurrency`.
+    - Declared `shared/diagnostics.lua` in `FiveM/nyx_vehicles/fxmanifest.lua`.
+  - **Server-Side Subsystem & RPCs (`nyx_vehicles/server/diagnostics.lua`, `server/exports.lua`)**:
+    - Implemented `GetDiagnosticsOverview` providing unified telemetry for player vehicles, wear statuses, impounded vehicles, and active service catalogs.
+    - Implemented `ScanVehicle` running OBD-II diagnostic scans, generating DTC trouble codes, persisting scan history, and certifying roadworthiness.
+    - Implemented `PerformCertifiedService` restoring vehicle wear components to 100.0% with treasury double-entry fee deduction.
+    - Implemented `ReleaseImpoundedVehicle` settling impound releases with closed-loop atomic transfer to municipal treasury (`gov:city:master`).
+    - Implemented `RenewVehicleRegistration` with 14-day extension and municipal road fund transfer.
+    - Registered RPC endpoints: `vehicles:getDiagnosticsOverview`, `vehicles:scanVehicle`, `vehicles:performCertifiedService`, `vehicles:getCivicImpoundLots`.
+    - Exported APIs in `FiveM/nyx_vehicles/server/exports.lua`.
+  - **Client-Side Dispatch & UI Bridge (`nyx_vehicles/client/diagnostics.lua`, `nyx_ui/client/bridge.lua`, `nyx_ui/client/exports.lua`)**:
+    - Created `nyx_vehicles/client/diagnostics.lua` with `OpenVehicleTerminal(options)`, `CloseVehicleTerminal()`, chat commands (`/diagnostics`, `/mechanic`, `/impound`, `/vehiclerotary`), Third-Eye kiosk interactions, and client exports. Registered in `fxmanifest.lua`.
+    - Updated `nyx_ui/client/bridge.lua` whitelisting parameters (`vin`, `plate`, `serviceType`, `notes`, `impoundLotId`, `activeTab`) in `SanitizePayload`, and registering 8 safe NUI callbacks (`closeVehicleTerminal`, `vehicle:getOverview`, `vehicle:scanOBD`, `vehicle:performService`, `vehicle:resetTrip`, `vehicle:releaseImpound`, `vehicle:renewRegistration`, `vehicle:getImpoundLots`).
+    - Updated `nyx_ui/client/exports.lua` exporting `OpenVehicleTerminalUI`, `CloseVehicleTerminalUI`, and mapping aliases in `OpenView`.
+  - **Web Single-Frame CEF SPA (`nyx_ui/web/`)**:
+    - *HTML (`index.html`)*: Section 8G `#vehicle-terminal-overlay` modal featuring 3 tabs (Diagnosztika & Telemetria, Polgári Autómentő & Kiváltás, Okmányok & Megfelelőség), submodals (`#vehicle-submodal-service`, `#vehicle-submodal-release`), and `#dev-btn-vehicle` in toolbar.
+    - *CSS (`css/app.css`)*: Section 21 CEF-compliant styling adhering strictly to render budget (high-opacity dark surfaces `rgba(12, 16, 24, 0.96)`, zero GPU shaders, zero `backdrop-filter`, zero `blur()`, touch targets $\ge 40$px, WCAG AA+ contrast).
+    - *JavaScript (`js/app.js`)*: Added `NyxState.vehicle` reactive state, message listeners (`VEHICLE_TERMINAL_OPEN`/`CLOSE`), tab switching, 5-gauge wear telemetry visualizer, OBD-II DTC diagnostic trouble code alert cards, certified service modal with cost preview and button locking, automated civic impound lot vehicle listing with storage breakdown and treasury fiscal surcharge tags, release settlement submodal, registration renewal flow, hierarchical submodal escape handling, and browser dev mode mock telemetry.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestVehicleDiagnosticsAndCivicImpoundUI()` (Test 34) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_vehicle_diagnostics_and_impound_ui.py` covering composite scores, DTC code generation, service calculations, impound totals with fiscal surcharges, wear badges, payload validation, migration 039 schema, web HTML structure, CEF CSS budget, JS state handlers, bridge registration, and tests.lua registration (10/10 passing).
+    - Full pytest suite: 300/300 tests passing (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 218 Lua files, 39 migrations, 100% clean verification.
 - **[2026-10-18] Feature: 3D Warehouse Matrix & Elastic Market Monitor (`nyx_ui` & `nyx_logistics`)**
   - **Database Migration (`038_warehouse_matrix_and_elastic_market_monitor.sql`, `index.json`)**:
     - Extended `nyx_logistics_shelf_nodes` table with `slot_status` (ENUM 'empty', 'occupied', 'reserved', 'damaged' DEFAULT 'empty'), `temperature_zone` (ENUM 'ambient', 'refrigerated', 'cryo', 'hazardous' DEFAULT 'ambient'), `reserved_until` (INT UNSIGNED NULL), and `reserved_by_citizen_id` (VARCHAR(64) NULL).

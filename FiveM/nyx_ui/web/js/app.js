@@ -968,6 +968,115 @@ function handleDevMockNui(action, data) {
         showNotification({ type: 'success', title: 'REKESZ FENNTARTVA', message: `Rekesz (#${data.nodeId}) lezárva a következő ${data.durationMinutes || 60} percre.` });
         return { success: true };
     }
+    // Vehicle Diagnostics & Civic Impound Terminal Mock Handlers
+    if (action === 'closeVehicleTerminal') {
+        return { success: true };
+    }
+    if (action === 'vehicle:getOverview') {
+        const mockTelemetry = {
+            vin: '1G1YY22U565100099',
+            plate: 'LS-9428',
+            modelName: 'Vapid Dominator GT',
+            mileage: 1420.5,
+            tripOdometer: 112.4,
+            engineHealth: 920.0,
+            oilQuality: 82.5,
+            brakePadWear: 76.0,
+            transmissionWear: 88.0,
+            suspensionWear: 79.5,
+            overallGrade: 'good',
+            compositeScore: 84.8,
+            isRoadworthy: true,
+            dtcCodes: [],
+            registration: {
+                plate: 'LS-9428',
+                vin: '1G1YY22U565100099',
+                modelName: 'Vapid Dominator GT',
+                status: 'valid',
+                expiresAt: Math.floor(Date.now() / 1000) + (86400 * 9),
+                fee: { baseFee: 250.00, latePenalty: 0.00, totalFee: 250.00 }
+            },
+            serviceLogs: [
+                { service_type: 'oil_change', mileage_at_service: 1000.0, cost: 150.00, created_at: '2026-10-10 14:22' }
+            ],
+            diagnosticScans: [
+                { scan_uuid: 'scan_20261010_101', mileage: 1000.0, engine_health: 980.0, overall_grade: 'good', scanned_at: '2026-10-10 14:20' }
+            ],
+            lastServiceMileage: 1000.0,
+            serviceNotes: 'Rendszeres olajcsere elvégezve'
+        };
+        const mockOwned = [
+            { vin: '1G1YY22U565100099', plate: 'LS-9428', modelName: 'Vapid Dominator GT', storageState: 'stored', garageId: 'legion_square', registrationStatus: 'valid', registrationExpiresAt: Math.floor(Date.now() / 1000) + (86400 * 9) },
+            { vin: '2C3CDXBG8FH881122', plate: 'BC-5510', modelName: 'Bravado Buffalo STX', storageState: 'out', garageId: 'pillbox_hill', registrationStatus: 'valid', registrationExpiresAt: Math.floor(Date.now() / 1000) + (86400 * 12) }
+        ];
+        const mockImpounded = [
+            {
+                vin: '3N1AB7AP6HY334455',
+                plate: 'LS-1092',
+                modelName: 'Declasse Granger 3600LX',
+                impoundLotId: 'impound_lot_ls',
+                lotLabel: 'Los Santos Municipal Impound',
+                impoundReason: 'Tilosban parkolás & lejárt forgalmi',
+                impoundedAt: Math.floor(Date.now() / 1000) - (86400 * 2),
+                cost: { baseFee: 500.00, storageDays: 2, dailyRate: 150.00, storageFee: 300.00, subtotal: 800.00, fiscalTier: 'solvent', surchargeRate: 0.00, emergencySurcharge: 0.00, totalFee: 800.00 }
+            }
+        ];
+        return {
+            success: true,
+            telemetry: mockTelemetry,
+            ownedVehicles: mockOwned,
+            impoundedVehicles: mockImpounded,
+            fiscalTier: 'solvent',
+            impoundLots: {
+                impound_lot_ls: { id: 'impound_lot_ls', label: 'Los Santos Municipal Auto Impound', baseFee: 500.00, dailyRate: 150.00 },
+                impound_lot_sandy: { id: 'impound_lot_sandy', label: 'Blaine County Sheriff Impound Compound', baseFee: 350.00, dailyRate: 100.00 }
+            },
+            serviceCatalog: {
+                oil_change: { label: 'Motorolaj Csere & Szűrő', baseCost: 150.00, component: 'oilQuality', targetRestore: 100.0, description: 'Szintetikus kenőanyag frissítése.' },
+                brake_replacement: { label: 'Fékbetét & Féktárcsa Csere', baseCost: 350.00, component: 'brakePadWear', targetRestore: 100.0, description: 'Kerámia fékbetétek beszerelése.' },
+                transmission_overhaul: { label: 'Sebességváltó Generál', baseCost: 850.00, component: 'transmissionWear', targetRestore: 100.0, description: 'Fogaskerekek és kuplung felújítása.' },
+                suspension_tune: { label: 'Futómű Beállítás & Lengéscsillapító', baseCost: 400.00, component: 'suspensionWear', targetRestore: 100.0, description: 'Lengéscsillapítók és szilentek cseréje.' },
+                full_service: { label: 'Teljes Műszaki Generál', baseCost: 1600.00, component: 'all', targetRestore: 100.0, description: 'Minden fődarab gyári felújítása.' }
+            }
+        };
+    }
+    if (action === 'vehicle:scanOBD') {
+        showNotification({ type: 'success', title: 'OBD-II DIAGNOSZTIKA', message: 'Műszeres vizsgálat befejeződött. Hibakódok ellenőrizve.' });
+        return {
+            success: true,
+            scanUuid: `scan_${Date.now()}_99`,
+            overallGrade: 'good',
+            compositeScore: 84.8,
+            isRoadworthy: true,
+            inspectionStatus: 'passed',
+            dtcCodes: []
+        };
+    }
+    if (action === 'vehicle:performService') {
+        showNotification({ type: 'success', title: 'SZERVIZ ELVÉGEZVE', message: `A(z) ${data.serviceType} beavatkozás sikeresen teljesítve!` });
+        return { success: true };
+    }
+    if (action === 'vehicle:resetTrip') {
+        showNotification({ type: 'info', title: 'NAPI SZÁMLÁLÓ', message: 'Napi kilométerszámláló nullázva (0.0 km).' });
+        return { success: true };
+    }
+    if (action === 'vehicle:releaseImpound') {
+        showNotification({ type: 'success', title: 'JÁRMŰ KIVÁLTVA', message: 'Kiváltási díj kiegyenlítve a városi kincstár javára. Jármű átvehető!' });
+        return { success: true, totalPaid: 800.00 };
+    }
+    if (action === 'vehicle:renewRegistration') {
+        showNotification({ type: 'success', title: 'FORGALMI MEGÚJÍTVA', message: 'Forgalmi engedély érvényessége 14 nappal meghosszabbítva!' });
+        return { success: true, totalPaid: 250.00 };
+    }
+    if (action === 'vehicle:getImpoundLots') {
+        return {
+            success: true,
+            lots: {
+                impound_lot_ls: { id: 'impound_lot_ls', label: 'Los Santos Municipal Auto Impound', baseFee: 500.00, dailyRate: 150.00 },
+                impound_lot_sandy: { id: 'impound_lot_sandy', label: 'Blaine County Sheriff Impound Compound', baseFee: 350.00, dailyRate: 100.00 }
+            }
+        };
+    }
     return { success: true, devMode: true };
 }
 
@@ -1100,6 +1209,21 @@ const NyxState = {
         zoneFilter: 'all',
         categoryFilter: 'all',
         citywideCpi: 1.00
+    },
+    vehicle: {
+        isOpen: false,
+        activeTab: 'diagnostics',
+        telemetry: null,
+        ownedVehicles: [],
+        impoundedVehicles: [],
+        fiscalTier: 'solvent',
+        impoundLots: {},
+        serviceCatalog: {},
+        selectedVehicleVin: null,
+        impoundSearchQuery: '',
+        impoundLotFilter: 'all',
+        selectedService: null,
+        selectedImpound: null
     },
     activeDialog: null
 };
@@ -4930,7 +5054,602 @@ async function submitReserveSlot() {
     });
 }
 
+// ============================================================================
+// 12. VEHICLE MECHANICAL DIAGNOSTICS & CIVIC IMPOUND TERMINAL LOGIC
+// ============================================================================
 
+async function openVehicleTerminal(payload = {}) {
+    const overlay = document.getElementById('vehicle-terminal-overlay');
+    if (!overlay) return;
+
+    NyxState.vehicle.isOpen = true;
+    overlay.classList.remove('hidden');
+
+    if (payload.activeTab) {
+        switchVehicleTab(payload.activeTab);
+    } else {
+        switchVehicleTab('diagnostics');
+    }
+
+    const targetVin = payload.vin || payload.plate || NyxState.vehicle.selectedVehicleVin;
+    await refreshVehicleTerminalOverview(targetVin);
+}
+
+function closeVehicleTerminal() {
+    const overlay = document.getElementById('vehicle-terminal-overlay');
+    if (overlay) overlay.classList.add('hidden');
+
+    closeVehicleServiceModal();
+    closeVehicleReleaseModal();
+
+    NyxState.vehicle.isOpen = false;
+    postNui('closeVehicleTerminal', {});
+}
+
+function switchVehicleTab(tabName) {
+    NyxState.vehicle.activeTab = tabName;
+
+    document.querySelectorAll('#vehicle-terminal-overlay .modal-tabs .tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.vehicleTab === tabName);
+    });
+
+    const panes = {
+        diagnostics: document.getElementById('vehicle-tab-diagnostics'),
+        impound: document.getElementById('vehicle-tab-impound'),
+        compliance: document.getElementById('vehicle-tab-compliance')
+    };
+
+    Object.entries(panes).forEach(([k, el]) => {
+        if (el) el.classList.toggle('hidden', k !== tabName);
+    });
+
+    if (tabName === 'impound') {
+        renderVehicleImpounds();
+    } else if (tabName === 'compliance') {
+        renderVehicleCompliance();
+    }
+}
+
+async function refreshVehicleTerminalOverview(vin) {
+    const res = await postNui('vehicle:getOverview', { vin: vin });
+    if (!res || !res.success) {
+        showNotification({
+            type: 'error',
+            title: 'DIAGNOSZTIKA HIBA',
+            message: res?.error || 'A járműadatok lekérdezése meghiúsult.'
+        });
+        return;
+    }
+
+    NyxState.vehicle.telemetry = res.telemetry || null;
+    NyxState.vehicle.ownedVehicles = res.ownedVehicles || [];
+    NyxState.vehicle.impoundedVehicles = res.impoundedVehicles || [];
+    NyxState.vehicle.fiscalTier = res.fiscalTier || 'solvent';
+    NyxState.vehicle.impoundLots = res.impoundLots || {};
+    NyxState.vehicle.serviceCatalog = res.serviceCatalog || {};
+
+    if (res.telemetry && res.telemetry.vin) {
+        NyxState.vehicle.selectedVehicleVin = res.telemetry.vin;
+    }
+
+    const fiscalBadge = document.getElementById('vehicle-fiscal-badge');
+    if (fiscalBadge) {
+        const tierLabels = {
+            solvent: 'Városi Kincstár: Fizetőképes',
+            fiscal_stress: 'Városi Kincstár: Költségvetési Nyomás (+15%)',
+            degraded: 'Városi Kincstár: Krízishelyzet (+35%)',
+            bankrupt: 'Városi Kincstár: Csőd / Max Felár (+60%)'
+        };
+        const tierClasses = {
+            solvent: 'badge-emerald',
+            fiscal_stress: 'badge-amber',
+            degraded: 'badge-orange',
+            bankrupt: 'badge-rose'
+        };
+        fiscalBadge.className = `badge ${tierClasses[NyxState.vehicle.fiscalTier] || 'badge-emerald'}`;
+        fiscalBadge.innerHTML = `<i class="fa-solid fa-building-columns"></i> ${tierLabels[NyxState.vehicle.fiscalTier] || 'Fizetőképes'}`;
+    }
+
+    renderVehicleTelemetry(NyxState.vehicle.telemetry);
+    renderVehicleImpounds();
+    renderVehicleCompliance();
+}
+
+function getFillColorClass(pct) {
+    if (pct >= 75) return 'emerald';
+    if (pct >= 40) return 'amber';
+    if (pct >= 15) return 'orange';
+    return 'rose';
+}
+
+function renderVehicleTelemetry(t) {
+    if (!t) {
+        const label = document.getElementById('vehicle-active-label');
+        if (label) label.textContent = 'Nincs kiválasztott jármű';
+        return;
+    }
+
+    const label = document.getElementById('vehicle-active-label');
+    if (label) label.textContent = `${t.modelName || 'Jármű'} [${t.plate || '---'}]`;
+
+    const sub = document.getElementById('vehicle-active-sub');
+    if (sub) sub.textContent = `Alvázszám: ${t.vin || '---'} | Futásteljesítmény: ${(t.mileage || 0).toFixed(1)} km (Napi: ${(t.tripOdometer || 0).toFixed(1)} km)`;
+
+    const roadworthyBadge = document.getElementById('vehicle-roadworthy-badge');
+    if (roadworthyBadge) {
+        if (t.isRoadworthy) {
+            roadworthyBadge.className = 'badge badge-emerald';
+            roadworthyBadge.innerHTML = '<i class="fa-solid fa-shield-check"></i> Műszaki: Érvényes';
+        } else {
+            roadworthyBadge.className = 'badge badge-rose';
+            roadworthyBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Balesetveszélyes / Kizárva';
+        }
+    }
+
+    const engHealth = t.engineHealth !== undefined ? t.engineHealth : 1000.0;
+    const engPct = Math.max(0, Math.min(100, engHealth / 10.0));
+    updateGauge('engine', `${Math.round(engHealth)} HP`, engPct, `${Math.round(engHealth)} / 1000`);
+
+    const oilPct = Math.max(0, Math.min(100, t.oilQuality !== undefined ? t.oilQuality : 100.0));
+    updateGauge('oil', `${oilPct.toFixed(0)}%`, oilPct, `${oilPct.toFixed(1)}%`);
+
+    const brkPct = Math.max(0, Math.min(100, t.brakePadWear !== undefined ? t.brakePadWear : 100.0));
+    updateGauge('brakes', `${brkPct.toFixed(0)}%`, brkPct, `${brkPct.toFixed(1)}%`);
+
+    const trnPct = Math.max(0, Math.min(100, t.transmissionWear !== undefined ? t.transmissionWear : 100.0));
+    updateGauge('transmission', `${trnPct.toFixed(0)}%`, trnPct, `${trnPct.toFixed(1)}%`);
+
+    const susPct = Math.max(0, Math.min(100, t.suspensionWear !== undefined ? t.suspensionWear : 100.0));
+    updateGauge('suspension', `${susPct.toFixed(0)}%`, susPct, `${susPct.toFixed(1)}%`);
+
+    const dtcContainer = document.getElementById('vehicle-dtc-container');
+    const dtcCountLabel = document.getElementById('vehicle-dtc-count-label');
+    const codes = t.dtcCodes || [];
+
+    if (dtcCountLabel) {
+        dtcCountLabel.textContent = `${codes.length} aktív hibakód észlelve`;
+    }
+
+    if (dtcContainer) {
+        if (codes.length === 0) {
+            dtcContainer.innerHTML = `
+                <div class="empty-state">
+                    <i class="fa-solid fa-circle-check empty-icon text-emerald"></i>
+                    <p>A fedélzeti diagnosztikai rendszer (OBD-II) nem talált aktív mechanikai hibakódot. Minden fődarab üzemi paramétereken belül üzemel.</p>
+                </div>`;
+        } else {
+            dtcContainer.innerHTML = codes.map(c => `
+                <div class="dtc-chip ${c.severity === 'critical' ? 'critical' : 'warning'}">
+                    <span class="dtc-chip-code">${escapeHtml(c.code)}</span>
+                    <div class="dtc-chip-info">
+                        <span class="dtc-chip-title">${escapeHtml(c.title || c.description)}</span>
+                        <span class="dtc-chip-desc">${escapeHtml(c.description || '')}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+
+    const serviceGrid = document.getElementById('vehicle-service-grid');
+    if (serviceGrid) {
+        const catalog = NyxState.vehicle.serviceCatalog || {};
+        const serviceKeys = ['oil_change', 'brake_replacement', 'transmission_overhaul', 'suspension_tune', 'full_service'];
+
+        serviceGrid.innerHTML = serviceKeys.map(k => {
+            const item = catalog[k] || { label: k, baseCost: 150.0, description: 'Szerviz' };
+            return `
+                <div class="service-card-item">
+                    <div class="service-card-header">
+                        <span class="service-card-title">${escapeHtml(item.label)}</span>
+                        <span class="service-card-cost">$${(item.baseCost || 0).toFixed(2)}</span>
+                    </div>
+                    <p class="service-card-desc">${escapeHtml(item.description)}</p>
+                    <div class="service-card-meta">
+                        <i class="fa-solid fa-screwdriver-wrench text-amber"></i> Szükséges: <code>tool_repairkit</code> vagy Készpénz
+                    </div>
+                    <button class="btn btn-primary btn-block btn-apply-service" data-service-type="${k}">
+                        <i class="fa-solid fa-wrench"></i> Szerviz Igénylése
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+        serviceGrid.querySelectorAll('.btn-apply-service').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const sType = btn.dataset.serviceType;
+                openVehicleServiceModal(sType);
+            });
+        });
+    }
+}
+
+function updateGauge(name, badgeText, pct, valText) {
+    const badge = document.getElementById(`vehicle-gauge-badge-${name}`);
+    if (badge) {
+        badge.textContent = badgeText;
+        const color = getFillColorClass(pct);
+        badge.className = `badge badge-${color}`;
+    }
+
+    const fill = document.getElementById(`vehicle-gauge-fill-${name}`);
+    if (fill) {
+        fill.style.width = `${pct}%`;
+        fill.className = `gauge-bar-fill ${getFillColorClass(pct)}`;
+    }
+
+    const val = document.getElementById(`vehicle-gauge-val-${name}`);
+    if (val) {
+        val.textContent = valText;
+    }
+}
+
+function renderVehicleImpounds() {
+    const container = document.getElementById('vehicle-impound-cards');
+    if (!container) return;
+
+    let items = NyxState.vehicle.impoundedVehicles || [];
+    const q = (NyxState.vehicle.impoundSearchQuery || '').toLowerCase();
+    const lotFilter = NyxState.vehicle.impoundLotFilter || 'all';
+
+    if (q) {
+        items = items.filter(v =>
+            (v.plate && v.plate.toLowerCase().includes(q)) ||
+            (v.vin && v.vin.toLowerCase().includes(q)) ||
+            (v.modelName && v.modelName.toLowerCase().includes(q)) ||
+            (v.impoundReason && v.impoundReason.toLowerCase().includes(q))
+        );
+    }
+
+    if (lotFilter !== 'all') {
+        items = items.filter(v => v.impoundLotId === lotFilter);
+    }
+
+    if (items.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="grid-column: 1 / -1;">
+                <i class="fa-solid fa-truck-pickup empty-icon"></i>
+                <p>Nincs lefoglalt jármű a megadott szűrési feltételek mellett.</p>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = items.map(v => {
+        const cost = v.cost || { baseFee: 500, storageDays: 0, dailyRate: 150, storageFee: 0, emergencySurcharge: 0, totalFee: 500 };
+        return `
+            <div class="impound-card">
+                <div class="impound-card-header">
+                    <span class="impound-veh-plate">${escapeHtml(v.plate || 'UNKNOWN')}</span>
+                    <span class="badge badge-rose"><i class="fa-solid fa-lock"></i> LEFOGLALVA</span>
+                </div>
+                <div class="impound-veh-model">${escapeHtml(v.modelName || 'Gépjármű')} &bull; <small class="text-muted">VIN: ${escapeHtml(v.vin || '')}</small></div>
+                <div class="impound-breakdown-box">
+                    <div class="impound-breakdown-row">
+                        <span>Telephely:</span>
+                        <strong>${escapeHtml(v.lotLabel || 'Városi Telep')}</strong>
+                    </div>
+                    <div class="impound-breakdown-row">
+                        <span>Lefoglalási indok:</span>
+                        <span>${escapeHtml(v.impoundReason || 'Szabálysértés')}</span>
+                    </div>
+                    <div class="impound-breakdown-row">
+                        <span>Alap lefoglalási bírság:</span>
+                        <span>$${cost.baseFee.toFixed(2)}</span>
+                    </div>
+                    <div class="impound-breakdown-row">
+                        <span>Tárolási díj (${cost.storageDays} nap &times; $${cost.dailyRate.toFixed(2)}):</span>
+                        <span>$${cost.storageFee.toFixed(2)}</span>
+                    </div>
+                    ${cost.emergencySurcharge > 0 ? `
+                        <div class="impound-breakdown-row">
+                            <span class="text-rose"><i class="fa-solid fa-triangle-exclamation"></i> Kincstári felár (${cost.fiscalTier}):</span>
+                            <span class="text-rose">+$${cost.emergencySurcharge.toFixed(2)}</span>
+                        </div>
+                    ` : ''}
+                    <div class="impound-breakdown-row total-row">
+                        <span>Fizetendő összeg:</span>
+                        <span class="impound-total-fee">$${cost.totalFee.toFixed(2)}</span>
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-block btn-release-veh" data-vin="${escapeHtml(v.vin)}" data-plate="${escapeHtml(v.plate)}" data-cost="${cost.totalFee}">
+                    <i class="fa-solid fa-dollar-sign"></i> Kiváltás & Kincstári Kiegyenlítés
+                </button>
+            </div>
+        `;
+    }).join('');
+
+    container.querySelectorAll('.btn-release-veh').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const vin = btn.dataset.vin;
+            const plate = btn.dataset.plate;
+            const cost = btn.dataset.cost;
+            openVehicleReleaseModal({ vin, plate, totalFee: cost });
+        });
+    });
+}
+
+function renderVehicleCompliance() {
+    const t = NyxState.vehicle.telemetry;
+    const reg = t ? t.registration : null;
+
+    const plateEl = document.getElementById('vehicle-comp-plate');
+    if (plateEl) plateEl.textContent = reg?.plate || t?.plate || '---';
+
+    const vinEl = document.getElementById('vehicle-comp-vin');
+    if (vinEl) vinEl.textContent = reg?.vin || t?.vin || '---';
+
+    const modelEl = document.getElementById('vehicle-comp-model');
+    if (modelEl) modelEl.textContent = reg?.modelName || t?.modelName || '---';
+
+    const expiryEl = document.getElementById('vehicle-comp-expiry');
+    if (expiryEl) {
+        if (reg && reg.expiresAt) {
+            const d = new Date(reg.expiresAt * 1000);
+            expiryEl.textContent = d.toLocaleString();
+        } else {
+            expiryEl.textContent = 'Nincs regisztrálva / Ismeretlen';
+        }
+    }
+
+    const baseFeeEl = document.getElementById('vehicle-comp-base-fee');
+    if (baseFeeEl) baseFeeEl.textContent = `$${(reg?.fee?.baseFee || 250.0).toFixed(2)}`;
+
+    const lateFeeEl = document.getElementById('vehicle-comp-late-fee');
+    if (lateFeeEl) lateFeeEl.textContent = `$${(reg?.fee?.latePenalty || 0.0).toFixed(2)}`;
+
+    const statusBadge = document.getElementById('vehicle-compliance-status-badge');
+    if (statusBadge) {
+        const isExp = reg?.isExpired || (reg?.status === 'expired');
+        if (isExp) {
+            statusBadge.className = 'badge badge-rose';
+            statusBadge.textContent = 'LEJÁRT';
+        } else if (reg?.status === 'suspended') {
+            statusBadge.className = 'badge badge-orange';
+            statusBadge.textContent = 'FELFÜGGESZTVE';
+        } else {
+            statusBadge.className = 'badge badge-emerald';
+            statusBadge.textContent = 'ÉRVÉNYES';
+        }
+    }
+
+    const scoreEl = document.getElementById('vehicle-comp-score');
+    if (scoreEl) scoreEl.textContent = `${(t?.compositeScore || 100).toFixed(1)} / 100`;
+
+    const gradeBadge = document.getElementById('vehicle-comp-grade-badge');
+    if (gradeBadge) {
+        const g = t?.overallGrade || 'pristine';
+        const labels = { pristine: 'KIVÁLÓ', good: 'JÓ', fair: 'KÖZEPES', critical: 'KRITIKUS', hazardous: 'VESZÉLYES' };
+        const cls = { pristine: 'badge-emerald', good: 'badge-emerald', fair: 'badge-amber', critical: 'badge-orange', hazardous: 'badge-rose' };
+        gradeBadge.className = `badge ${cls[g] || 'badge-emerald'}`;
+        gradeBadge.textContent = labels[g] || g.toUpperCase();
+    }
+
+    const roadworthyEl = document.getElementById('vehicle-comp-roadworthy');
+    if (roadworthyEl) {
+        if (t?.isRoadworthy) {
+            roadworthyEl.className = 'text-emerald';
+            roadworthyEl.textContent = 'Igen (Megfelelt)';
+        } else {
+            roadworthyEl.className = 'text-rose';
+            roadworthyEl.textContent = 'Nem (Közúti Kizárás)';
+        }
+    }
+
+    const notesEl = document.getElementById('vehicle-comp-notes');
+    if (notesEl) notesEl.textContent = t?.serviceNotes || 'Gyári állapot';
+
+    const fleetTable = document.getElementById('vehicle-fleet-rows');
+    if (fleetTable) {
+        const owned = NyxState.vehicle.ownedVehicles || [];
+        if (owned.length === 0) {
+            fleetTable.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Nincsenek nyilvántartott járművek a flottádban.</td></tr>`;
+        } else {
+            fleetTable.innerHTML = owned.map(v => `
+                <tr>
+                    <td><strong>${escapeHtml(v.plate || '')}</strong></td>
+                    <td><code>${escapeHtml(v.vin || '')}</code></td>
+                    <td>${escapeHtml(v.modelName || 'Jármű')}</td>
+                    <td>${escapeHtml(v.garageId || v.storageState || 'stored')}</td>
+                    <td><span class="badge ${v.registrationStatus === 'valid' ? 'badge-emerald' : 'badge-rose'}">${escapeHtml(v.registrationStatus || 'valid')}</span></td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm btn-select-fleet-veh" data-vin="${escapeHtml(v.vin)}">
+                            <i class="fa-solid fa-magnifying-glass"></i> Diagnosztika
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            fleetTable.querySelectorAll('.btn-select-fleet-veh').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const vin = btn.dataset.vin;
+                    refreshVehicleTerminalOverview(vin);
+                    switchVehicleTab('diagnostics');
+                });
+            });
+        }
+    }
+}
+
+function openVehicleServiceModal(serviceType) {
+    const submodal = document.getElementById('vehicle-submodal-service');
+    if (!submodal) return;
+
+    NyxState.vehicle.selectedService = serviceType;
+    const catalog = NyxState.vehicle.serviceCatalog || {};
+    const item = catalog[serviceType] || { label: serviceType, baseCost: 150.0 };
+
+    const titleInput = document.getElementById('vehicle-service-title-input');
+    if (titleInput) titleInput.value = item.label || serviceType;
+
+    const costInput = document.getElementById('vehicle-service-cost-input');
+    if (costInput) costInput.value = `$${(item.baseCost || 0).toFixed(2)}`;
+
+    const notesInput = document.getElementById('vehicle-service-notes-input');
+    if (notesInput) notesInput.value = '';
+
+    submodal.classList.remove('hidden');
+}
+
+function closeVehicleServiceModal() {
+    const submodal = document.getElementById('vehicle-submodal-service');
+    if (submodal) submodal.classList.add('hidden');
+    NyxState.vehicle.selectedService = null;
+}
+
+async function submitVehicleService() {
+    const serviceType = NyxState.vehicle.selectedService;
+    const vin = NyxState.vehicle.selectedVehicleVin;
+    if (!serviceType || !vin) return;
+
+    const notesInput = document.getElementById('vehicle-service-notes-input');
+    const notes = notesInput ? notesInput.value : '';
+
+    const btn = document.getElementById('vehicle-service-confirm-btn');
+    lockButtonAction(btn, async () => {
+        const res = await postNui('vehicle:performService', {
+            vin: vin,
+            serviceType: serviceType,
+            notes: notes
+        });
+
+        if (res && res.success) {
+            playWebBeep(980, 'sine', 0.12);
+            showNotification({
+                type: 'success',
+                title: 'SZERVIZ ELVÉGEZVE',
+                message: 'A jármű alkatrésze gyári szintre (100%) lett felújítva!'
+            });
+            closeVehicleServiceModal();
+            refreshVehicleTerminalOverview(vin);
+        } else {
+            showNotification({
+                type: 'error',
+                title: 'SZERVIZ SIKERTELEN',
+                message: res?.error || 'A javítás meghiúsult. Ellenőrizd a szerszámokat és a fedezetet!'
+            });
+        }
+    });
+}
+
+function openVehicleReleaseModal(data) {
+    const submodal = document.getElementById('vehicle-submodal-release');
+    if (!submodal) return;
+
+    NyxState.vehicle.selectedImpound = data;
+
+    const plateInput = document.getElementById('vehicle-release-plate-input');
+    if (plateInput) plateInput.value = `${data.plate} (${data.vin})`;
+
+    const totalInput = document.getElementById('vehicle-release-total-input');
+    if (totalInput) totalInput.value = `$${parseFloat(data.totalFee || 0).toFixed(2)}`;
+
+    submodal.classList.remove('hidden');
+}
+
+function closeVehicleReleaseModal() {
+    const submodal = document.getElementById('vehicle-submodal-release');
+    if (submodal) submodal.classList.add('hidden');
+    NyxState.vehicle.selectedImpound = null;
+}
+
+async function submitVehicleRelease() {
+    const item = NyxState.vehicle.selectedImpound;
+    if (!item || !item.vin) return;
+
+    const btn = document.getElementById('vehicle-release-confirm-btn');
+    lockButtonAction(btn, async () => {
+        const res = await postNui('vehicle:releaseImpound', { vin: item.vin });
+        if (res && res.success) {
+            playWebBeep(1100, 'triangle', 0.15);
+            showNotification({
+                type: 'success',
+                title: 'JÁRMŰ KIVÁLTVA',
+                message: `Jármű [${item.plate}] sikeresen kiváltva! Kifizetve: $${(res.totalPaid || item.totalFee || 0).toFixed(2)}.`
+            });
+            closeVehicleReleaseModal();
+            refreshVehicleTerminalOverview(item.vin);
+        } else {
+            showNotification({
+                type: 'error',
+                title: 'KIVÁLTÁS SIKERTELEN',
+                message: res?.error || 'A kiváltás meghiúsult. Ellenőrizd a számlaegyenleged!'
+            });
+        }
+    });
+}
+
+async function renewVehicleRegistration() {
+    const vin = NyxState.vehicle.selectedVehicleVin;
+    if (!vin) return;
+
+    const btn = document.getElementById('vehicle-btn-renew-reg');
+    lockButtonAction(btn, async () => {
+        const res = await postNui('vehicle:renewRegistration', { vin: vin });
+        if (res && res.success) {
+            playWebBeep(1050, 'sine', 0.12);
+            showNotification({
+                type: 'success',
+                title: 'FORGALMI MEGÚJÍTVA',
+                message: `A forgalmi engedély érvényessége 14 nappal meghosszabbítva! Kifizetve: $${(res.totalPaid || 250).toFixed(2)}.`
+            });
+            refreshVehicleTerminalOverview(vin);
+        } else {
+            showNotification({
+                type: 'error',
+                title: 'MEGÚJÍTÁS SIKERTELEN',
+                message: res?.error || 'A forgalmi megújítása meghiúsult.'
+            });
+        }
+    });
+}
+
+async function scanVehicleOBD() {
+    const vin = NyxState.vehicle.selectedVehicleVin;
+    if (!vin) return;
+
+    const btn = document.getElementById('vehicle-btn-scan-obd');
+    lockButtonAction(btn, async () => {
+        const res = await postNui('vehicle:scanOBD', { vin: vin });
+        if (res && res.success) {
+            playWebBeep(880, 'sine', 0.1);
+            showNotification({
+                type: 'success',
+                title: 'OBD-II SCAN BEFEJEZVE',
+                message: `Vizsgálati jegyzőkönyv rögzítve (#${res.scanUuid}). Minősítés: ${(res.overallGrade || 'pristine').toUpperCase()}.`
+            });
+            refreshVehicleTerminalOverview(vin);
+        } else {
+            showNotification({
+                type: 'error',
+                title: 'VIZSGÁLAT SIKERTELEN',
+                message: res?.error || 'Az OBD-II kapcsolat meghiúsult.'
+            });
+        }
+    });
+}
+
+async function resetVehicleTripOdometer() {
+    const vin = NyxState.vehicle.selectedVehicleVin;
+    if (!vin) return;
+
+    const btn = document.getElementById('vehicle-btn-reset-trip');
+    lockButtonAction(btn, async () => {
+        const res = await postNui('vehicle:resetTrip', { vin: vin });
+        if (res && res.success) {
+            showNotification({
+                type: 'info',
+                title: 'NAPI SZÁMLÁLÓ NULLÁZVA',
+                message: 'A napi kilométerszámláló sikeresen visszaállítva 0.0 km-re.'
+            });
+            refreshVehicleTerminalOverview(vin);
+        } else {
+            showNotification({
+                type: 'error',
+                title: 'MŰVELET SIKERTELEN',
+                message: res?.error || 'A nullázás nem sikerült.'
+            });
+        }
+    });
+}
 
 // 13. Global NUI Envelope Dispatcher
 window.addEventListener('message', (event) => {
@@ -5033,6 +5752,13 @@ window.addEventListener('message', (event) => {
         openMarketMonitor(packet.payload);
     } else if (action === 'LOGISTICS_MATRIX_CLOSE') {
         closeMarketMonitor();
+    }
+
+    // Mechanical Diagnostics & Civic Impound Terminal
+    else if (action === 'VEHICLE_TERMINAL_OPEN') {
+        openVehicleTerminal(packet.payload);
+    } else if (action === 'VEHICLE_TERMINAL_CLOSE') {
+        closeVehicleTerminal();
     }
 });
 
@@ -5557,6 +6283,31 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('logistics-reserve-cancel-btn')?.addEventListener('click', closeReserveSlotModal);
     document.getElementById('logistics-reserve-confirm-btn')?.addEventListener('click', submitReserveSlot);
 
+    // Mechanical Diagnostics & Civic Impound Terminal Listeners
+    document.getElementById('vehicle-terminal-close')?.addEventListener('click', closeVehicleTerminal);
+
+    document.querySelectorAll('#vehicle-terminal-overlay .tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.getAttribute('data-vehicle-tab');
+            if (tab) switchVehicleTab(tab);
+        });
+    });
+
+    document.getElementById('vehicle-btn-scan-obd')?.addEventListener('click', scanVehicleOBD);
+    document.getElementById('vehicle-btn-reset-trip')?.addEventListener('click', resetVehicleTripOdometer);
+    document.getElementById('vehicle-btn-renew-reg')?.addEventListener('click', renewVehicleRegistration);
+
+    document.getElementById('vehicle-submodal-service-close')?.addEventListener('click', closeVehicleServiceModal);
+    document.getElementById('vehicle-service-cancel-btn')?.addEventListener('click', closeVehicleServiceModal);
+    document.getElementById('vehicle-service-confirm-btn')?.addEventListener('click', submitVehicleService);
+
+    document.getElementById('vehicle-submodal-release-close')?.addEventListener('click', closeVehicleReleaseModal);
+    document.getElementById('vehicle-release-cancel-btn')?.addEventListener('click', closeVehicleReleaseModal);
+    document.getElementById('vehicle-release-confirm-btn')?.addEventListener('click', submitVehicleRelease);
+
+    document.getElementById('vehicle-impound-search')?.addEventListener('input', renderVehicleImpounds);
+    document.getElementById('vehicle-impound-lot-filter')?.addEventListener('change', renderVehicleImpounds);
+
     // Dialog Confirm & Cancel
     document.getElementById('dialog-confirm-btn')?.addEventListener('click', () => closeDialog(true));
     document.getElementById('dialog-cancel-btn')?.addEventListener('click', () => closeDialog(false));
@@ -5624,6 +6375,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const vehicleServiceSubmodal = document.getElementById('vehicle-submodal-service');
+            if (vehicleServiceSubmodal && !vehicleServiceSubmodal.classList.contains('hidden')) {
+                closeVehicleServiceModal();
+                return;
+            }
+
+            const vehicleReleaseSubmodal = document.getElementById('vehicle-submodal-release');
+            if (vehicleReleaseSubmodal && !vehicleReleaseSubmodal.classList.contains('hidden')) {
+                closeVehicleReleaseModal();
+                return;
+            }
+
             const dialogOverlay = document.getElementById('dialog-overlay');
             if (dialogOverlay && !dialogOverlay.classList.contains('hidden')) {
                 closeDialog(false);
@@ -5662,6 +6425,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (NyxState.logistics.isOpen) {
                 closeMarketMonitor();
+                return;
+            }
+            if (NyxState.vehicle && NyxState.vehicle.isOpen) {
+                closeVehicleTerminal();
                 return;
             }
             if (NyxState.mdt.isOpen) {
@@ -5845,6 +6612,14 @@ function initBrowserDevMode() {
             closeMarketMonitor();
         } else {
             openMarketMonitor({ activeTab: 'matrix' });
+        }
+    });
+
+    document.getElementById('dev-btn-vehicle')?.addEventListener('click', () => {
+        if (NyxState.vehicle && NyxState.vehicle.isOpen) {
+            closeVehicleTerminal();
+        } else {
+            openVehicleTerminal({ activeTab: 'diagnostics' });
         }
     });
 

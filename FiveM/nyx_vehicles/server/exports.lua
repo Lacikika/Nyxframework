@@ -79,3 +79,19 @@ exports("RenewVehicleRegistration", function(src, vin)
     return Nyx.Vehicles.RenewVehicleRegistration(src, vin)
 end)
 
+exports("GetDiagnosticsOverview", function(src, vinOrIdentifier)
+    return Nyx.Vehicles.GetDiagnosticsOverview(src, vinOrIdentifier)
+end)
+
+exports("ScanVehicle", function(src, vinOrPlate, notes)
+    return Nyx.Vehicles.ScanVehicle(src, vinOrPlate, notes)
+end)
+
+exports("PerformCertifiedService", function(src, payload)
+    return Nyx.Vehicles.PerformCertifiedService(src, payload)
+end)
+
+exports("GetCivicImpoundLots", function()
+    return Nyx.Vehicles.ImpoundLots or {}
+end)
+

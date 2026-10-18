@@ -26,6 +26,7 @@
             <button id="dev-btn-property"><i class="fa-solid fa-building-columns"></i> Real Estate</button>
             <button id="dev-btn-freight"><i class="fa-solid fa-truck"></i> Freight</button>
             <button id="dev-btn-logistics"><i class="fa-solid fa-boxes-stacked"></i> Warehouse/Market</button>
+            <button id="dev-btn-vehicle"><i class="fa-solid fa-wrench"></i> Vehicles/Impound</button>
             <button id="dev-btn-interact"><i class="fa-solid fa-crosshairs"></i> Target</button>
             <button id="dev-btn-place"><i class="fa-solid fa-arrows-up-down-left-right"></i> Place</button>
             <button id="dev-btn-toast"><i class="fa-solid fa-bell"></i> Toast</button>
@@ -1897,6 +1898,302 @@
                 <div class="modal-footer">
                     <button id="logistics-reserve-cancel-btn" class="btn btn-secondary">Mégse</button>
                     <button id="logistics-reserve-confirm-btn" class="btn btn-primary"><i class="fa-solid fa-check"></i> Rekesz Zárolása</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================
+             8G. VEHICLE MECHANICAL DIAGNOSTICS & CIVIC IMPOUND TERMINAL
+             ================================================================ -->
+        <div id="vehicle-terminal-overlay" class="modal-backdrop hidden">
+            <div class="modal-dialog large-dialog vehicle-dialog">
+                <!-- Modal Header -->
+                <div class="modal-header">
+                    <div class="header-branding">
+                        <i class="fa-solid fa-wrench icon-accent amber"></i>
+                        <div>
+                            <h3 id="vehicle-terminal-title">Gépjármű Műszaki Diagnosztika & Városi Autómentő</h3>
+                            <span class="sub-text">Hivatalos OBD-II Telemetria, Fődarab Állapot & Lefoglalt Járművek Kiváltása</span>
+                        </div>
+                    </div>
+                    <div class="header-badges">
+                        <span id="vehicle-fiscal-badge" class="badge badge-emerald"><i class="fa-solid fa-building-columns"></i> Városi Kincstár: Fizetőképes</span>
+                        <span id="vehicle-roadworthy-badge" class="badge badge-emerald"><i class="fa-solid fa-shield-check"></i> Műszaki: Érvényes</span>
+                        <button id="vehicle-terminal-close" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <div class="modal-tabs">
+                    <button class="tab-btn active" data-vehicle-tab="diagnostics"><i class="fa-solid fa-gauge-high"></i> Mechanikai Diagnosztika & Telemetria</button>
+                    <button class="tab-btn" data-vehicle-tab="impound"><i class="fa-solid fa-truck-pickup"></i> Városi Autómentő & Járműkiváltás</button>
+                    <button class="tab-btn" data-vehicle-tab="compliance"><i class="fa-solid fa-file-invoice"></i> Forgalmi Engedély & Hatósági Műszaki</button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="modal-body terminal-body">
+                    <!-- Tab 1: Mechanical Diagnostics & Telemetry -->
+                    <div id="vehicle-tab-diagnostics" class="vehicle-tab-pane">
+                        <!-- Vehicle Selector & Primary Stats Bar -->
+                        <div class="tab-action-bar">
+                            <div class="action-bar-info">
+                                <h4 class="section-title" id="vehicle-active-label">Aktív Jármű: [RENDER-VIN]</h4>
+                                <span class="sub-text" id="vehicle-active-sub">Rendszám: --- | Futásteljesítmény: 0.0 km</span>
+                            </div>
+                            <div class="action-bar-actions">
+                                <button id="vehicle-btn-scan-obd" class="btn btn-primary"><i class="fa-solid fa-microchip"></i> OBD-II Műszeres Vizsgálat</button>
+                                <button id="vehicle-btn-reset-trip" class="btn btn-secondary"><i class="fa-solid fa-rotate-left"></i> Napi Számláló (Trip) Nulla</button>
+                            </div>
+                        </div>
+
+                        <!-- Telemetry Grid: 5 Core Gauges -->
+                        <div class="telemetry-gauges-grid">
+                            <div class="gauge-card">
+                                <div class="gauge-header">
+                                    <span class="gauge-title"><i class="fa-solid fa-heart-pulse"></i> Motor Állapot</span>
+                                    <span class="badge" id="vehicle-gauge-badge-engine">1000 HP</span>
+                                </div>
+                                <div class="gauge-bar-track">
+                                    <div class="gauge-bar-fill emerald" id="vehicle-gauge-fill-engine" style="width: 100%;"></div>
+                                </div>
+                                <div class="gauge-meta">
+                                    <span class="meta-label">Mechanikai épség</span>
+                                    <strong id="vehicle-gauge-val-engine">1000 / 1000</strong>
+                                </div>
+                            </div>
+
+                            <div class="gauge-card">
+                                <div class="gauge-header">
+                                    <span class="gauge-title"><i class="fa-solid fa-oil-can"></i> Motorolaj Minőség</span>
+                                    <span class="badge" id="vehicle-gauge-badge-oil">100%</span>
+                                </div>
+                                <div class="gauge-bar-track">
+                                    <div class="gauge-bar-fill emerald" id="vehicle-gauge-fill-oil" style="width: 100%;"></div>
+                                </div>
+                                <div class="gauge-meta">
+                                    <span class="meta-label">Kenőképesség</span>
+                                    <strong id="vehicle-gauge-val-oil">100.0%</strong>
+                                </div>
+                            </div>
+
+                            <div class="gauge-card">
+                                <div class="gauge-header">
+                                    <span class="gauge-title"><i class="fa-solid fa-compact-disc"></i> Fékbetét Kopás</span>
+                                    <span class="badge" id="vehicle-gauge-badge-brakes">100%</span>
+                                </div>
+                                <div class="gauge-bar-track">
+                                    <div class="gauge-bar-fill emerald" id="vehicle-gauge-fill-brakes" style="width: 100%;"></div>
+                                </div>
+                                <div class="gauge-meta">
+                                    <span class="meta-label">Fékező felület</span>
+                                    <strong id="vehicle-gauge-val-brakes">100.0%</strong>
+                                </div>
+                            </div>
+
+                            <div class="gauge-card">
+                                <div class="gauge-header">
+                                    <span class="gauge-title"><i class="fa-solid fa-gears"></i> Sebességváltó</span>
+                                    <span class="badge" id="vehicle-gauge-badge-transmission">100%</span>
+                                </div>
+                                <div class="gauge-bar-track">
+                                    <div class="gauge-bar-fill emerald" id="vehicle-gauge-fill-transmission" style="width: 100%;"></div>
+                                </div>
+                                <div class="gauge-meta">
+                                    <span class="meta-label">Fogaskerekek & Kuplung</span>
+                                    <strong id="vehicle-gauge-val-transmission">100.0%</strong>
+                                </div>
+                            </div>
+
+                            <div class="gauge-card">
+                                <div class="gauge-header">
+                                    <span class="gauge-title"><i class="fa-solid fa-car-tunnel"></i> Futómű & Felfüggesztés</span>
+                                    <span class="badge" id="vehicle-gauge-badge-suspension">100%</span>
+                                </div>
+                                <div class="gauge-bar-track">
+                                    <div class="gauge-bar-fill emerald" id="vehicle-gauge-fill-suspension" style="width: 100%;"></div>
+                                </div>
+                                <div class="gauge-meta">
+                                    <span class="meta-label">Lengéscsillapítás</span>
+                                    <strong id="vehicle-gauge-val-suspension">100.0%</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active DTC Fault Codes Section -->
+                        <div class="card-surface dtc-card">
+                            <div class="card-header-row">
+                                <h4 class="card-title"><i class="fa-solid fa-triangle-exclamation"></i> Aktív OBD-II Hibakódok (Diagnostic Trouble Codes)</h4>
+                                <span class="card-subtitle" id="vehicle-dtc-count-label">0 aktív hibakód észlelve</span>
+                            </div>
+                            <div id="vehicle-dtc-container" class="dtc-chips-container">
+                                <div class="empty-state">
+                                    <i class="fa-solid fa-circle-check empty-icon text-emerald"></i>
+                                    <p>A fedélzeti diagnosztikai rendszer (OBD-II) nem talált aktív mechanikai hibakódot. Minden fődarab üzemi paramétereken belül üzemel.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Certified Mechanic Service Options -->
+                        <div class="card-surface service-actions-card">
+                            <div class="card-header-row">
+                                <h4 class="card-title"><i class="fa-solid fa-toolbox"></i> Hivatalos Műhelyszerviz & Alkatrész Csere</h4>
+                                <span class="card-subtitle">Válassz a minősített műhelyi beavatkozások közül a jármű alkatrészeinek 100%-os helyreállításához.</span>
+                            </div>
+                            <div class="service-actions-grid" id="vehicle-service-grid">
+                                <!-- Dynamic Service Action Cards (Oil, Brakes, Transmission, Suspension, Full) -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Civic Impound Lot Release Terminal -->
+                    <div id="vehicle-tab-impound" class="vehicle-tab-pane hidden">
+                        <div class="tab-action-bar">
+                            <div class="action-bar-info">
+                                <h4 class="section-title">Városi Autómentő & Hatósági Járműkiváltás</h4>
+                                <span class="sub-text">A lefoglalt járművek tárolási díja naponta halmozódik. A kiváltási összeg közvetlenül a városi kincstárba kerül átvezetésre.</span>
+                            </div>
+                            <div class="action-bar-filters">
+                                <input type="text" id="vehicle-impound-search" placeholder="Keresés rendszám vagy típus szerint..." class="modal-input search-input">
+                                <select id="vehicle-impound-lot-filter" class="modal-select filter-select">
+                                    <option value="all">Minden Telephely</option>
+                                    <option value="impound_lot_ls">Los Santos Municipal Impound</option>
+                                    <option value="impound_lot_sandy">Blaine County Sheriff Compound</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Impound Items Cards Grid -->
+                        <div class="impound-cards-grid" id="vehicle-impound-cards">
+                            <!-- Dynamic Impounded Vehicles -->
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Registration & Compliance Portal -->
+                    <div id="vehicle-tab-compliance" class="vehicle-tab-pane hidden">
+                        <div class="tab-action-bar">
+                            <div class="action-bar-info">
+                                <h4 class="section-title">Hatósági Forgalmi Engedély & Közúti Alkalmasság</h4>
+                                <span class="sub-text">A lejárt forgalmi engedélyű járművek közúti közlekedése szabálysértési bírságot von maga után.</span>
+                            </div>
+                        </div>
+
+                        <div class="compliance-layout-grid">
+                            <!-- Registration Card -->
+                            <div class="card-surface compliance-card">
+                                <div class="card-header-row">
+                                    <h4 class="card-title"><i class="fa-solid fa-id-card"></i> Forgalmi Engedély Állapota</h4>
+                                    <span id="vehicle-compliance-status-badge" class="badge badge-emerald">ÉRVÉNYES</span>
+                                </div>
+                                <div class="compliance-details-grid">
+                                    <div class="comp-item"><span>Nyilvántartott Rendszám:</span> <strong id="vehicle-comp-plate">---</strong></div>
+                                    <div class="comp-item"><span>Alvázszám (VIN):</span> <strong id="vehicle-comp-vin">---</strong></div>
+                                    <div class="comp-item"><span>Modell & Kategória:</span> <strong id="vehicle-comp-model">---</strong></div>
+                                    <div class="comp-item"><span>Engedély Lejárata:</span> <strong id="vehicle-comp-expiry">---</strong></div>
+                                    <div class="comp-item"><span>Megújítási Alapdíj:</span> <strong id="vehicle-comp-base-fee">$250.00</strong></div>
+                                    <div class="comp-item"><span>Késedelmi Pótdíj:</span> <strong id="vehicle-comp-late-fee">$0.00</strong></div>
+                                </div>
+                                <div class="compliance-actions">
+                                    <button id="vehicle-btn-renew-reg" class="btn btn-primary btn-block"><i class="fa-solid fa-arrows-rotate"></i> Forgalmi Megújítása (14 Nap)</button>
+                                </div>
+                            </div>
+
+                            <!-- Roadworthiness & Inspection Certificate Card -->
+                            <div class="card-surface compliance-card">
+                                <div class="card-header-row">
+                                    <h4 class="card-title"><i class="fa-solid fa-certificate"></i> Hatósági Műszaki Bizonyítvány</h4>
+                                    <span id="vehicle-comp-grade-badge" class="badge badge-emerald">KIVÁLÓ</span>
+                                </div>
+                                <div class="compliance-details-grid">
+                                    <div class="comp-item"><span>Összesített Pontszám:</span> <strong id="vehicle-comp-score">100 / 100</strong></div>
+                                    <div class="comp-item"><span>Közúti Alkalmasság:</span> <strong id="vehicle-comp-roadworthy" class="text-emerald">Igen (Megfelelt)</strong></div>
+                                    <div class="comp-item"><span>Utolsó Átvizsgálás:</span> <strong id="vehicle-comp-last-scan">---</strong></div>
+                                    <div class="comp-item"><span>Hitelesítő Szerelő:</span> <strong id="vehicle-comp-inspector">---</strong></div>
+                                    <div class="comp-item"><span>Megjegyzések:</span> <strong id="vehicle-comp-notes">Gyári állapot</strong></div>
+                                </div>
+                                <div class="compliance-actions">
+                                    <button id="vehicle-btn-inspect-quick" class="btn btn-secondary btn-block"><i class="fa-solid fa-print"></i> Vizsgálati Jegyzőkönyv Megtekintése</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Owned Vehicles Fleet Table -->
+                        <div class="card-surface fleet-card">
+                            <div class="card-header-row">
+                                <h4 class="card-title"><i class="fa-solid fa-car-side"></i> Saját Járműflotta & Regisztrációs Áttekintő</h4>
+                            </div>
+                            <div class="table-container">
+                                <table class="nyx-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Rendszám</th>
+                                            <th>VIN</th>
+                                            <th>Modell</th>
+                                            <th>Tárolási Hely</th>
+                                            <th>Forgalmi Állapot</th>
+                                            <th>Művelet</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="vehicle-fleet-rows">
+                                        <!-- Dynamic Fleet Rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submodal: Service Confirmation Dialog -->
+        <div id="vehicle-submodal-service" class="modal-backdrop hidden">
+            <div class="modal-dialog submodal-dialog">
+                <div class="modal-header">
+                    <h4><i class="fa-solid fa-wrench icon-accent amber"></i> Műhelyi Beavatkozás Megerősítése</h4>
+                    <button id="vehicle-submodal-service-close" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <p class="submodal-instruction" id="vehicle-service-instruction">A javítási művelet azonnal megkezdi a megjelölt alkatrész gyári szintre történő helyreállítását.</p>
+                    <div class="form-group">
+                        <label>Beavatkozás Típusa</label>
+                        <input type="text" id="vehicle-service-title-input" class="modal-input" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Munkadíj & Alkatrészköltség</label>
+                        <input type="text" id="vehicle-service-cost-input" class="modal-input" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Szerviz Megjegyzések (Opcionális)</label>
+                        <input type="text" id="vehicle-service-notes-input" class="modal-input" placeholder="pl. Fékbetét kopás miatt cserélve...">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="vehicle-service-cancel-btn" class="btn btn-secondary">Mégse</button>
+                    <button id="vehicle-service-confirm-btn" class="btn btn-primary"><i class="fa-solid fa-check"></i> Szerviz Végrehajtása</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submodal: Impound Release Settlement Confirmation -->
+        <div id="vehicle-submodal-release" class="modal-backdrop hidden">
+            <div class="modal-dialog submodal-dialog">
+                <div class="modal-header">
+                    <h4><i class="fa-solid fa-truck-pickup icon-accent emerald"></i> Járműkiváltás & Kincstári Elszámolás</h4>
+                    <button id="vehicle-submodal-release-close" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <p class="submodal-instruction">A kiváltási díj azonnal levonásra kerül a bankszámládról a városi kincstár javára. A jármű a telephely kijáratánál vehető át.</p>
+                    <div class="form-group">
+                        <label>Jármű Rendszáma / VIN</label>
+                        <input type="text" id="vehicle-release-plate-input" class="modal-input" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Fizetendő Végösszeg (Alapdíj + Tárolás + Kincstári Felár)</label>
+                        <input type="text" id="vehicle-release-total-input" class="modal-input" readonly>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="vehicle-release-cancel-btn" class="btn btn-secondary">Mégse</button>
+                    <button id="vehicle-release-confirm-btn" class="btn btn-primary"><i class="fa-solid fa-dollar-sign"></i> Díj Megfizetése & Kiváltás</button>
                 </div>
             </div>
         </div>

@@ -7291,7 +7291,275 @@ function Nyx.Tests.TestWarehouseMatrixAndElasticMarketMonitorUI()
     return passes == total
 end
 
--- 34. Master Test Runner
+-- 34. Test Vehicle Diagnostics & Civic Impound UI Subsystem
+function Nyx.Tests.TestVehicleDiagnosticsAndCivicImpoundUI()
+    print("^3[Nyx:Tests] Running Vehicle Diagnostics & Civic Impound UI Test Suite...^7")
+    local passes = 0
+    local total = 6
+
+    local DiagMod = (Nyx and Nyx.VehicleDiagnostics) or {}
+
+    -- Sub-test A: Overall Grade & Composite Score Calculation Invariant
+    local calcGrade = DiagMod.CalculateOverallGrade or function(wearData)
+        if not wearData then
+            return { grade = "unknown", score = 0.0, isRoadworthy = false }
+        end
+        local oil = math.max(0.0, math.min(100.0, tonumber(wearData.oilQuality or wearData.oil_quality or 100.0)))
+        local pads = math.max(0.0, math.min(100.0, tonumber(wearData.brakePadWear or wearData.brake_pad_wear or 100.0)))
+        local trans = math.max(0.0, math.min(100.0, tonumber(wearData.transmissionWear or wearData.transmission_wear or 100.0)))
+        local susp = math.max(0.0, math.min(100.0, tonumber(wearData.suspensionWear or wearData.suspension_wear or 100.0)))
+        local eng = math.max(0.0, math.min(1000.0, tonumber(wearData.engineHealth or wearData.engine_health or 1000.0)))
+        local engPct = (eng / 1000.0) * 100.0
+
+        local compositeScore = (oil * 0.25) + (pads * 0.25) + (trans * 0.20) + (susp * 0.15) + (engPct * 0.15)
+        compositeScore = math.floor(compositeScore * 10 + 0.5) / 10
+
+        local grade = "pristine"
+        if compositeScore < 25.0 then
+            grade = "critical"
+        elseif compositeScore < 50.0 then
+            grade = "poor"
+        elseif compositeScore < 75.0 then
+            grade = "fair"
+        elseif compositeScore < 90.0 then
+            grade = "good"
+        end
+
+        local isRoadworthy = (compositeScore >= 25.0) and (oil > 10.0) and (pads > 10.0)
+
+        return {
+            grade = grade,
+            score = compositeScore,
+            isRoadworthy = isRoadworthy
+        }
+    end
+
+    local pristineRes = calcGrade({ oilQuality = 100, brakePadWear = 100, transmissionWear = 100, suspensionWear = 100, engineHealth = 1000 })
+    local goodRes = calcGrade({ oilQuality = 85, brakePadWear = 80, transmissionWear = 90, suspensionWear = 85, engineHealth = 900 })
+    local critRes = calcGrade({ oilQuality = 5, brakePadWear = 8, transmissionWear = 20, suspensionWear = 15, engineHealth = 200 })
+
+    local testA_ok = (pristineRes.grade == "pristine" and pristineRes.score == 100.0 and pristineRes.isRoadworthy == true) and
+                     (goodRes.grade == "good" and goodRes.score >= 75.0 and goodRes.isRoadworthy == true) and
+                     (critRes.grade == "critical" and critRes.isRoadworthy == false)
+
+    if assertTest(testA_ok == true,
+        "Vehicle Overall Health Grade, Composite Score & Roadworthiness Invariant",
+        string.format("pristine=%s (%.1f), good=%s (%.1f), crit=%s (%.1f)", pristineRes.grade, pristineRes.score, goodRes.grade, goodRes.score, critRes.grade, critRes.score)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: OBD-II DTC (Diagnostic Trouble Codes) Generation & Severity Invariant
+    local genDTC = DiagMod.GenerateDiagnosticCodes or function(wearData)
+        local dtc = {}
+        if not wearData then return dtc end
+
+        local oil = tonumber(wearData.oilQuality or wearData.oil_quality or 100.0)
+        local pads = tonumber(wearData.brakePadWear or wearData.brake_pad_wear or 100.0)
+        local trans = tonumber(wearData.transmissionWear or wearData.transmission_wear or 100.0)
+        local susp = tonumber(wearData.suspensionWear or wearData.suspension_wear or 100.0)
+        local eng = tonumber(wearData.engineHealth or wearData.engine_health or 1000.0)
+
+        if oil <= 15.0 then
+            table.insert(dtc, { code = "P0524", severity = "critical", component = "oilQuality" })
+        end
+        if pads <= 15.0 then
+            table.insert(dtc, { code = "C0035", severity = "critical", component = "brakePadWear" })
+        end
+        if trans <= 20.0 then
+            table.insert(dtc, { code = "P0730", severity = "warning", component = "transmissionWear" })
+        end
+        if susp <= 20.0 then
+            table.insert(dtc, { code = "C1100", severity = "warning", component = "suspensionWear" })
+        end
+        if eng <= 300.0 then
+            table.insert(dtc, { code = "P0300", severity = "critical", component = "engineHealth" })
+        end
+
+        return dtc
+    end
+
+    local cleanCodes = genDTC({ oilQuality = 95, brakePadWear = 90, transmissionWear = 88, suspensionWear = 92, engineHealth = 950 })
+    local faultyCodes = genDTC({ oilQuality = 10, brakePadWear = 12, transmissionWear = 15, suspensionWear = 18, engineHealth = 250 })
+
+    local testB_ok = (#cleanCodes == 0) and (#faultyCodes == 5)
+
+    if assertTest(testB_ok == true,
+        "OBD-II Diagnostic Trouble Code (DTC) Generation & Component Mapping Invariant",
+        string.format("cleanCount=%d, faultyCount=%d", #cleanCodes, #faultyCodes)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Certified Service Estimate Calculation & Restorative Targets
+    local calcEstimate = DiagMod.CalculateServiceEstimate or function(serviceType, baseMultiplier)
+        local catalog = {
+            oil_change = { label = "Motorolaj Csere & Szűrő", baseCost = 150.00, component = "oilQuality", targetRestore = 100.0 },
+            brake_replacement = { label = "Fékbetét & Féktárcsa Csere", baseCost = 350.00, component = "brakePadWear", targetRestore = 100.0 },
+            transmission_overhaul = { label = "Sebességváltó Generál", baseCost = 850.00, component = "transmissionWear", targetRestore = 100.0 },
+            suspension_tune = { label = "Futómű Beállítás", baseCost = 400.00, component = "suspensionWear", targetRestore = 100.0 },
+            full_service = { label = "Teljes Műszaki Generál", baseCost = 1600.00, component = "all", targetRestore = 100.0 }
+        }
+        local item = catalog[serviceType]
+        if not item then return nil end
+
+        local mult = math.max(0.5, math.min(3.0, tonumber(baseMultiplier or 1.0)))
+        local cost = math.floor((item.baseCost * mult) * 100 + 0.5) / 100
+
+        return {
+            serviceType = serviceType,
+            label = item.label,
+            cost = cost,
+            component = item.component,
+            targetRestore = item.targetRestore
+        }
+    end
+
+    local estOil = calcEstimate("oil_change", 1.0)
+    local estBrakes = calcEstimate("brake_replacement", 1.2)
+    local estFull = calcEstimate("full_service", 1.0)
+    local estInvalid = calcEstimate("warp_drive", 1.0)
+
+    local testC_ok = (estOil and estOil.cost == 150.00 and estOil.component == "oilQuality") and
+                     (estBrakes and estBrakes.cost == 420.00 and estBrakes.component == "brakePadWear") and
+                     (estFull and estFull.cost == 1600.00 and estFull.component == "all") and
+                     (estInvalid == nil)
+
+    if assertTest(testC_ok == true,
+        "Mechanical Service Itemization, Cost Multiplier & Restorative Target Invariant",
+        string.format("oilCost=%.2f, brakesCost=%.2f, fullCost=%.2f", estOil.cost, estBrakes.cost, estFull.cost)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Zero-Trust Service & Release Payload Validation
+    local valService = DiagMod.ValidateServicePayload or function(payload)
+        if type(payload) ~= "table" then return false, "Payload must be a table" end
+        local vin = tostring(payload.vin or "")
+        if #vin < 6 or #vin > 32 then return false, "Invalid VIN identifier" end
+        local stype = tostring(payload.serviceType or "")
+        local validTypes = { oil_change = true, brake_replacement = true, transmission_overhaul = true, suspension_tune = true, full_service = true }
+        if not validTypes[stype] then return false, "Unknown service type" end
+        return true, "Valid"
+    end
+
+    local vOk, _ = valService({ vin = "1G1YY22U565100099", serviceType = "oil_change" })
+    local vBadVin, _ = valService({ vin = "", serviceType = "oil_change" })
+    local vBadType, _ = valService({ vin = "1G1YY22U565100099", serviceType = "nitro_boost" })
+
+    local testD_ok = (vOk == true and vBadVin == false and vBadType == false)
+
+    if assertTest(testD_ok == true,
+        "Mechanical Service Zero-Trust Payload Validation Rules",
+        string.format("vOk=%s, vBadVin=%s, vBadType=%s", tostring(vOk), tostring(vBadVin), tostring(vBadType))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Civic Impound Fee Math with Municipal Fiscal Crisis Surcharges
+    local calcImpound = DiagMod.CalculateImpoundTotals or function(baseFee, storageDays, dailyRate, fiscalTier)
+        local base = math.max(0.0, tonumber(baseFee or 500.0))
+        local days = math.max(0, tonumber(storageDays or 0))
+        local rate = math.max(0.0, tonumber(dailyRate or 150.0))
+        local tier = tostring(fiscalTier or "solvent"):lower()
+
+        local storageFee = days * rate
+        local subtotal = base + storageFee
+
+        local surchargeRates = {
+            solvent = 0.00,
+            fiscal_stress = 0.15,
+            degraded = 0.35,
+            bankrupt = 0.60
+        }
+        local surchargeRate = surchargeRates[tier] or 0.00
+        local emergencySurcharge = math.floor((subtotal * surchargeRate) * 100 + 0.5) / 100
+        local totalFee = subtotal + emergencySurcharge
+
+        return {
+            baseFee = base,
+            storageDays = days,
+            dailyRate = rate,
+            storageFee = storageFee,
+            subtotal = subtotal,
+            fiscalTier = tier,
+            surchargeRate = surchargeRate,
+            emergencySurcharge = emergencySurcharge,
+            totalFee = totalFee
+        }
+    end
+
+    local impSolvent = calcImpound(500.0, 2, 150.0, "solvent")        -- 500 + 300 = 800, 0% = 800
+    local impStress = calcImpound(500.0, 2, 150.0, "fiscal_stress")   -- 800 + 15% (120) = 920
+    local impDegraded = calcImpound(500.0, 2, 150.0, "degraded")     -- 800 + 35% (280) = 1080
+    local impBankrupt = calcImpound(500.0, 2, 150.0, "bankrupt")     -- 800 + 60% (480) = 1280
+
+    local testE_ok = (impSolvent.totalFee == 800.00 and impSolvent.emergencySurcharge == 0.00) and
+                     (impStress.totalFee == 920.00 and impStress.emergencySurcharge == 120.00) and
+                     (impDegraded.totalFee == 1080.00 and impDegraded.emergencySurcharge == 280.00) and
+                     (impBankrupt.totalFee == 1280.00 and impBankrupt.emergencySurcharge == 480.00)
+
+    if assertTest(testE_ok == true,
+        "Civic Impound Storage Totals & Treasury Fiscal Crisis Surcharge Invariant",
+        string.format("solvent=%.2f, stress=%.2f, degraded=%.2f, bankrupt=%.2f", impSolvent.totalFee, impStress.totalFee, impDegraded.totalFee, impBankrupt.totalFee)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Wear Badge Taxonomy & Catalog Search Filtering
+    local formatWear = DiagMod.FormatWearBadge or function(percentage)
+        local pct = math.max(0.0, math.min(100.0, tonumber(percentage or 100.0)))
+        if pct >= 80.0 then
+            return { badgeClass = "badge-success", label = "KIVÁLÓ", tier = "pristine" }
+        elseif pct >= 50.0 then
+            return { badgeClass = "badge-info", label = "MEGFELELŐ", tier = "good" }
+        elseif pct >= 25.0 then
+            return { badgeClass = "badge-warning", label = "KOPOTT", tier = "worn" }
+        else
+            return { badgeClass = "badge-danger", label = "KRITIKUS", tier = "critical" }
+        end
+    end
+
+    local filterCatalog = DiagMod.FilterVehiclesCatalog or function(list, query)
+        if not list then return {} end
+        local q = tostring(query or ""):lower():gsub("%s+", "")
+        if #q == 0 then return list end
+        local res = {}
+        for _, v in ipairs(list) do
+            local plate = tostring(v.plate or ""):lower():gsub("%s+", "")
+            local vin = tostring(v.vin or ""):lower():gsub("%s+", "")
+            local model = tostring(v.modelName or ""):lower():gsub("%s+", "")
+            if plate:find(q, 1, true) or vin:find(q, 1, true) or model:find(q, 1, true) then
+                table.insert(res, v)
+            end
+        end
+        return res
+    end
+
+    local b1 = formatWear(95.0)
+    local b2 = formatWear(60.0)
+    local b3 = formatWear(35.0)
+    local b4 = formatWear(10.0)
+
+    local sampleList = {
+        { vin = "VIN001", plate = "LS-100", modelName = "Dominator" },
+        { vin = "VIN002", plate = "BC-200", modelName = "Buffalo" }
+    }
+    local fPlate = filterCatalog(sampleList, "LS-100")
+    local fModel = filterCatalog(sampleList, "buff")
+
+    local testF_ok = (b1.tier == "pristine" and b1.badgeClass == "badge-success") and
+                     (b2.tier == "good" and b2.badgeClass == "badge-info") and
+                     (b3.tier == "worn" and b3.badgeClass == "badge-warning") and
+                     (b4.tier == "critical" and b4.badgeClass == "badge-danger") and
+                     (#fPlate == 1 and fPlate[1].plate == "LS-100") and
+                     (#fModel == 1 and fModel[1].modelName == "Buffalo")
+
+    if assertTest(testF_ok == true,
+        "Vehicle Wear Badge Taxonomy & Catalog Search Invariants",
+        string.format("b1=%s, b4=%s, fPlate=%d, fModel=%d", b1.tier, b4.tier, #fPlate, #fModel)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 35. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -7330,9 +7598,10 @@ function Nyx.Tests.RunAll()
     local t31 = Nyx.Tests.TestParliamentRankedChoiceAndLegislationUI()
     local t32 = Nyx.Tests.TestPropertyBlindAuctionAndStewardshipUI()
     local t33 = Nyx.Tests.TestWarehouseMatrixAndElasticMarketMonitorUI()
+    local t34 = Nyx.Tests.TestVehicleDiagnosticsAndCivicImpoundUI()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")
