@@ -119,6 +119,35 @@ function Nyx.Factions.CreateCharter(src, legalName, charterType, initialDeposit)
         return false, "REGISTRY_INSERT_FAILED"
     end
 
+    -- Step 4b: Initialize primary corporate vault in nyx_factions_vaults
+    local primaryVaultId = "vlt:" .. factionId .. ":main"
+    local defaultDailyLimit = Config.Vaults and Config.Vaults.DefaultDailyLimit or 100000.00
+    MySQL.prepare.await([[
+        INSERT INTO `nyx_factions_vaults`
+            (`vault_id`, `faction_id`, `vault_label`, `account_id`, `is_primary`, `daily_limit`, `daily_withdrawn`)
+        VALUES (?, ?, 'Primary Operating Treasury', ?, 1, ?, 0.00)
+        ON DUPLICATE KEY UPDATE `is_primary` = 1
+    ]], {
+        primaryVaultId,
+        factionId,
+        corpTreasuryAcc,
+        defaultDailyLimit
+    })
+
+    -- Step 4c: Seed default tiered sign-off rules
+    local defThreshold = Config.MultiSig and Config.MultiSig.DefaultThresholdAmount or 50000.00
+    local defSigs = Config.MultiSig and Config.MultiSig.DefaultRequiredSignatures or 2
+    MySQL.prepare.await([[
+        INSERT INTO `nyx_factions_signoff_rules`
+            (`rule_id`, `faction_id`, `vault_id`, `rule_name`, `min_amount`, `max_amount`, `required_signatures`, `timelock_seconds`, `priority`, `is_active`)
+        VALUES
+            (UUID(), ?, NULL, 'Standard Low-Tier Operating Liquidity', 0.00, ?, 1, 0, 10, 1),
+            (UUID(), ?, NULL, 'High-Tier Multi-Sig Corporate Quorum', ?, NULL, ?, 0, 20, 1)
+    ]], {
+        factionId, defThreshold,
+        factionId, defThreshold, defSigs
+    })
+
     -- Step 5: Assign founder as Supreme Executive with wildcard permissions and 100% initial equity
     Nyx.Factions.AddMember(
         "SYSTEM",
@@ -140,6 +169,7 @@ function Nyx.Factions.CreateCharter(src, legalName, charterType, initialDeposit)
         legalName = legalName,
         charterType = charterType,
         treasuryAccountId = corpTreasuryAcc,
+        primaryVaultId = primaryVaultId,
         primaryStashId = corpStashId,
         seedCapital = seedDeposit
     }
@@ -159,10 +189,17 @@ function Nyx.Factions.GetFactionOverview(factionId)
 
     local treasuryBalance = exports['nyx_treasury']:GetAccountBalance(faction.treasury_account_id) or 0.00
     local members = Nyx.Factions.GetFactionMembers(factionId)
+    local vaults = Nyx.Factions.GetFactionVaults(factionId)
+    local signoffRules = Nyx.Factions.GetSignoffRules(factionId)
 
     local pendingMultiSig = MySQL.query.await([[
         SELECT * FROM `nyx_factions_multisig_queue`
         WHERE `faction_id` = ? AND `status` = 'pending'
+    ]], { factionId })
+
+    local timelockedMultiSig = MySQL.query.await([[
+        SELECT * FROM `nyx_factions_multisig_queue`
+        WHERE `faction_id` = ? AND `status` = 'timelocked'
     ]], { factionId })
 
     local fleetCount = MySQL.scalar.await([[
@@ -172,8 +209,11 @@ function Nyx.Factions.GetFactionOverview(factionId)
     return {
         faction = faction,
         treasuryBalance = treasuryBalance,
+        vaults = vaults,
+        signoffRules = signoffRules,
         members = members,
         pendingMultiSig = pendingMultiSig or {},
+        timelockedMultiSig = timelockedMultiSig or {},
         fleetCount = tonumber(fleetCount) or 0
     }
 end

@@ -70,11 +70,12 @@ CreateThread(function()
             return { success = ok, error = (not ok and res or nil) }
         end)
 
-        -- 6. Initiate withdrawal (direct or multi-sig queue)
+        -- 6. Initiate withdrawal (direct or multi-sig queue with vault binding)
         exports['nyx_core']:RegisterRPC("factions:initiateWithdrawal", function(src, payload)
             local ok, status, res = Nyx.Factions.InitiateWithdrawal(
                 src,
                 payload.factionId,
+                payload.vaultId,
                 payload.targetAccount,
                 payload.amount,
                 payload.reason
@@ -83,8 +84,10 @@ CreateThread(function()
         end)
 
         -- 7. Approve / Sign multi-sig request
-        exports['nyx_core']:RegisterRPC("factions:signMultiSig", function(src, requestId)
-            local ok, status, res = Nyx.Factions.ApproveMultiSigRequest(src, requestId)
+        exports['nyx_core']:RegisterRPC("factions:signMultiSig", function(src, payload)
+            local requestId = (type(payload) == "table") and payload.requestId or payload
+            local note = (type(payload) == "table") and payload.note or nil
+            local ok, status, res = Nyx.Factions.ApproveMultiSigRequest(src, requestId, note)
             return { success = ok, status = status, data = res, error = (not ok and status or nil) }
         end)
 
@@ -92,6 +95,93 @@ CreateThread(function()
         exports['nyx_core']:RegisterRPC("factions:rejectMultiSig", function(src, requestId, reason)
             local ok, res = Nyx.Factions.RejectMultiSigRequest(src, requestId, reason)
             return { success = ok, error = (not ok and res or nil) }
+        end)
+
+        -- 8b. Cancel multi-sig request (Initiator or Authorized Executive)
+        exports['nyx_core']:RegisterRPC("factions:cancelMultiSig", function(src, payload)
+            local requestId = (type(payload) == "table") and payload.requestId or payload
+            local reason = (type(payload) == "table") and payload.reason or "Cancelled via Client Request"
+            local ok, res = Nyx.Factions.CancelMultiSigRequest(src, requestId, reason)
+            return { success = ok, error = (not ok and res or nil) }
+        end)
+
+        -- 8c. Execute timelocked multi-sig request
+        exports['nyx_core']:RegisterRPC("factions:executeTimelocked", function(src, requestId)
+            local ok, status, res = Nyx.Factions.ExecuteTimelockedMultiSig(src, requestId)
+            return { success = ok, status = status, data = res, error = (not ok and status or nil) }
+        end)
+
+        -- 8d. Corporate Vaults: Query all vaults
+        exports['nyx_core']:RegisterRPC("factions:getVaults", function(src, factionId)
+            local vaults = Nyx.Factions.GetFactionVaults(factionId)
+            return { success = true, vaults = vaults }
+        end)
+
+        -- 8e. Corporate Vaults: Create new designated sub-vault
+        exports['nyx_core']:RegisterRPC("factions:createVault", function(src, payload)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local ok, res = Nyx.Factions.CreateVault(player.citizenId, payload.factionId, payload.vaultLabel, payload.dailyLimit)
+            return { success = ok, vault = res, error = (not ok and res or nil) }
+        end)
+
+        -- 8f. Corporate Vaults: Emergency freeze / unfreeze toggle
+        exports['nyx_core']:RegisterRPC("factions:freezeVault", function(src, payload)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local ok, res = Nyx.Factions.SetVaultFreeze(player.citizenId, payload.factionId, payload.vaultId, payload.isFrozen, payload.reason)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- 8g. Corporate Vaults: Inter-vault capital transfer
+        exports['nyx_core']:RegisterRPC("factions:transferVaultFunds", function(src, payload)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local ok, res = Nyx.Factions.TransferVaultFunds(player.citizenId, payload.factionId, payload.fromVaultId, payload.toVaultId, payload.amount, payload.memo)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- 8h. Corporate Vaults: Deposit capital
+        exports['nyx_core']:RegisterRPC("factions:depositVault", function(src, payload)
+            local ok, res = Nyx.Factions.DepositToVault(src, payload.factionId, payload.vaultId, payload.amount)
+            return { success = ok, data = res, error = (not ok and res or nil) }
+        end)
+
+        -- 8i. Sign-Off Rules: Query rules
+        exports['nyx_core']:RegisterRPC("factions:getSignoffRules", function(src, payload)
+            local factionId = (type(payload) == "table") and payload.factionId or payload
+            local vaultId = (type(payload) == "table") and payload.vaultId or nil
+            local rules = Nyx.Factions.GetSignoffRules(factionId, vaultId)
+            return { success = true, rules = rules }
+        end)
+
+        -- 8j. Sign-Off Rules: Set rule
+        exports['nyx_core']:RegisterRPC("factions:setSignoffRule", function(src, payload)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local ok, res = Nyx.Factions.SetSignoffRule(player.citizenId, payload.factionId, payload.ruleData)
+            return { success = ok, rule = res, error = (not ok and res or nil) }
+        end)
+
+        -- 8k. Sign-Off Rules: Delete rule
+        exports['nyx_core']:RegisterRPC("factions:deleteSignoffRule", function(src, payload)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local ok, res = Nyx.Factions.DeleteSignoffRule(player.citizenId, payload.factionId, payload.ruleId)
+            return { success = ok, error = (not ok and res or nil) }
+        end)
+
+        -- 8l. Multi-Sig Audit Log
+        exports['nyx_core']:RegisterRPC("factions:getAuditLog", function(src, payload)
+            local factionId = (type(payload) == "table") and payload.factionId or payload
+            local limit = (type(payload) == "table") and payload.limit or 50
+            local logs = Nyx.Factions.GetMultiSigAuditLog(factionId, limit)
+            return { success = true, logs = logs }
         end)
 
         -- 9. Preview dividends

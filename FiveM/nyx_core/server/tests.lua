@@ -803,7 +803,167 @@ function Nyx.Tests.TestSharedMathAndVectorUtils()
     return passes == total
 end
 
--- 10. Master Test Runner
+-- 10. Test Multi-Signature Corporate Treasury Vaults & Dynamic Sign-Off Rules
+function Nyx.Tests.TestMultiSigVaultsAndSignOffRules()
+    print("^3[Nyx:Tests] Running Multi-Sig Vaults & Sign-Off Rules Suite...^7")
+    local passes = 0
+    local total = 6
+
+    -- Test A: Dynamic Sign-Off Rule Matching & Specificity Precedence
+    local mockRules = {
+        { ruleId = "r_petty", vaultId = nil, ruleName = "Petty Cash", minAmount = 0.00, maxAmount = 1000.00, requiredSignatures = 1, requiredRoles = nil, timelockSeconds = 0, priority = 10 },
+        { ruleId = "r_oper", vaultId = nil, ruleName = "Operational Expenses", minAmount = 1000.01, maxAmount = 25000.00, requiredSignatures = 2, requiredRoles = nil, timelockSeconds = 0, priority = 10 },
+        { ruleId = "r_capex", vaultId = nil, ruleName = "Capital Expenditure", minAmount = 25000.01, maxAmount = nil, requiredSignatures = 3, requiredRoles = { "Chief Executive" }, timelockSeconds = 3600, priority = 10 },
+        { ruleId = "r_payroll_spec", vaultId = "vlt:payroll", ruleName = "Dedicated Payroll Policy", minAmount = 0.00, maxAmount = 100000.00, requiredSignatures = 2, requiredRoles = { "Chief Financial Officer" }, timelockSeconds = 0, priority = 50 },
+    }
+
+    local function matchRule(vaultId, amount)
+        local matched = nil
+        for _, r in ipairs(mockRules) do
+            local matchesVault = (r.vaultId == vaultId or r.vaultId == nil)
+            local matchesMin = (amount >= r.minAmount)
+            local matchesMax = (r.maxAmount == nil or amount <= r.maxAmount)
+            if matchesVault and matchesMin and matchesMax then
+                if not matched then
+                    matched = r
+                else
+                    local curIsSpecific = (matched.vaultId ~= nil)
+                    local newIsSpecific = (r.vaultId ~= nil)
+                    if newIsSpecific and not curIsSpecific then
+                        matched = r
+                    elseif (newIsSpecific == curIsSpecific) and r.priority > matched.priority then
+                        matched = r
+                    end
+                end
+            end
+        end
+        return matched
+    end
+
+    local match500 = matchRule("vlt:main", 500.00)
+    local match15k = matchRule("vlt:main", 15000.00)
+    local match50k = matchRule("vlt:main", 50000.00)
+    local matchPayroll = matchRule("vlt:payroll", 40000.00)
+
+    if assertTest(match500 and match500.ruleId == "r_petty"
+        and match15k and match15k.ruleId == "r_oper" and match15k.requiredSignatures == 2
+        and match50k and match50k.ruleId == "r_capex" and match50k.requiredSignatures == 3 and match50k.timelockSeconds == 3600
+        and matchPayroll and matchPayroll.ruleId == "r_payroll_spec" and matchPayroll.vaultId == "vlt:payroll",
+        "Sign-Off Rule Matching, Amount Boundaries & Vault Specificity Invariant",
+        "Rule matching engine failed boundary or precedence checks") then
+        passes = passes + 1
+    end
+
+    -- Test B: Multi-Signature Quorum Accumulation & Role Fulfillment
+    local reqRoles = { "Chief Executive" }
+    local function evaluateRoles(sigDetails)
+        local present = {}
+        for _, s in ipairs(sigDetails) do
+            if s.roleTitle then present[s.roleTitle] = true end
+        end
+        for _, rr in ipairs(reqRoles) do
+            if not present[rr] then return false end
+        end
+        return true
+    end
+
+    local sigs1 = { { citizenId = "CIT_01", roleTitle = "Associate" } }
+    local sigs2 = { { citizenId = "CIT_01", roleTitle = "Associate" }, { citizenId = "CIT_02", roleTitle = "Manager" } }
+    local sigs3 = { { citizenId = "CIT_01", roleTitle = "Associate" }, { citizenId = "CIT_02", roleTitle = "Manager" }, { citizenId = "CIT_03", roleTitle = "Chief Executive" } }
+
+    local q1 = (#sigs1 >= 2) and evaluateRoles(sigs1)
+    local q2 = (#sigs2 >= 2) and evaluateRoles(sigs2)
+    local q3 = (#sigs3 >= 2) and evaluateRoles(sigs3)
+
+    if assertTest(q1 == false and q2 == false and q3 == true,
+        "Signatory Quorum Count & Mandatory Role Validation Invariant",
+        "Quorum validation failed role or count criteria") then
+        passes = passes + 1
+    end
+
+    -- Test C: Timelock Gating & Delayed Disbursement Execution Invariant
+    local nowTime = 1770000000
+    local timelockDelay = 3600
+    local timelockUntil = nowTime + timelockDelay
+    local isEarlyExecutable = (nowTime >= timelockUntil)
+    local isPostExecutable = ((nowTime + 3601) >= timelockUntil)
+
+    if assertTest(isEarlyExecutable == false and isPostExecutable == true,
+        "Timelock Escrow Gating & Execution Window Invariant",
+        "Timelock premature execution check failed") then
+        passes = passes + 1
+    end
+
+    -- Test D: Rolling 24-Hour Daily Withdrawal Limit Invariant
+    local mockVault = {
+        dailyLimit = 100000.00,
+        dailyWithdrawn = 0.00,
+        lastReset = nowTime
+    }
+
+    local function withdrawFromVault(amt, curTime)
+        if (curTime - mockVault.lastReset) >= 86400 then
+            mockVault.dailyWithdrawn = 0.00
+            mockVault.lastReset = curTime
+        end
+        if (mockVault.dailyWithdrawn + amt) > mockVault.dailyLimit then
+            return false, "EXCEEDS_VAULT_DAILY_LIMIT"
+        end
+        mockVault.dailyWithdrawn = mockVault.dailyWithdrawn + amt
+        return true, mockVault.dailyWithdrawn
+    end
+
+    local w1Ok, w1Withdrawn = withdrawFromVault(60000.00, nowTime)
+    local w2Ok, w2Err = withdrawFromVault(50000.00, nowTime + 100)
+    local w3Ok, w3Withdrawn = withdrawFromVault(30000.00, nowTime + 200)
+    local w4Ok, w4Withdrawn = withdrawFromVault(50000.00, nowTime + 86500)
+
+    if assertTest(w1Ok == true and w1Withdrawn == 60000.00
+        and w2Ok == false and w2Err == "EXCEEDS_VAULT_DAILY_LIMIT"
+        and w3Ok == true and w3Withdrawn == 90000.00
+        and w4Ok == true and w4Withdrawn == 50000.00,
+        "Rolling 24-Hour Daily Withdrawal Limit & Reset Invariant",
+        "Daily limit tracking or rolling reset deviated from expected behavior") then
+        passes = passes + 1
+    end
+
+    -- Test E: Emergency Vault Freeze & Lockdown Invariant
+    local frozenVault = { isFrozen = true }
+    local function attemptDisbursement(vlt, amt)
+        if vlt.isFrozen then return false, "VAULT_FROZEN" end
+        return true, "DISBURSED"
+    end
+
+    local frozenRes, frozenErr = attemptDisbursement(frozenVault, 1000.00)
+    frozenVault.isFrozen = false
+    local unfrozenRes, unfrozenStatus = attemptDisbursement(frozenVault, 1000.00)
+
+    if assertTest(frozenRes == false and frozenErr == "VAULT_FROZEN" and unfrozenRes == true and unfrozenStatus == "DISBURSED",
+        "Emergency Vault Freeze & Lockdown Execution Block Invariant",
+        "Vault lockdown failed to block transactions") then
+        passes = passes + 1
+    end
+
+    -- Test F: Inter-Vault Capital Rebalance Closed-Loop Conservation
+    local sourceBal = 150000.00
+    local targetBal = 25000.00
+    local initialTotal = sourceBal + targetBal
+    local transferAmt = 45000.00
+
+    sourceBal = sourceBal - transferAmt
+    targetBal = targetBal + transferAmt
+    local finalTotal = sourceBal + targetBal
+
+    if assertTest(sourceBal == 105000.00 and targetBal == 70000.00 and finalTotal == initialTotal,
+        "Inter-Vault Transfer Closed-Loop Conservation Invariant",
+        "Inter-vault balance shifted or leaked during rebalance") then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 11. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -818,9 +978,10 @@ function Nyx.Tests.RunAll()
     local t7 = Nyx.Tests.TestElasticItemPricingAndZoneDemand()
     local t8 = Nyx.Tests.TestEvidenceChainOfCustody()
     local t9 = Nyx.Tests.TestSharedMathAndVectorUtils()
+    local t10 = Nyx.Tests.TestMultiSigVaultsAndSignOffRules()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

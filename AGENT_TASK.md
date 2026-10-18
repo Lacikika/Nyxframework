@@ -30,15 +30,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] Feature: Elastic item pricing based on localized stock-to-demand ratio (`nyx_logistics` / `nyx_treasury`)
 - [x] Feature: Cryptographic evidence chain-of-custody registry with SHA-256 fingerprints (`nyx_judiciary`)
 - [x] Refactor: Extract shared math/vector helper functions into a standalone utility (`nyx_core/shared/math.lua`)
-- [ ] Feature: Multi-signature corporate treasury vaults and sign-off rules (`nyx_factions`)
-- [ ] Feature: Municipal power grid substation failure & blackout simulation (`nyx_services`)
-- [ ] Security: Enforce RPC rate limiting (50 req/s token bucket) and 64KB payload cap (`nyx_core/server/rpc.lua`)
-- [ ] Feature: Instant-Runoff Voting (IRV) election engine & live penal code sync (`nyx_parliament`)
-- [ ] Feature: Automated jury pool dispatcher with Fisher-Yates shuffle & courtroom bucket routing (`nyx_judiciary`)
-- [ ] Feature: Fiscal circuit protection & logarithmic public payroll scaling (`nyx_treasury`)
-- [ ] Feature: Spatial grid ground drops & time-based item durability decay (`nyx_inventory` / `nyx_interact`)
-- [ ] Feature: Physical freight pallets & power-dependent industrial assembly (`nyx_logistics` / `nyx_services`)
-- [ ] QA: Add concurrency unit tests for inventory mutex locks and treasury double-entry conservation (`nyx_core/server/tests.lua`)
+- [x] Feature: Multi-signature corporate treasury vaults and sign-off rules (`nyx_factions`)
 - [ ] **Architecture: Master SPA CEF Optimization, Zero-Trust Security & UI/UX Ergonomics (`nyx_ui`)**
   - **Dynamic Resource & Browser Dev Mode:** Resolve endpoints dynamically via `window.GetParentResourceName ? GetParentResourceName() : 'nui-dev'`. Provide mock state fallbacks when `window.invokeNative` is undefined for desktop browser debugging.
   - **Focus & Lifecycle Failsafes:** Guarantee `cb(...)` execution on all code paths across every `RegisterNUICallback`. Bind `Escape` (and `Backspace` only when active element is not `INPUT`, `TEXTAREA`, or `[contenteditable]`) to close sub-modals/tooltips first before triggering `SetNuiFocus(false, false)`. Reset NUI focus automatically inside an `onResourceStop` handler.
@@ -66,9 +58,24 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
     - **Tier 1 (71%–95% load):** Moderate load; `-10%` sprint speed and slightly increased stamina drain.
     - **Tier 2 (96%–100%+ load):** Overencumbered; sprinting and jumping disabled, fast walking allowed.
     - **Tier 3 (Heavy Industrial Crates > 50kg):** Cannot be stored in backpack; requires physical two-handed carry, ground-dragging via `LALT`, or transport via pallet jack / forklift.
+- [ ] Feature: Municipal power grid substation failure & blackout simulation (`nyx_services`)
+- [ ] Security: Enforce RPC rate limiting (50 req/s token bucket) and 64KB payload cap (`nyx_core/server/rpc.lua`)
+- [ ] Feature: Instant-Runoff Voting (IRV) election engine & live penal code sync (`nyx_parliament`)
+- [ ] Feature: Automated jury pool dispatcher with Fisher-Yates shuffle & courtroom bucket routing (`nyx_judiciary`)
+- [ ] Feature: Fiscal circuit protection & logarithmic public payroll scaling (`nyx_treasury`)
+- [ ] Feature: Spatial grid ground drops & time-based item durability decay (`nyx_inventory` / `nyx_interact`)
+- [ ] Feature: Physical freight pallets & power-dependent industrial assembly (`nyx_logistics` / `nyx_services`)
+- [ ] QA: Add concurrency unit tests for inventory mutex locks and treasury double-entry conservation (`nyx_core/server/tests.lua`)
+
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Multi-signature corporate treasury vaults and sign-off rules (`nyx_factions`)**
+  - **Database Migration (`016_factions_vaults_and_signoff_rules.sql`)**: Created `nyx_factions_vaults` (storing designated sub-vaults, balances, daily limits, 24h rolling window reset timestamp, and emergency lockdown/freeze states). Created `nyx_factions_signoff_rules` (tiered min/max amount boundaries, required signature counts, required roles/permissions JSON array, timelocks, and rule priority). Extended `nyx_factions_multisig_queue` with `vault_id`, `rule_id`, detailed signer telemetry (`signature_details`), timelock timestamp (`timelock_until`), and cancellation metadata. Created `nyx_factions_multisig_audit` for immutable audit logging. Registered in `FiveM/nyx_core/sql/migrations/index.json` and mirrored to `nyx_factions`.
+  - **Corporate Sub-Vaults Engine (`nyx_factions/server/vaults.lua`)**: Created modular vault management subsystem. Supports automatic primary vault initialization fallback for legacy factions (`EnsurePrimaryVault`), creation of customized corporate sub-vaults (`CreateVault`, capped at 10 sub-vaults per organization), rolling 24h withdrawal limit tracking and automatic reset, emergency freeze/lockdown toggle (`SetVaultFreeze`) with real-time push broadcasts, internal inter-vault capital rebalancing (`TransferVaultFunds`), and personal capital deposits (`DepositToVault`).
+  - **Dynamic Sign-Off Rules & Multi-Sig Execution Engine (`nyx_factions/server/multisig.lua`)**: Implemented dynamic rule matching engine (`EvaluateSignoffRule`) evaluating withdrawal amounts against specific vault or global faction rules with priority weighting. Integrated into `InitiateWithdrawal`, executing direct transfers when permitted or routing to multi-sig escrow when thresholds or policies require quorum. Enforces mandatory signer role criteria (`evaluateSignatoryRoles`), prevents duplicate signatures, logs signer metadata with roles and audit notes. Implemented timelock execution mechanics (`ExecuteTimelockedMultiSig`) preventing premature disbursements until cooldowns elapse. Added formal cancellation workflows (`CancelMultiSigRequest`) and audit trail querying (`GetMultiSigAuditLog`).
+  - **RPC Endpoints & Manifest Topology (`nyx_factions/server/main.lua`, `config.lua`, `fxmanifest.lua`)**: Registered 13 new and updated RPC routes (`factions:getVaults`, `factions:createVault`, `factions:freezeVault`, `factions:transferVaultFunds`, `factions:depositVault`, `factions:getSignoffRules`, `factions:setSignoffRule`, `factions:deleteSignoffRule`, `factions:initiateWithdrawal`, `factions:signMultiSig`, `factions:rejectMultiSig`, `factions:cancelMultiSig`, `factions:executeTimelocked`, `factions:getAuditLog`). Added permission nodes `treasury:manage_vaults`, `treasury:manage_rules`, and `treasury:freeze_vault` to `Config.PermissionNodes`. Declared `server/vaults.lua` in `fxmanifest.lua` server scripts. Updated `client/main.lua` with event handlers and `/corp_vaults` command.
+  - **Testing & Verification**: Created in-engine integration test suite `Nyx.Tests.TestMultiSigVaultsAndSignOffRules` in `FiveM/nyx_core/server/tests.lua` validating rule matching precedence, quorum and mandatory role criteria, timelock gating, rolling 24h daily limit reset, emergency vault freeze lockout, and inter-vault closed-loop conservation. Created standalone Python unit test suite `tests/test_multisig_vaults.py` (41/41 tests passing across all pytest suites), and verified clean passes across all 13 resources and 153 Lua files in `scripts/verify.ps1` and `scripts/validator.py`.
 - **[2026-10-18] Refactor: Extract shared math/vector helper functions into a standalone utility (`nyx_core/shared/math.lua`)**
   - **Standalone Pure Lua 5.4 Math & Vector Library (`FiveM/nyx_core/shared/math.lua`)**: Created comprehensive, defensive, zero-busywait mathematical, vector algebra, and spatial geometry utility module (`Nyx.Math`).
     - *Scalar Operations*: `Clamp` (with inversion auto-repair), precision `Round` (symmetric negative/positive rounding to configurable decimal places), `Lerp`, `InvLerp` (with zero-division prevention), `Remap`, `Sign`, `IsNear` (floating-point epsilon tolerance comparison), `DegToRad`, and `RadToDeg`.

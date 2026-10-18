@@ -38,6 +38,13 @@ Config.Dividends = {
     MaxReinvestmentRate = 0.50      -- Constitutional ceiling
 }
 
+-- Corporate Treasury Vaults & Sub-Accounts Configuration
+Config.Vaults = {
+    DefaultDailyLimit = 100000.00, -- Default 24h rolling withdrawal limit per vault
+    MaxSubVaults = 10,             -- Maximum designated sub-vaults per organization
+    DailyResetSeconds = 86400      -- Rolling window reset threshold (24 hours)
+}
+
 -- Standard Granular RBAC Permission Nodes
 Config.PermissionNodes = {
     "treasury:view_ledger",
@@ -45,6 +52,9 @@ Config.PermissionNodes = {
     "treasury:withdraw_low",
     "treasury:withdraw_high",
     "treasury:sign_tx",
+    "treasury:manage_vaults",
+    "treasury:manage_rules",
+    "treasury:freeze_vault",
     "inventory:view",
     "inventory:deposit",
     "inventory:withdraw",

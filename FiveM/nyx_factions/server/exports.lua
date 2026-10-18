@@ -41,17 +41,75 @@ exports("GetFactionMembers", function(factionId)
     return Nyx.Factions.GetFactionMembers(factionId)
 end)
 
--- Multi-Signature Vault
-exports("InitiateWithdrawal", function(src, factionId, targetAccount, amount, reason)
-    return Nyx.Factions.InitiateWithdrawal(src, factionId, targetAccount, amount, reason)
+-- Corporate Treasury Vaults
+exports("GetFactionVaults", function(factionId)
+    return Nyx.Factions.GetFactionVaults(factionId)
 end)
 
-exports("ApproveMultiSigRequest", function(src, requestId)
-    return Nyx.Factions.ApproveMultiSigRequest(src, requestId)
+exports("GetVault", function(vaultId)
+    return Nyx.Factions.GetVault(vaultId)
+end)
+
+exports("CreateVault", function(actorCitizenId, factionId, vaultLabel, dailyLimit)
+    return Nyx.Factions.CreateVault(actorCitizenId, factionId, vaultLabel, dailyLimit)
+end)
+
+exports("SetVaultFreeze", function(actorCitizenId, factionId, vaultId, isFrozen, reason)
+    return Nyx.Factions.SetVaultFreeze(actorCitizenId, factionId, vaultId, isFrozen, reason)
+end)
+
+exports("TransferVaultFunds", function(actorCitizenId, factionId, fromVaultId, toVaultId, amount, memo)
+    return Nyx.Factions.TransferVaultFunds(actorCitizenId, factionId, fromVaultId, toVaultId, amount, memo)
+end)
+
+exports("DepositToVault", function(src, factionId, vaultId, amount)
+    return Nyx.Factions.DepositToVault(src, factionId, vaultId, amount)
+end)
+
+-- Granular Sign-Off Rules
+exports("GetSignoffRules", function(factionId, vaultId)
+    return Nyx.Factions.GetSignoffRules(factionId, vaultId)
+end)
+
+exports("EvaluateSignoffRule", function(factionId, vaultId, amount)
+    return Nyx.Factions.EvaluateSignoffRule(factionId, vaultId, amount)
+end)
+
+exports("SetSignoffRule", function(actorCitizenId, factionId, ruleData)
+    return Nyx.Factions.SetSignoffRule(actorCitizenId, factionId, ruleData)
+end)
+
+exports("DeleteSignoffRule", function(actorCitizenId, factionId, ruleId)
+    return Nyx.Factions.DeleteSignoffRule(actorCitizenId, factionId, ruleId)
+end)
+
+-- Multi-Signature Vault Requests
+exports("InitiateWithdrawal", function(src, factionId, vaultId, targetAccount, amount, reason)
+    -- Backward compatibility: If 5 args passed (no vaultId), shift parameters
+    if reason == nil and type(amount) == "string" then
+        return Nyx.Factions.InitiateWithdrawal(src, factionId, nil, vaultId, targetAccount, amount)
+    end
+    return Nyx.Factions.InitiateWithdrawal(src, factionId, vaultId, targetAccount, amount, reason)
+end)
+
+exports("ApproveMultiSigRequest", function(src, requestId, note)
+    return Nyx.Factions.ApproveMultiSigRequest(src, requestId, note)
 end)
 
 exports("RejectMultiSigRequest", function(src, requestId, reason)
     return Nyx.Factions.RejectMultiSigRequest(src, requestId, reason)
+end)
+
+exports("CancelMultiSigRequest", function(src, requestId, reason)
+    return Nyx.Factions.CancelMultiSigRequest(src, requestId, reason)
+end)
+
+exports("ExecuteTimelockedMultiSig", function(src, requestId)
+    return Nyx.Factions.ExecuteTimelockedMultiSig(src, requestId)
+end)
+
+exports("GetMultiSigAuditLog", function(factionId, limit)
+    return Nyx.Factions.GetMultiSigAuditLog(factionId, limit)
 end)
 
 -- Dividends & Equity

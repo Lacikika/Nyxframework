@@ -21,6 +21,7 @@ server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/permissions.lua',
     'server/charter.lua',
+    'server/vaults.lua',
     'server/multisig.lua',
     'server/dividends.lua',
     'server/fleet.lua',

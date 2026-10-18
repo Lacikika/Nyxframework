@@ -11,3 +11,7 @@ end)
 exports("GetFleetDepots", function()
     return Config.FleetDepots or {}
 end)
+
+exports("GetVaultsConfig", function()
+    return Config.Vaults or {}
+end)
