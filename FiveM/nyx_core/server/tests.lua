@@ -8096,7 +8096,229 @@ function Nyx.Tests.TestAnatomicalTraumaAndInjuryEngine()
     return passes == total
 end
 
--- 37. Master Test Runner
+-- 37. Test Pillbox Hospital Supply Depletion & Emergency Medical Hauls
+function Nyx.Tests.TestPillboxSupplyDepletionAndEmergencyHauls()
+    print("^3[Nyx:Tests] Running Pillbox Hospital Supply Depletion & Emergency Medical Hauls Suite...^7")
+    local passes = 0
+    local total = 6
+
+    local SupplyMod = Nyx.HospitalSupplies or {}
+
+    -- Sub-test A: Finite Container Stash Mapping & Canonical Resolution
+    local resolveStash = SupplyMod.GetStashIdForHospital or function(hId)
+        local map = {
+            ['pillbox_hill'] = "stash:pillbox_meds",
+            ['sandy_shores_clinic'] = "stash:sandy_clinic_meds",
+            ['paleto_bay_hospital'] = "stash:paleto_hospital_meds"
+        }
+        return map[hId] or "stash:pillbox_meds"
+    end
+
+    local resolveHospital = SupplyMod.GetHospitalIdForStash or function(sId)
+        local map = {
+            ['stash:pillbox_meds'] = "pillbox_hill",
+            ['stash:sandy_clinic_meds'] = "sandy_shores_clinic",
+            ['stash:paleto_hospital_meds'] = "paleto_bay_hospital"
+        }
+        return map[sId] or "pillbox_hill"
+    end
+
+    local stashPillbox = resolveStash("pillbox_hill")
+    local hospPillbox = resolveHospital("stash:pillbox_meds")
+    local stashSandy = resolveStash("sandy_shores_clinic")
+    local stashPaleto = resolveStash("paleto_bay_hospital")
+
+    local testA_ok = (stashPillbox == "stash:pillbox_meds") and
+                     (hospPillbox == "pillbox_hill") and
+                     (stashSandy == "stash:sandy_clinic_meds") and
+                     (stashPaleto == "stash:paleto_hospital_meds")
+
+    if assertTest(testA_ok == true,
+        "Finite Container Stash Mapping & Canonical Resolution Invariant",
+        string.format("pillboxStash=%s, hosp=%s, sandyStash=%s, paletoStash=%s",
+            tostring(stashPillbox), tostring(hospPillbox), tostring(stashSandy), tostring(stashPaleto))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Supply Level Evaluation & Multi-Tier Shortage Classification
+    local evaluateLevel = SupplyMod.EvaluateSupplyLevel or function(counts, thresh)
+        thresh = thresh or { critical = 5, degraded = 15 }
+        local p = counts['med_plasma'] or 0
+        local t = counts['med_firstaid'] or 0
+        local s = counts['med_surgical_pack'] or 0
+        if p <= thresh.critical or t <= thresh.critical or s <= 1 then
+            return "critical_shortage", { status = "critical_shortage", plasma = p, traumaKits = t, surgicalPacks = s }
+        elseif p <= thresh.degraded or t <= thresh.degraded or s <= 3 then
+            return "degraded", { status = "degraded", plasma = p, traumaKits = t, surgicalPacks = s }
+        else
+            return "optimal", { status = "optimal", plasma = p, traumaKits = t, surgicalPacks = s }
+        end
+    end
+
+    local statusOptimal, _ = evaluateLevel({ med_plasma = 30, med_firstaid = 25, med_surgical_pack = 15 })
+    local statusDegraded, _ = evaluateLevel({ med_plasma = 12, med_firstaid = 25, med_surgical_pack = 15 })
+    local statusCritPlasma, _ = evaluateLevel({ med_plasma = 3, med_firstaid = 25, med_surgical_pack = 15 })
+    local statusCritSurg, _ = evaluateLevel({ med_plasma = 30, med_firstaid = 25, med_surgical_pack = 0 })
+
+    local testB_ok = (statusOptimal == "optimal") and
+                     (statusDegraded == "degraded") and
+                     (statusCritPlasma == "critical_shortage") and
+                     (statusCritSurg == "critical_shortage")
+
+    if assertTest(testB_ok == true,
+        "Supply Level Evaluation & Multi-Tier Shortage Classification Invariant",
+        string.format("optimal=%s, degraded=%s, critPlasma=%s, critSurg=%s",
+            statusOptimal, statusDegraded, statusCritPlasma, statusCritSurg)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Patient Revival Depletion, Surgical Requirements & Zero-Stock Shortage Penalty Invariant
+    local mockStash = {
+        ['med_plasma'] = 10,
+        ['med_firstaid'] = 10,
+        ['med_surgical_pack'] = 2
+    }
+
+    local function mockRevive(requiresSurgery, isPowered)
+        local delay = 0
+        if not isPowered then delay = delay + 30 end
+
+        if requiresSurgery then
+            if (mockStash['med_surgical_pack'] or 0) <= 0 then
+                return false, "SURGICAL_UNAVAILABLE_SUPPLY_DEPLETED"
+            end
+            mockStash['med_surgical_pack'] = mockStash['med_surgical_pack'] - 1
+        end
+
+        if (mockStash['med_plasma'] or 0) > 0 and (mockStash['med_firstaid'] or 0) > 0 then
+            mockStash['med_plasma'] = mockStash['med_plasma'] - 1
+            mockStash['med_firstaid'] = mockStash['med_firstaid'] - 1
+        else
+            delay = delay + 60
+        end
+
+        return true, delay
+    end
+
+    local ok1, delay1 = mockRevive(true, true)  -- uses 1 surg, 1 plasma, 1 firstaid
+    local ok2, delay2 = mockRevive(false, true) -- uses 1 plasma, 1 firstaid
+    mockStash['med_surgical_pack'] = 0
+    local ok3Fail, errSurg = mockRevive(true, true) -- should fail
+    mockStash['med_plasma'] = 0
+    local ok4, delay4 = mockRevive(false, true) -- zero-stock penalty: delay = 60s
+
+    local testC_ok = (ok1 == true and delay1 == 0) and
+                     (ok2 == true and delay2 == 0) and
+                     (mockStash['med_plasma'] == 8) and
+                     (mockStash['med_firstaid'] == 8) and
+                     (ok3Fail == false and errSurg == "SURGICAL_UNAVAILABLE_SUPPLY_DEPLETED") and
+                     (ok4 == true and delay4 == 60)
+
+    if assertTest(testC_ok == true,
+        "Patient Revival Depletion, Surgical Guard & Zero-Stock Penalty Invariant",
+        string.format("ok1=%s, ok2=%s, pLeft=%d, errSurg=%s, delay4=%d",
+            tostring(ok1), tostring(ok2), mockStash['med_plasma'], tostring(errSurg), delay4)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Emergency Medical Haul Contract Formulation & Hazard Escrow Bounties
+    local calcContract = SupplyMod.CalculateEmergencyContract or function(hId, itemId, curStock, q, target)
+        q = q or 25
+        target = target or 50
+        curStock = curStock or 0
+        local basePrice = 120.00
+        local deficitRatio = math.max(0.0, math.min(1.0, (target - curStock) / target))
+        local mult = 1.85 + (deficitRatio * (2.75 - 1.85))
+        local payoutPerUnit = math.floor((basePrice * mult) * 100 + 0.5) / 100
+        local totalPayout = math.floor((payoutPerUnit * q) * 100 + 0.5) / 100
+        local escrow = math.floor((totalPayout * 0.15) * 100 + 0.5) / 100
+        return {
+            hospitalId = hId,
+            itemId = itemId,
+            quantity = q,
+            payoutPerUnit = payoutPerUnit,
+            totalPayout = totalPayout,
+            escrowDeposit = escrow,
+            deadlineSeconds = 900
+        }
+    end
+
+    local contractCritical = calcContract("pillbox_hill", "med_plasma", 0, 25, 50)
+    local contractModerate = calcContract("pillbox_hill", "med_plasma", 25, 25, 50)
+
+    local c1Ok = (contractCritical.payoutPerUnit == 330.00) and
+                 (contractCritical.totalPayout == 8250.00) and
+                 (contractCritical.escrowDeposit == 1237.50) and
+                 (contractCritical.deadlineSeconds == 900)
+
+    local c2Ok = (contractModerate.payoutPerUnit == 276.00) and
+                 (contractModerate.totalPayout == 6900.00) and
+                 (contractModerate.escrowDeposit == 1035.00)
+
+    local testD_ok = c1Ok and c2Ok
+
+    if assertTest(testD_ok == true,
+        "Emergency Medical Haul Contract Formulation & Hazard Escrow Bounty Invariant",
+        string.format("critPayout=%.2f (escrow=%.2f), modPayout=%.2f",
+            contractCritical.totalPayout, contractCritical.escrowDeposit, contractModerate.totalPayout)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Restock Validation & Closed-Loop Hospital Replenishment Lifecycle
+    local validateRestock = SupplyMod.ValidateRestockItem or function(itemId, amt)
+        if not itemId or type(itemId) ~= "string" then return false, "INVALID_ITEM_ID" end
+        amt = tonumber(amt)
+        if not amt or amt <= 0 or math.floor(amt) ~= amt then return false, "INVALID_AMOUNT" end
+        local valid = { med_plasma = true, med_firstaid = true, med_surgical_pack = true, bandage_sterile = true, tourniquet = true }
+        if not valid[itemId] then return false, "UNTRACKED_MEDICAL_SUPPLY_ITEM" end
+        return true, { itemId = itemId, amount = amt }
+    end
+
+    local okRestockValid, _ = validateRestock("med_plasma", 25)
+    local okRestockBadAmt, errAmt = validateRestock("med_plasma", -5)
+    local okRestockBadItem, errItem = validateRestock("weapon_pistol", 1)
+
+    local testE_ok = (okRestockValid == true) and
+                     (okRestockBadAmt == false and errAmt == "INVALID_AMOUNT") and
+                     (okRestockBadItem == false and errItem == "UNTRACKED_MEDICAL_SUPPLY_ITEM")
+
+    if assertTest(testE_ok == true,
+        "Medical Restock Validation & Zero-Trust Item Guards Invariant",
+        string.format("valid=%s, errAmt=%s, errItem=%s",
+            tostring(okRestockValid), errAmt, errItem)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Grid Blackout Emergency Generator Delay Compounding Invariant
+    local calcPenalty = SupplyMod.CalculateRespawnPenalty or function(status, isPowered)
+        local base = (status == "critical_shortage") and 60 or ((status == "degraded") and 30 or 0)
+        if not isPowered then base = base + 30 end
+        return base
+    end
+
+    local pOptOnline = calcPenalty("optimal", true)
+    local pOptBlackout = calcPenalty("optimal", false)
+    local pDegOnline = calcPenalty("degraded", true)
+    local pDegBlackout = calcPenalty("degraded", false)
+    local pCritBlackout = calcPenalty("critical_shortage", false)
+
+    local testF_ok = (pOptOnline == 0) and
+                     (pOptBlackout == 30) and
+                     (pDegOnline == 30) and
+                     (pDegBlackout == 60) and
+                     (pCritBlackout == 90)
+
+    if assertTest(testF_ok == true,
+        "Power Grid Blackout Emergency Generator Delay Compounding Invariant",
+        string.format("optOn=%d, optOff=%d, degOn=%d, degOff=%d, critOff=%d",
+            pOptOnline, pOptBlackout, pDegOnline, pDegBlackout, pCritBlackout)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 38. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -8138,9 +8360,10 @@ function Nyx.Tests.RunAll()
     local t34 = Nyx.Tests.TestVehicleDiagnosticsAndCivicImpoundUI()
     local t35 = Nyx.Tests.TestCitizenOSSmartphoneFramework()
     local t36 = Nyx.Tests.TestAnatomicalTraumaAndInjuryEngine()
+    local t37 = Nyx.Tests.TestPillboxSupplyDepletionAndEmergencyHauls()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

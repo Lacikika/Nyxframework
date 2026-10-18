@@ -61,6 +61,39 @@ CreateThread(function()
             return { success = ok, data = res, error = (not ok and res or nil) }
         end)
 
+        -- Query detailed hospital finite stash supplies
+        exports['nyx_core']:RegisterRPC("services:getHospitalSupplies", function(src, hospitalId)
+            hospitalId = hospitalId or "pillbox_hill"
+            local h = Nyx.Services.GetHospital(hospitalId)
+            if not h then return { success = false, error = "HOSPITAL_NOT_FOUND" } end
+            local counts = Nyx.Services.GetHospitalStashCounts(hospitalId)
+            local status, metrics = Nyx.Services.EvaluateHospitalStatus(hospitalId)
+            return {
+                success = true,
+                hospitalId = hospitalId,
+                label = h.label,
+                stashId = h.stashId,
+                status = status,
+                counts = counts,
+                metrics = metrics
+            }
+        end)
+
+        -- Query hospital stash container ID
+        exports['nyx_core']:RegisterRPC("services:getHospitalStash", function(src, hospitalId)
+            hospitalId = hospitalId or "pillbox_hill"
+            local h = Nyx.Services.GetHospital(hospitalId)
+            if not h then return { success = false, error = "HOSPITAL_NOT_FOUND" } end
+            return { success = true, hospitalId = hospitalId, stashId = h.stashId }
+        end)
+
+        -- Force immediate supply evaluation
+        exports['nyx_core']:RegisterRPC("services:evaluateHospital", function(src, hospitalId)
+            hospitalId = hospitalId or "pillbox_hill"
+            local status, metrics = Nyx.Services.EvaluateHospitalStatus(hospitalId)
+            return { success = true, hospitalId = hospitalId, status = status, metrics = metrics }
+        end)
+
         -- Pay utility arrears
         exports['nyx_core']:RegisterRPC("services:payUtilityBill", function(src, meterId, amount)
             local ok, res = Nyx.Services.PayUtilityBill(src, meterId, amount)

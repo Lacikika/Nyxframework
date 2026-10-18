@@ -78,6 +78,19 @@ exports("RestockHospital", function(src, hospitalId, item, amount)
     return Nyx.Services.RestockHospital(src, hospitalId, item, amount)
 end)
 
+exports("GetHospitalStashId", function(hospitalId)
+    local h = Nyx.Services.GetHospital(hospitalId)
+    return h and h.stashId or Nyx.HospitalSupplies.GetStashIdForHospital(hospitalId)
+end)
+
+exports("GetHospitalSupplyCounts", function(hospitalId)
+    return Nyx.Services.GetHospitalStashCounts(hospitalId)
+end)
+
+exports("EvaluateHospitalStatus", function(hospitalId)
+    return Nyx.Services.EvaluateHospitalStatus(hospitalId)
+end)
+
 -- Public Auto-Repair Stations
 exports("GetRepairStations", function()
     return Nyx.Services.RepairStations or {}

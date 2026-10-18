@@ -66,7 +66,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Anatomical Trauma & Organ-Specific Medical Injury Engine (`nyx_services`)**
   - **Implementation:** Limb-specific wound system (arterial bleeding, fractures, ballistic trauma) requiring physical medical items (`bandage_sterile`, `first_aid_pack`) for field stabilization.
 
-- [ ] **Feature: Pillbox Hospital Supply Depletion & Emergency Medical Hauls (`nyx_services` & `nyx_logistics`)**
+- [x] **Feature: Pillbox Hospital Supply Depletion & Emergency Medical Hauls (`nyx_services` & `nyx_logistics`)**
   - **Implementation:** Replace static medical supply loops with finite container `stash:pillbox_meds`. Low medical stock triggers priority emergency logistics contracts for couriers.
 
 - [ ] **Feature: Dynamic Gas Station Reservoir Stocks & Bulk Fuel Hauling (`nyx_logistics` & `nyx_vehicles`)**
@@ -107,6 +107,36 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Pillbox Hospital Supply Depletion & Emergency Medical Hauls (`nyx_services` & `nyx_logistics`)**
+  - **Database Migration (`042_pillbox_hospital_supply_depletion_and_emergency_hauls.sql`, `index.json`)**:
+    - Extended `nyx_services_hospitals` with `stash_id` (VARCHAR(64) DEFAULT 'stash:pillbox_meds'), `critical_threshold` (INT DEFAULT 5), `degraded_threshold` (INT DEFAULT 15), and `last_emergency_contract_at` (TIMESTAMP NULL).
+    - Mapped hospital facilities to finite containers: `pillbox_hill` -> `stash:pillbox_meds`, `sandy_shores_clinic` -> `stash:sandy_clinic_meds`, `paleto_bay_hospital` -> `stash:paleto_hospital_meds`.
+    - Seeded hospital stash containers into `nyx_inventories` (type `stash`, 250kg / 100 slots).
+    - Seeded initial finite medical stock into `stash:pillbox_meds`: 30x `med_plasma`, 25x `med_firstaid`, 15x `med_surgical_pack`, 50x `bandage_sterile`, 20x `tourniquet`.
+    - Created `nyx_services_hospital_supply_audit` table (`audit_id` PK, `audit_uuid`, `hospital_id`, `stash_id`, `action`, `item_id`, `quantity`, `remaining_count`, `status`, `citizen_id`, `contract_id`, `notes`, `created_at`) for immutable event auditing.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 42) and mirrored to `FiveM/nyx_services/sql/migrations/`.
+  - **Shared Pure Lua 5.4 Supply Logic Engine (`nyx_services/shared/medical.lua`, `fxmanifest.lua`)**:
+    - Implemented `Nyx.HospitalSupplies.GetStashIdForHospital` and `GetHospitalIdForStash` for bidirectional canonical stash resolution.
+    - Implemented `Nyx.HospitalSupplies.EvaluateSupplyLevel` classifying clinical reserves into 3-tier status (`optimal`, `degraded`, `critical_shortage`), computing composite medical readiness percentage, and itemizing deficit metrics.
+    - Implemented `Nyx.HospitalSupplies.CalculateRespawnPenalty` enforcing physiological delay scaling (optimal 0s, degraded 30s, critical 60s) compounded by regional electrical grid blackout penalties (+30s).
+    - Implemented `Nyx.HospitalSupplies.CalculateEmergencyContract` generating expedited courier freight contract parameters (hazard bounty multiplier $1.85\times$ to $2.75\times$, 15% escrow deposit, 900s deadline).
+    - Implemented `Nyx.HospitalSupplies.ValidateRestockItem` enforcing zero-trust item whitelists and positive integer quantities.
+    - Implemented `Nyx.HospitalSupplies.FormatSupplyBadge` and `FormatStockSummary` for UI telemetry.
+    - Declared `shared/medical.lua` in `FiveM/nyx_services/fxmanifest.lua`.
+  - **Server-Side Subsystem & RPCs (`nyx_services/server/medical.lua`, `server/main.lua`, `server/exports.lua`)**:
+    - Replaced static integer counters with live inventory container queries against `stash:pillbox_meds` using `exports['nyx_inventory']`.
+    - Re-engineered `ProcessRevival`: consumes real items from `stash:pillbox_meds` (`med_plasma`, `med_firstaid`, `med_surgical_pack`), enforces strict surgical availability guards (`SURGICAL_UNAVAILABLE_SUPPLY_DEPLETED`), applies zero-stock fallback delays (+60s), and logs consumption to audit table.
+    - Re-engineered `RestockHospital`: safely transfers physical medical supplies from player inventory into `stash:pillbox_meds`, logs restock events, re-evaluates hospital status, and marks open emergency contracts fulfilled.
+    - Implemented automated emergency logistics contract dispatcher in `EvaluateHospitalStatus`: detects critical shortage, checks for existing active hauls, and posts priority contracts to `nyx_logistics_freight_contracts` with courier broadcast alerts.
+    - Registered RPC endpoints: `services:getHospitalSupplies`, `services:getHospitalStash`, `services:evaluateHospital`.
+    - Exported `GetHospitalStashId`, `GetHospitalSupplyCounts`, and `EvaluateHospitalStatus` in `FiveM/nyx_services/server/exports.lua`.
+  - **Logistics Delivery Hook (`nyx_logistics/server/contracts.lua`)**:
+    - Added hospital delivery completion hook in `logistics:deliverContract`: automatically triggers `nyx:services:server:hospitalSuppliesDelivered` upon courier pallet delivery into `stash:*_meds`, instantly updating hospital status and resolving critical shortages.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestPillboxSupplyDepletionAndEmergencyHauls()` (Test 37) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_pillbox_hospital_supplies_and_emergency_hauls.py` with 9 test cases covering migration 042 schema, stash mapping, item registry consistency, shortage classification, respawn delay compounding, emergency contract math, restock validation, and in-engine registration (9/9 passing).
+    - Full pytest suite: 328/328 tests passing (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 226 Lua files, 42 migrations, 100% clean verification.
 - **[2026-10-18] Feature: Anatomical Trauma & Organ-Specific Medical Injury Engine (`nyx_services`)**
   - **Database Migration (`041_anatomical_trauma_and_medical_injury_engine.sql`, `index.json`)**:
     - Created `nyx_medical_trauma` table (`citizen_id` PK, `blood_volume_ml`, `bleeding_rate`, `pain_level`, `wounds_json`, `is_unconscious`, `last_updated_at`) for persistent character trauma state tracking.

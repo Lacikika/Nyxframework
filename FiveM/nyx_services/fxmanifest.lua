@@ -16,7 +16,8 @@ version '1.0.0'
 shared_scripts {
     '@nyx_treasury/shared/degradation.lua',
     'config.lua',
-    'shared/trauma.lua'
+    'shared/trauma.lua',
+    'shared/medical.lua'
 }
 
 server_scripts {

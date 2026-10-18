@@ -527,6 +527,11 @@ Nyx.RPC.Register("logistics:deliverContract", function(src, payload)
         TriggerClientEvent("nyx:logistics:client:shelfUpdated", -1, targetShelf.id or destInvId, newPrice, newStock, targetShelf.zone_id, newRatio)
     end
 
+    -- Notify medical services if destination is a hospital clinical stash
+    if destInvId and (destInvId:find("_meds") or contract.contract_type == "emergency_medical") then
+        TriggerEvent("nyx:services:server:hospitalSuppliesDelivered", destInvId, contractId, contract.item_id, contract.quantity)
+    end
+
     return {
         success = true,
         payout = payout,
