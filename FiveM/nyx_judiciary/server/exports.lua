@@ -173,3 +173,23 @@ exports("ComputeChainHash", function(prevHash, evidenceId, sequenceId, action, c
     return Nyx.Judiciary.ComputeChainHash(prevHash, evidenceId, sequenceId, action, custodianCitId, recipientCitId, facilityId, timestamp, salt)
 end)
 
+exports("GetEvidenceList", function(filterQuery, evidenceType, isSealedOnly, limit, offset)
+    return Nyx.Judiciary.GetEvidenceList(filterQuery, evidenceType, isSealedOnly, limit, offset)
+end)
+
+exports("LogEvidenceVerification", function(evidenceId, verifierCitizenId, status, isValid, chainLength, rootHash, headHash)
+    return Nyx.Judiciary.LogEvidenceVerification(evidenceId, verifierCitizenId, status, isValid, chainLength, rootHash, headHash)
+end)
+
+exports("GetEvidenceChainOfCustody", function(evidenceId)
+    return Nyx.Judiciary.GetEvidenceChainOfCustody(evidenceId)
+end)
+
+exports("VerifyChainOfCustody", function(evidenceId)
+    return Nyx.Judiciary.VerifyChainOfCustody(evidenceId)
+end)
+
+exports("ConcludeTrial", function(docketId, verdictRuling)
+    return Nyx.Judiciary.ConcludeTrial(docketId, verdictRuling)
+end)
+

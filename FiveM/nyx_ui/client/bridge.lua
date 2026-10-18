@@ -75,6 +75,28 @@ function Nyx.UI.SanitizePayload(data)
     if data.legalName and type(data.legalName) == "string" then sanitized.legalName = string.sub(data.legalName, 1, 64) end
     if data.charterType and type(data.charterType) == "string" then sanitized.charterType = string.sub(data.charterType, 1, 32) end
     if data.initialDeposit and type(data.initialDeposit) == "number" then sanitized.initialDeposit = data.initialDeposit end
+    -- Courtroom Terminal, Forensics & Warrants parameters
+    if data.evidenceId and (type(data.evidenceId) == "string" or type(data.evidenceId) == "number") then sanitized.evidenceId = tostring(data.evidenceId) end
+    if data.warrantId and (type(data.warrantId) == "string" or type(data.warrantId) == "number") then sanitized.warrantId = tostring(data.warrantId) end
+    if data.petitionId and (type(data.petitionId) == "string" or type(data.petitionId) == "number") then sanitized.petitionId = tostring(data.petitionId) end
+    if data.decision and type(data.decision) == "string" then sanitized.decision = string.sub(data.decision, 1, 32) end
+    if data.verdictRuling and type(data.verdictRuling) == "string" then sanitized.verdictRuling = string.sub(data.verdictRuling, 1, 64) end
+    if data.docketId and type(data.docketId) == "string" then sanitized.docketId = string.sub(data.docketId, 1, 64) end
+    if data.probableCauseSummary and type(data.probableCauseSummary) == "string" then sanitized.probableCauseSummary = string.sub(data.probableCauseSummary, 1, 4096) end
+    if data.subpoenaScope and type(data.subpoenaScope) == "string" then sanitized.subpoenaScope = string.sub(data.subpoenaScope, 1, 32) end
+    if data.warrantType and type(data.warrantType) == "string" then sanitized.warrantType = string.sub(data.warrantType, 1, 32) end
+    if data.filterQuery and type(data.filterQuery) == "string" then sanitized.filterQuery = string.sub(data.filterQuery, 1, 128) end
+    if data.search and type(data.search) == "string" then sanitized.search = string.sub(data.search, 1, 128) end
+    if data.evidenceType and type(data.evidenceType) == "string" then sanitized.evidenceType = string.sub(data.evidenceType, 1, 32) end
+    if data.type and type(data.type) == "string" then sanitized.type = string.sub(data.type, 1, 32) end
+    if data.isSealedOnly ~= nil then sanitized.isSealedOnly = (data.isSealedOnly == true or data.isSealedOnly == 1) end
+    if data.seatIndex and type(data.seatIndex) == "number" then sanitized.seatIndex = math.max(1, math.min(20, math.floor(data.seatIndex))) end
+    if data.requiredCount and type(data.requiredCount) == "number" then sanitized.requiredCount = math.max(1, math.min(20, math.floor(data.requiredCount))) end
+    if data.requestedDurationHours and type(data.requestedDurationHours) == "number" then sanitized.requestedDurationHours = math.max(1, math.min(336, math.floor(data.requestedDurationHours))) end
+    if data.durationHours and type(data.durationHours) == "number" then sanitized.durationHours = math.max(1, math.min(336, math.floor(data.durationHours))) end
+    if data.reviewNotes and type(data.reviewNotes) == "string" then sanitized.reviewNotes = string.sub(data.reviewNotes, 1, 512) end
+    if data.limit and type(data.limit) == "number" then sanitized.limit = math.max(1, math.min(100, math.floor(data.limit))) end
+    if data.offset and type(data.offset) == "number" then sanitized.offset = math.max(0, math.min(10000, math.floor(data.offset))) end
     if data.payload and type(data.payload) == "table" then
         sanitized.payload = Nyx.UI.SanitizePayload(data.payload)
     end
@@ -331,6 +353,128 @@ end)
 Nyx.UI.SafeNUICallback("faction:distributeDividends", function(data, cb)
     if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
         local res = exports['nyx_core']:TriggerRPCAwait("factions:distributeDividends", data and data.factionId, data and data.netProfit, data and data.rate)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+-- ============================================================================
+-- 4E. Courtroom Terminal & Forensic Explorer NUI Callbacks
+-- ============================================================================
+
+Nyx.UI.SafeNUICallback("closeCourtTerminal", function(data, cb)
+    Nyx.UI.SetFocus(false, false)
+    cb({ success = true })
+end)
+
+Nyx.UI.SafeNUICallback("court:getOverview", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("judiciary:getCourtOverview")
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("court:getEvidenceList", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("judiciary:getEvidenceList", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("court:getEvidenceChain", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("judiciary:getEvidenceChain", data and data.evidenceId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("court:verifyEvidenceChain", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("judiciary:verifyEvidenceChain", data and data.evidenceId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("court:castJuryVote", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("judiciary:castJuryVote", data and data.docketId, data and data.vote)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("court:seatJuror", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("judiciary:seatJuror", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("court:summonJury", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("judiciary:summonJury", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("court:startTrial", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("judiciary:startTrial", data and data.docketId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("court:startDeliberation", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("judiciary:startDeliberation", data and data.docketId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("court:concludeTrial", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("judiciary:concludeTrial", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("court:petitionWarrant", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("judiciary:petitionWarrant", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("court:reviewPetition", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("judiciary:reviewPetition", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("court:rescindWarrant", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("judiciary:rescindWarrant", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("court:getSubpoenaRecords", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local target = data and (data.targetCitizenId or data.targetId)
+        local res = exports['nyx_core']:TriggerRPCAwait("judiciary:getSubpoenaRecords", target)
         return cb(res or { success = false })
     end
     cb({ success = false, error = "RPC_UNAVAILABLE" })

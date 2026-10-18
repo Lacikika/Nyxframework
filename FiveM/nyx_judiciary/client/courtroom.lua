@@ -342,18 +342,26 @@ CreateThread(function()
     end
 
     local registryCoords = vector3(-540.8, -198.2, 38.2)
-    exports['nyx_interact']:AddTargetCoords("court_warrant_registry", registryCoords, 2.0, {
+    exports['nyx_interact']:AddTargetCoords("court_warrant_registry", registryCoords, 2.5, {
         options = {
+            {
+                icon = "fa-solid fa-scale-balanced",
+                label = "Courtroom Terminal & Forensic Explorer",
+                event = "nyx:judiciary:client:openCourtTerminal",
+                canInteract = function(entity, dist)
+                    return dist <= 2.5
+                end
+            },
             {
                 icon = "fa-solid fa-file-contract",
                 label = "Warrant & Subpoena Petition Registry",
                 event = "nyx:judiciary:client:openWarrantRegistry",
                 canInteract = function(entity, dist)
-                    return dist <= 2.0
+                    return dist <= 2.5
                 end
             }
         },
-        distance = 2.0
+        distance = 2.5
     })
 end)
 
@@ -520,4 +528,47 @@ RegisterCommand("subpoenarecords", function(source, args)
             end
         end)
     end
+end, false)
+
+-- ----------------------------------------------------------------------------
+-- 7. Visual Courtroom Terminal UI Dispatcher & Chat Commands
+-- ----------------------------------------------------------------------------
+function OpenCourtTerminal(activeTab)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerServerRPC then
+        exports['nyx_core']:TriggerServerRPC("judiciary:getCourtOverview", function(res)
+            local overviewData = (res and res.success and res.overview) or {}
+            overviewData.activeTab = activeTab or "evidence"
+
+            if exports['nyx_ui'] and exports['nyx_ui'].OpenCourtTerminal then
+                exports['nyx_ui']:OpenCourtTerminal(overviewData)
+            elseif exports['nyx_ui'] and exports['nyx_ui'].Send then
+                exports['nyx_ui']:SetFocus(true, true)
+                exports['nyx_ui']:Send("court", "COURT_TERMINAL_OPEN", overviewData)
+            end
+        end)
+    else
+        if exports['nyx_ui'] and exports['nyx_ui'].OpenCourtTerminal then
+            exports['nyx_ui']:OpenCourtTerminal({ activeTab = activeTab or "evidence" })
+        end
+    end
+end
+
+RegisterNetEvent("nyx:judiciary:client:openCourtTerminal", function(data)
+    local tab = type(data) == "table" and data.activeTab or data
+    OpenCourtTerminal(tab)
+end)
+
+RegisterCommand("courtroom", function(source, args)
+    local tab = args[1] and string.lower(args[1]) or "evidence"
+    OpenCourtTerminal(tab)
+end, false)
+
+RegisterCommand("court", function(source, args)
+    local tab = args[1] and string.lower(args[1]) or "evidence"
+    OpenCourtTerminal(tab)
+end, false)
+
+RegisterCommand("judiciary", function(source, args)
+    local tab = args[1] and string.lower(args[1]) or "evidence"
+    OpenCourtTerminal(tab)
 end, false)

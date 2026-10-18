@@ -45,7 +45,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Corporate Multi-Sig, RBAC & Union Management UI (`nyx_ui` & `nyx_factions`)**
   - **Implementation:** Single-frame React/Svelte dashboard for player corporations and trade unions: visual RBAC permission matrix, multi-sig escrow approvals, and CBA contract builder.
 
-- [ ] **Feature: Judicial Chain-of-Custody, Warrants & Jury UI (`nyx_ui` & `nyx_judiciary`)**
+- [x] **Feature: Judicial Chain-of-Custody, Warrants & Jury UI (`nyx_ui` & `nyx_judiciary`)**
   - **Implementation:** Visual courtroom terminal app: SHA-256 evidence integrity explorer, secret-ballot jury voting box, and judge probable-cause warrant issuance screen.
 
 - [ ] **Feature: Parliamentary Ranked-Choice Voting & Legislation UI (`nyx_ui` & `nyx_parliament`)**
@@ -107,6 +107,36 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Judicial Chain-of-Custody, Warrants & Jury UI (`nyx_ui` & `nyx_judiciary`)**
+  - **Database Migration (`035_judiciary_courtroom_terminal_and_evidence_audit.sql`, `index.json`)**:
+    - Created `nyx_judiciary_evidence_verifications` table recording immutable evidence chain validation audits (`verification_id`, `evidence_id`, `verifier_citizen_id`, `status`, `is_valid`, `chain_length`, `root_hash`, `current_chain_hash`, `verified_at`).
+    - Extended `nyx_judiciary_dockets` table with `case_brief` and `court_notes` columns for case overview and judicial annotations.
+    - Extended `nyx_judiciary_evidence` table with `verified_by_judge_at` timestamp.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 35) and mirrored to `FiveM/nyx_judiciary/sql/migrations/`.
+  - **Shared Lua 5.4 Courtroom UI Engine (`nyx_judiciary/shared/courtroom_ui.lua`, `fxmanifest.lua`)**:
+    - Implemented pure Lua 5.4 zero-dependency `Nyx.CourtroomUI.SHA256` digest engine matching standard cryptographic vectors.
+    - Implemented `Nyx.CourtroomUI.EvaluateEvidenceIntegrity` verifying root hash, chronological block sequences, unbroken `previous_hash` continuity, and latest head hash match, detecting sequence gaps and tampering.
+    - Implemented `Nyx.CourtroomUI.FilterEvidenceExplorer` providing multi-dimensional case-insensitive substring searching across ID, hashes, custodians, case type, and sealed status.
+    - Implemented `Nyx.CourtroomUI.FormatWarrantBadge` mapping taxonomy badges (`arrest`, `search_property`, `search_vehicle`, `subpoena`, `wiretap`) with WCAG AA+ compliant colors and icons.
+    - Implemented `Nyx.CourtroomUI.EvaluateJuryTerminalState` computing active juror counts, quorum thresholds, and voter secret-ballot authorization.
+    - Implemented `Nyx.CourtroomUI.ValidateWarrantIssuancePayload` enforcing 20-character narrative minimums, duration bounds ($[1, 336]$ hours), and recognized subpoena scopes.
+    - Registered `shared/courtroom_ui.lua` in `FiveM/nyx_judiciary/fxmanifest.lua`.
+  - **Server-Side Evidence Querying, Audit Logging & RPC Bus (`nyx_judiciary/server/`)**:
+    - *Evidence Subsystem (`evidence.lua`)*: Added `GetEvidenceList` supporting search, type filtering, sealed status, limit, and offset pagination; added `LogEvidenceVerification` persisting audit proofs.
+    - *RPC Dispatcher (`main.lua`)*: Registered `judiciary:getCourtOverview`, `judiciary:getEvidenceList`, `judiciary:getEvidenceChain`, `judiciary:verifyEvidenceChain`, and `judiciary:concludeTrial`.
+    - *Server Exports (`exports.lua`)*: Exported `GetEvidenceList`, `LogEvidenceVerification`, `GetEvidenceChainOfCustody`, `VerifyChainOfCustody`, and `ConcludeTrial`.
+  - **Client-Side Terminal Dispatch & UI Bridge (`nyx_judiciary/client/`, `nyx_ui/client/`)**:
+    - *Courtroom Client (`courtroom.lua`, `exports.lua`)*: Added commands `/courtroom`, `/court`, `/judiciary`; added Third-Eye option `Courtroom Terminal & Forensic Explorer` to `court_warrant_registry`; exported `OpenCourtTerminal` and `CloseCourtTerminal`.
+    - *UI Bridge (`bridge.lua`, `exports.lua`)*: Whitelisted court parameters in `SanitizePayload`; registered 15 safe NUI callbacks (`closeCourtTerminal`, `court:getOverview`, `court:getEvidenceList`, `court:getEvidenceChain`, `court:verifyEvidenceChain`, `court:castJuryVote`, `court:seatJuror`, `court:summonJury`, `court:startTrial`, `court:startDeliberation`, `court:concludeTrial`, `court:petitionWarrant`, `court:reviewPetition`, `court:rescindWarrant`, `court:getSubpoenaRecords`); exported `OpenCourtTerminal`, `CloseCourtTerminal`, and mapped `court` in `OpenView`.
+  - **Web Single-Frame CEF SPA (`nyx_ui/web/`)**:
+    - *HTML (`index.html`)*: Section 8C `#court-overlay` modal featuring 3 tabs (Evidence Explorer & Cryptographic Chain of Custody, Secret-Ballot Jury Voting Box & Deliberation, Judge Probable-Cause Warrants & Subpoenas). Added `#dev-btn-court` to dev mode bar.
+    - *CSS (`css/app.css`)*: Section 17 styling strictly adhering to CEF render budget (high-opacity dark surfaces, zero shaders, no `backdrop-filter`, no `blur()`, touch targets $\ge 40$px).
+    - *JavaScript (`js/app.js`)*: Added `NyxState.court` reactive state, message listeners (`COURT_TERMINAL_OPEN`/`CLOSE`), tab switching, interactive search filtering, cryptographic verification banner rendering, anonymous jury voting, juror seat check-in, judge trial workflow buttons, warrant petition submission with affidavit validation, subpoena financial disclosure viewer, double-submit exploit locking (`lockButtonAction`), hierarchical submodal escape handling, and browser dev mode mock telemetry.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestCourtroomTerminalEvidenceAndJuryUI()` (Test 30) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_courtroom_evidence_warrants_jury_ui.py` covering migration 035 schema, manifest declarations, server RPCs, client bridge, CEF render budget, HTML IDs, and algorithmic parity (9/9 passing).
+    - Full pytest suite: 255/255 tests passing (100% pass rate).
+    - Verified clean passes across all 14 resources, 209 Lua files, and all 35 SQL migrations via `scripts/validator.py`.
 - **[2026-10-18] Feature: Corporate Multi-Sig, RBAC & Union Management UI (`nyx_ui` & `nyx_factions`)**
   - **Database Schema Migration (`034_factions_corporate_ui_and_rbac_audit.sql`, `index.json`)**:
     - Created `nyx_factions_rbac_audit` table persisting immutable corporate governance and permission mutation logs (`audit_id`, `faction_id`, `actor_citizen_id`, `target_citizen_id`, `action_type`, `old_values`, `new_values`, `notes`, `created_at`).

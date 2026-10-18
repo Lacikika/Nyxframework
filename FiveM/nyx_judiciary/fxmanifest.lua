@@ -15,7 +15,8 @@ version '1.0.0'
 shared_scripts {
     'config.lua',
     'shared/jury.lua',
-    'shared/warrants.lua'
+    'shared/warrants.lua',
+    'shared/courtroom_ui.lua'
 }
 
 server_scripts {

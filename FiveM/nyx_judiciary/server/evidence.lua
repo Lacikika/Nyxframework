@@ -1180,3 +1180,93 @@ function Nyx.Judiciary.SweepExpiredEvidence()
         TriggerClientEvent("nyx:judiciary:client:evidenceRemoved", -1, id)
     end
 end
+
+-- 17. Query Evidence List with Dynamic Filtering & Pagination for Explorer UI
+function Nyx.Judiciary.GetEvidenceList(filterQuery, evidenceType, isSealedOnly, limit, offset)
+    limit = math.min(100, math.max(1, tonumber(limit) or 30))
+    offset = math.max(0, tonumber(offset) or 0)
+
+    local conditions = {}
+    local params = {}
+
+    if evidenceType and evidenceType ~= "all" and evidenceType ~= "" then
+        table.insert(conditions, "`type` = ?")
+        table.insert(params, string.lower(evidenceType))
+    end
+
+    if isSealedOnly == true or isSealedOnly == 1 then
+        table.insert(conditions, "`is_sealed` = 1")
+    end
+
+    if filterQuery and type(filterQuery) == "string" and string.len(filterQuery) > 0 then
+        local pattern = "%" .. filterQuery .. "%"
+        table.insert(conditions, "(`evidence_id` LIKE ? OR `evidence_hash` LIKE ? OR `current_custodian_id` LIKE ? OR `collector_citizen_id` LIKE ? OR `docket_id` LIKE ? OR `exhibit_label` LIKE ?)")
+        table.insert(params, pattern)
+        table.insert(params, pattern)
+        table.insert(params, pattern)
+        table.insert(params, pattern)
+        table.insert(params, pattern)
+        table.insert(params, pattern)
+    end
+
+    local whereClause = ""
+    if #conditions > 0 then
+        whereClause = "WHERE " .. table.concat(conditions, " AND ")
+    end
+
+    local sql = string.format([[
+        SELECT `evidence_id`, `docket_id`, `type`, `evidence_hash`, `collector_citizen_id`,
+               `current_custodian_id`, `current_facility`, `current_chain_hash`, `chain_length`,
+               `is_contaminated`, `contamination_source`, `is_sealed`, `metadata`, `lab_analysis`,
+               `exhibit_label`, `verified_by_judge_at`, `created_at`
+        FROM `nyx_judiciary_evidence`
+        %s
+        ORDER BY `created_at` DESC
+        LIMIT %d OFFSET %d
+    ]], whereClause, limit, offset)
+
+    local rows = MySQL.query.await(sql, params)
+    local result = {}
+    for _, row in ipairs(rows or {}) do
+        local meta = {}
+        if type(row.metadata) == "string" then
+            local ok, parsed = pcall(json.decode, row.metadata)
+            if ok and type(parsed) == "table" then meta = parsed end
+        elseif type(row.metadata) == "table" then
+            meta = row.metadata
+        end
+        row.metadata = meta
+
+        local lab = {}
+        if type(row.lab_analysis) == "string" then
+            local ok, parsed = pcall(json.decode, row.lab_analysis)
+            if ok and type(parsed) == "table" then lab = parsed end
+        elseif type(row.lab_analysis) == "table" then
+            lab = row.lab_analysis
+        end
+        row.lab_analysis = lab
+
+        table.insert(result, row)
+    end
+
+    return result
+end
+
+-- 18. Log Formal SHA-256 Evidence Chain Verification Audit Entry
+function Nyx.Judiciary.LogEvidenceVerification(evidenceId, verifierCitizenId, status, isValid, chainLength, rootHash, headHash)
+    if not evidenceId or not verifierCitizenId then return false end
+    MySQL.prepare.await([[
+        INSERT INTO `nyx_judiciary_evidence_verifications`
+            (`evidence_id`, `verifier_citizen_id`, `status`, `is_valid`, `chain_length`, `root_hash`, `current_chain_hash`)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ]], {
+        evidenceId,
+        verifierCitizenId,
+        status or "UNKNOWN",
+        isValid and 1 or 0,
+        chainLength or 0,
+        rootHash or "",
+        headHash or ""
+    })
+    return true
+end

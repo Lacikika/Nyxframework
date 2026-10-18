@@ -21,6 +21,7 @@
             <button id="dev-btn-mdt"><i class="fa-solid fa-shield-halved"></i> MDT</button>
             <button id="dev-btn-treasury"><i class="fa-solid fa-scale-balanced"></i> Treasury</button>
             <button id="dev-btn-faction"><i class="fa-solid fa-building-user"></i> Corp/Union</button>
+            <button id="dev-btn-court"><i class="fa-solid fa-scale-balanced"></i> Court</button>
             <button id="dev-btn-freight"><i class="fa-solid fa-truck"></i> Freight</button>
             <button id="dev-btn-interact"><i class="fa-solid fa-crosshairs"></i> Target</button>
             <button id="dev-btn-place"><i class="fa-solid fa-arrows-up-down-left-right"></i> Place</button>
@@ -771,6 +772,352 @@
                     <div class="submodal-footer">
                         <button id="faction-withdraw-modal-cancel" class="btn btn-secondary">Mégse</button>
                         <button id="faction-withdraw-modal-submit" class="btn btn-warning"><i class="fa-solid fa-signature"></i> Letét Nyújtása (Initiate)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================
+             8C. COURT TERMINAL & FORENSIC EXPLORER (`nyx_judiciary`)
+             ================================================================ -->
+        <div id="court-overlay" class="modal-backdrop hidden">
+            <div class="modal-dialog court-dialog">
+                <div class="modal-header court-header">
+                    <div class="header-left">
+                        <i class="fa-solid fa-scale-balanced icon-accent amber"></i>
+                        <div>
+                            <div class="header-title-row">
+                                <h3 id="court-header-title">San Andreas Kerületi Bíróság & Törvényszék</h3>
+                                <span id="court-role-badge" class="badge">POLGÁR</span>
+                                <span id="court-case-badge" class="badge badge-outline">NINCS AKTÍV TÁRGYALÁS</span>
+                            </div>
+                            <span class="sub-heading">Decentralized Courtroom Terminal, SHA-256 Chain-of-Custody & Civic Jury Hub</span>
+                        </div>
+                    </div>
+                    <div class="court-header-kpi">
+                        <span class="kpi-micro-label">ÜGYVITELI STÁTUSZ</span>
+                        <span id="court-header-status" class="kpi-micro-val">NYITVA</span>
+                    </div>
+                    <button id="court-close-btn" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <div class="court-nav-tabs">
+                    <button class="court-tab active" data-tab="evidence" id="court-tab-btn-evidence"><i class="fa-solid fa-microscope"></i> Bűnjel & SHA-256 Lánc</button>
+                    <button class="court-tab" data-tab="jury" id="court-tab-btn-jury"><i class="fa-solid fa-check-to-slot"></i> Titkos Ülnöki Szavazás</button>
+                    <button class="court-tab" data-tab="warrants" id="court-tab-btn-warrants"><i class="fa-solid fa-file-contract"></i> Bírói Parancsok & Idézések</button>
+                </div>
+
+                <div class="modal-body court-body">
+                    <!-- Tab 1: Evidence Explorer & Cryptographic Chain of Custody -->
+                    <div id="court-tab-evidence" class="court-tab-pane">
+                        <div class="court-evidence-layout">
+                            <!-- Left: Filter & Evidence List -->
+                            <div class="evidence-list-col">
+                                <div class="filter-bar">
+                                    <input type="text" id="court-evidence-search" placeholder="Keresés bűnjel ID, hash, őrző vagy ügy alapján..." class="modal-input search-input">
+                                    <div class="filter-controls-row">
+                                        <select id="court-evidence-type-filter" class="modal-select">
+                                            <option value="all">Minden típus</option>
+                                            <option value="casing">Hüvely (Casing)</option>
+                                            <option value="blood">Vérnyom (Blood)</option>
+                                            <option value="fingerprint">Ujjlenyomat (Fingerprint)</option>
+                                            <option value="swab">Kenet / GSR (Swab)</option>
+                                            <option value="photo">Fotó / CCTV (Photo)</option>
+                                            <option value="ballistics">Ballisztika (Ballistics)</option>
+                                            <option value="document">Dokumentum (Document)</option>
+                                        </select>
+                                        <label class="sealed-toggle">
+                                            <input type="checkbox" id="court-evidence-sealed-check">
+                                            <span>Csak Lepecsételt</span>
+                                        </label>
+                                        <button id="court-evidence-refresh-btn" class="btn btn-secondary btn-sm" title="Frissítés"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                    </div>
+                                </div>
+
+                                <div class="table-container evidence-table-wrapper">
+                                    <table class="nyx-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Azonosító (ID)</th>
+                                                <th>Típus</th>
+                                                <th>Lánc Hossz</th>
+                                                <th>Állapot</th>
+                                                <th>Jelenlegi Őrző</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="court-evidence-rows">
+                                            <!-- Dynamic evidence items -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Right: Chain-of-Custody Detailed Inspector -->
+                            <div class="evidence-inspector-col">
+                                <div id="court-evidence-empty-hint" class="empty-state">
+                                    <i class="fa-solid fa-fingerprint empty-icon"></i>
+                                    <p>Válassz ki egy bűnjelet a bal oldali listából a kriptográfiai lánc és integritás megtekintéséhez.</p>
+                                </div>
+
+                                <div id="court-evidence-detail-card" class="card-surface evidence-detail-card hidden">
+                                    <div class="detail-header-row">
+                                        <div>
+                                            <div class="evidence-title-tags">
+                                                <h4 id="court-detail-id" class="evidence-title">EVI-2026-001</h4>
+                                                <span id="court-detail-type-badge" class="badge">CASING</span>
+                                                <span id="court-detail-sealed-badge" class="badge badge-success">LEPECSETELVE</span>
+                                                <span id="court-detail-contam-badge" class="badge badge-danger hidden">SZENNYEZETT</span>
+                                            </div>
+                                            <span class="sub-text" id="court-detail-created">Rögzítve: 2026-10-18 10:00 | Gyűjtő: CIT1024</span>
+                                        </div>
+                                        <button id="court-verify-chain-btn" class="btn btn-primary"><i class="fa-solid fa-shield-halved"></i> SHA-256 Lánc Hitelesítése</button>
+                                    </div>
+
+                                    <!-- Cryptographic Hash Verification Proof Banner -->
+                                    <div id="court-verification-result" class="verification-banner hidden">
+                                        <!-- Dynamic verification proof status & details -->
+                                    </div>
+
+                                    <!-- Root and Tip Hash Fingerprints -->
+                                    <div class="hash-grid">
+                                        <div class="hash-box">
+                                            <span class="hash-label"><i class="fa-solid fa-fingerprint"></i> Eredeti SHA-256 Ujjlenyomat (Root Hash)</span>
+                                            <code id="court-detail-root-hash" class="hash-code">--</code>
+                                        </div>
+                                        <div class="hash-box">
+                                            <span class="hash-label"><i class="fa-solid fa-link"></i> Lánc Legfrissebb Feje (Head Hash)</span>
+                                            <code id="court-detail-head-hash" class="hash-code">--</code>
+                                        </div>
+                                    </div>
+
+                                    <!-- Metadata & Custodian Overview -->
+                                    <div class="meta-pills-row">
+                                        <div class="meta-pill">
+                                            <span class="label">Jelenlegi Őrző</span>
+                                            <span id="court-detail-custodian" class="value">-</span>
+                                        </div>
+                                        <div class="meta-pill">
+                                            <span class="label">Létesítmény / Széf</span>
+                                            <span id="court-detail-facility" class="value">-</span>
+                                        </div>
+                                        <div class="meta-pill">
+                                            <span class="label">Iktatási Ügy (Docket)</span>
+                                            <span id="court-detail-docket" class="value">Nincs</span>
+                                        </div>
+                                        <div class="meta-pill">
+                                            <span class="label">Bírósági Tárgyi Bizonyíték</span>
+                                            <span id="court-detail-exhibit" class="value">-</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Chronological Chain-of-Custody Timeline -->
+                                    <h5 class="sub-section-title"><i class="fa-solid fa-timeline"></i> Időrendi Birtoklási Lánc (Chain of Custody Blocks)</h5>
+                                    <div id="court-evidence-chain-timeline" class="chain-timeline-list">
+                                        <!-- Dynamic chronological blocks -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Secret-Ballot Jury Voting Box & Deliberation -->
+                    <div id="court-tab-jury" class="court-tab-pane hidden">
+                        <!-- Active Docket Overview Banner -->
+                        <div class="card-surface docket-banner">
+                            <div class="docket-banner-header">
+                                <div>
+                                    <span class="badge" id="court-jury-case-type">BÜNTETŐPER</span>
+                                    <h3 id="court-jury-docket-title" class="docket-heading">Nincs aktív per folyamatban</h3>
+                                    <span id="court-jury-parties" class="sub-text">Felperes: - vs Alperes: -</span>
+                                </div>
+                                <div class="docket-status-col">
+                                    <span class="status-label">TÁRGYALÁSI STÁTUSZ</span>
+                                    <span id="court-jury-docket-status" class="badge badge-warning">INAKTÍV</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="jury-dashboard-grid">
+                            <!-- Left: Juror Roster & Seat Map -->
+                            <div class="juror-roster-card card-surface">
+                                <div class="card-header-row">
+                                    <div>
+                                        <h4 class="card-title"><i class="fa-solid fa-users"></i> Esküdtszék / Ülnöki Tanács (Jury Box)</h4>
+                                        <span class="card-subtitle">6 személyes állampolgári esküdtszék ülései és jelenléte.</span>
+                                    </div>
+                                    <span id="court-jury-quorum-badge" class="badge badge-outline">Kvórum: 0/3</span>
+                                </div>
+
+                                <div id="court-juror-seats" class="jury-seats-grid">
+                                    <!-- 6 dynamic seat cards -->
+                                </div>
+
+                                <!-- Check-in button for summoned citizens -->
+                                <div id="court-juror-checkin-bar" class="checkin-bar hidden">
+                                    <span class="checkin-msg"><i class="fa-solid fa-bell"></i> Hivatalos ülnöki idézésed érkezett erre az ügyre!</span>
+                                    <button id="court-juror-checkin-btn" class="btn btn-success"><i class="fa-solid fa-chair"></i> Ülnöki Hely Elfoglalása & Bejelentkezés</button>
+                                </div>
+                            </div>
+
+                            <!-- Right: Secret Ballot Voting Box -->
+                            <div class="ballot-box-card card-surface">
+                                <div class="card-header-row">
+                                    <div>
+                                        <h4 class="card-title"><i class="fa-solid fa-box-archive"></i> Titkos Ülnöki Szavazóurna (Secret Ballot)</h4>
+                                        <span class="card-subtitle">Kriptográfiailag izolált szavazás az esküdtszéki tanácskozáson.</span>
+                                    </div>
+                                    <span id="court-ballot-open-badge" class="badge badge-warning">ZÁRVA</span>
+                                </div>
+
+                                <div id="court-ballot-voting-section" class="ballot-voting-section">
+                                    <p class="ballot-instruction">A tanácskozási szakaszban az esküdtek titkos szavazást adnak le a vádlott bűnösségéről. A szavazat leadása után nem módosítható.</p>
+
+                                    <div class="ballot-options-grid">
+                                        <button id="court-vote-guilty-btn" class="ballot-choice-btn guilty" data-vote="guilty">
+                                            <i class="fa-solid fa-gavel"></i>
+                                            <span class="choice-title">BŰNÖS</span>
+                                            <span class="choice-sub">Guilty as Charged</span>
+                                        </button>
+                                        <button id="court-vote-notguilty-btn" class="ballot-choice-btn not-guilty" data-vote="not_guilty">
+                                            <i class="fa-solid fa-shield"></i>
+                                            <span class="choice-title">NEM BŰNÖS</span>
+                                            <span class="choice-sub">Not Guilty / Acquittal</span>
+                                        </button>
+                                        <button id="court-vote-abstain-btn" class="ballot-choice-btn abstain" data-vote="abstain">
+                                            <i class="fa-solid fa-circle-pause"></i>
+                                            <span class="choice-title">TARTÓZKODÁS</span>
+                                            <span class="choice-sub">Abstain Ballot</span>
+                                        </button>
+                                    </div>
+
+                                    <div id="court-vote-status-banner" class="vote-status-banner hidden">
+                                        <i class="fa-solid fa-check-double"></i>
+                                        <span id="court-vote-status-text">A titkos szavazatod sikeresen rögzítésre került az urnában.</span>
+                                    </div>
+                                </div>
+
+                                <!-- Judicial Case Management Controls (Presiding Judge Only) -->
+                                <div id="court-judge-controls" class="judge-controls-panel hidden">
+                                    <h5 class="sub-section-title"><i class="fa-solid fa-gavel"></i> Elnöklő Bírói Vezérlők</h5>
+                                    <div class="judge-actions-grid">
+                                        <button id="court-summon-jury-btn" class="btn btn-secondary"><i class="fa-solid fa-user-plus"></i> Ülnökök Kijelölése</button>
+                                        <button id="court-start-trial-btn" class="btn btn-primary"><i class="fa-solid fa-play"></i> Tárgyalás Megnyitása</button>
+                                        <button id="court-start-deliberation-btn" class="btn btn-warning"><i class="fa-solid fa-door-closed"></i> Tanácskozás Elrendelése</button>
+                                    </div>
+                                    <div class="verdict-form-row">
+                                        <select id="court-verdict-select" class="modal-select">
+                                            <option value="guilty">Bűnös (Guilty Ruling)</option>
+                                            <option value="not_guilty">Felmentés (Acquitted)</option>
+                                            <option value="hung_jury">Eredménytelen Esküdtszék (Hung Jury)</option>
+                                            <option value="mistrial">Tárgyalás Megsemmisítése (Mistrial)</option>
+                                        </select>
+                                        <button id="court-conclude-trial-btn" class="btn btn-danger"><i class="fa-solid fa-stamp"></i> Ítélet Kihirdetése & Zárolás</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Judge Probable-Cause Warrants & Subpoenas -->
+                    <div id="court-tab-warrants" class="court-tab-pane hidden">
+                        <div class="warrants-dashboard-grid">
+                            <!-- Left: Pending Petitions Queue & Active Warrants -->
+                            <div class="warrants-main-col">
+                                <!-- Pending Petitions Queue -->
+                                <div class="card-surface warrants-card">
+                                    <div class="card-header-row">
+                                        <div>
+                                            <h4 class="card-title"><i class="fa-solid fa-file-signature"></i> Elbírálásra Váró Bírói Kérvények (Pending Petitions)</h4>
+                                            <span class="card-subtitle">Rendvédelmi szervek által benyújtott gyanúsítási és házkutatási kérvények.</span>
+                                        </div>
+                                        <span id="court-petitions-count" class="badge badge-warning">0 kérvény</span>
+                                    </div>
+
+                                    <div id="court-petitions-list" class="petitions-list">
+                                        <!-- Dynamic petition cards with approve/reject -->
+                                    </div>
+                                </div>
+
+                                <!-- Active Judicial Warrants -->
+                                <div class="card-surface warrants-card">
+                                    <div class="card-header-row">
+                                        <div>
+                                            <h4 class="card-title"><i class="fa-solid fa-shield-halved"></i> Érvényben Lévő Bírói Parancsok & Idézések</h4>
+                                            <span class="card-subtitle">Kiadott letartóztatási, kutatási, lehallgatási és pénzügyi idézési parancsok.</span>
+                                        </div>
+                                        <span id="court-active-warrants-count" class="badge badge-success">0 aktív</span>
+                                    </div>
+
+                                    <div id="court-active-warrants-list" class="warrants-grid">
+                                        <!-- Dynamic active warrant cards with tracking status & subpoena view -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right: New Warrant Petition Form & Subpoena Disclosure Viewer -->
+                            <div class="warrants-form-col">
+                                <div class="card-surface petition-form-card">
+                                    <h4 class="card-title"><i class="fa-solid fa-feather-pointed"></i> Bírói Parancs / Idézés Kérvényezése</h4>
+                                    <span class="card-subtitle">Hivatalos eskü alatti gyanú és indoklás benyújtása a bíróságnak.</span>
+
+                                    <div class="petition-form">
+                                        <div class="form-group">
+                                            <label>Célszemély Citizen ID</label>
+                                            <input type="text" id="court-input-target-citid" placeholder="Pl. NYX4092" class="modal-input" maxlength="64">
+                                        </div>
+                                        <div class="form-row-2">
+                                            <div class="form-group">
+                                                <label>Parancs Típusa</label>
+                                                <select id="court-select-warrant-type" class="modal-select">
+                                                    <option value="arrest">Letartóztatási Parancs (Arrest)</option>
+                                                    <option value="search_property">Ingatlan Házkutatás (Property)</option>
+                                                    <option value="search_vehicle">Jármű Átvizsgálás (Vehicle)</option>
+                                                    <option value="subpoena">Pénzügyi / Főkönyvi Idézés (Subpoena)</option>
+                                                    <option value="wiretap">Cellaalapú Lehallgatás (Wiretap)</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Érvényesség (Óra, 1-336)</label>
+                                                <input type="number" id="court-input-duration" min="1" max="336" value="72" class="modal-input">
+                                            </div>
+                                        </div>
+                                        <div class="form-group" id="court-group-subpoena-scope">
+                                            <label>Idézési Hatókör (Subpoena Scope)</label>
+                                            <select id="court-select-subpoena-scope" class="modal-select">
+                                                <option value="financial">Pénzügyi & Kincstári Főkönyv (Financial)</option>
+                                                <option value="property">Ingatlanvagyon Nyilvántartás (Property)</option>
+                                                <option value="telecom">Híváslista & Távközlés (Telecom)</option>
+                                                <option value="all">Teljes Körű Átvilágítás (All Scopes)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Célobjektum / Rendszám / Ingatlan ID (Opcionális)</label>
+                                            <input type="text" id="court-input-target-entity" placeholder="Pl. PROP-102 vagy NYX 777" class="modal-input" maxlength="64">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Alapos Gyanú Összefoglalása (Probable Cause Affidavit, min 20 betű)</label>
+                                            <textarea id="court-input-cause-summary" rows="4" placeholder="Írd le a bizonyítékokat, tanúvallomást vagy nyomozati megfigyelést..." class="modal-input"></textarea>
+                                        </div>
+                                        <button id="court-submit-petition-btn" class="btn btn-primary btn-block"><i class="fa-solid fa-paper-plane"></i> Kérvény Hivatalos Benyújtása</button>
+                                    </div>
+                                </div>
+
+                                <!-- Subpoena Financial Records Disclosure Pane (When selected) -->
+                                <div id="court-subpoena-disclosure" class="card-surface subpoena-disclosure-card hidden">
+                                    <div class="card-header-row">
+                                        <div>
+                                            <h4 class="card-title"><i class="fa-solid fa-vault"></i> Idézési Főkönyvi Feltárás</h4>
+                                            <span class="card-subtitle" id="court-subpoena-target-label">Célszemély: -</span>
+                                        </div>
+                                        <button id="court-subpoena-close-btn" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                                    </div>
+                                    <div id="court-subpoena-content" class="subpoena-content">
+                                        <!-- Dynamic balances, transactions, properties, shares -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

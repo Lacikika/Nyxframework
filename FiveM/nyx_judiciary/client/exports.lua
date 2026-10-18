@@ -23,3 +23,19 @@ end)
 exports("VerifyChainOfCustody", function(evidenceId)
     return ClientVerifyChainOfCustody and ClientVerifyChainOfCustody(evidenceId) or false
 end)
+
+exports("OpenCourtTerminal", function(activeTab)
+    if OpenCourtTerminal then
+        OpenCourtTerminal(activeTab)
+        return true
+    end
+    return false
+end)
+
+exports("CloseCourtTerminal", function()
+    if exports['nyx_ui'] and exports['nyx_ui'].CloseCourtTerminal then
+        exports['nyx_ui']:CloseCourtTerminal()
+        return true
+    end
+    return false
+end)

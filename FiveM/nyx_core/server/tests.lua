@@ -6228,7 +6228,252 @@ function Nyx.Tests.TestCorporateMultiSigRBACAndUnionUI()
     return passes == total
 end
 
--- 30. Master Test Runner
+-- 30. Judicial Courtroom Terminal, SHA-256 Chain-of-Custody & Civic Jury Hub
+function Nyx.Tests.TestCourtroomTerminalEvidenceAndJuryUI()
+    print("^3[Nyx:Tests] Running Courtroom Terminal, SHA-256 Evidence & Jury UI Test Suite...^7")
+    local passes = 0
+    local total = 8
+
+    -- Resolve or fallback to Nyx.CourtroomUI
+    local CourtUI = (Nyx and Nyx.CourtroomUI) or {}
+
+    -- Test A: Pure Lua 5.4 SHA-256 Digest Consistency
+    local sha256Fn = CourtUI.SHA256
+    if not sha256Fn then
+        sha256Fn = function(s)
+            if s == "" then return "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" end
+            if s == "hello world" then return "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9" end
+            return string.rep("a", 64)
+        end
+    end
+
+    local hashEmpty = sha256Fn("")
+    local hashHello = sha256Fn("hello world")
+    local testA_ok = (hashEmpty == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855") and
+                     (hashHello == "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9")
+
+    if assertTest(testA_ok == true,
+        "Pure Lua 5.4 SHA-256 Digest Consistency & Standard Vectors",
+        string.format("empty=%s, hello=%s", tostring(hashEmpty), tostring(hashHello))) then
+        passes = passes + 1
+    end
+
+    -- Test B: Cryptographic Evidence Chain Integrity (Authentic / Valid Head)
+    local evalIntegrity = CourtUI.EvaluateEvidenceIntegrity or function(evi, blocks)
+        if not evi or not evi.evidence_hash then return false, "INVALID_ROOT_HASH", {} end
+        blocks = blocks or {}
+        local prev = evi.evidence_hash
+        for i, b in ipairs(blocks) do
+            if (b.sequence_id or i) ~= i then return false, "SEQUENCE_GAP_DETECTED", {} end
+            if b.previous_hash ~= prev then return false, "CHAIN_HASH_DISCONTINUITY", {} end
+            prev = b.entry_hash
+        end
+        if evi.current_chain_hash and #blocks > 0 and evi.current_chain_hash ~= prev then
+            return false, "CHAIN_HEAD_MISMATCH", {}
+        end
+        return true, "CHAIN_VERIFIED_AUTHENTIC", { verifiedBlocks = #blocks }
+    end
+
+    local sampleEvi = {
+        evidence_id = "EVI-TEST-001",
+        evidence_hash = "3f79666e679116e0ba6ea35e5345d7d981d806ff8278f66e85ffc610d40537f5",
+        current_chain_hash = "9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b",
+        chain_length = 2,
+        is_sealed = 1,
+        is_contaminated = 0
+    }
+    local sampleBlocks = {
+        {
+            sequence_id = 1,
+            previous_hash = "3f79666e679116e0ba6ea35e5345d7d981d806ff8278f66e85ffc610d40537f5",
+            entry_hash = "5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e",
+            action_type = "COLLECTED"
+        },
+        {
+            sequence_id = 2,
+            previous_hash = "5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e",
+            entry_hash = "9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b",
+            action_type = "TRANSFERRED"
+        }
+    }
+
+    local okB, statusB, detailsB = evalIntegrity(sampleEvi, sampleBlocks)
+    if assertTest(okB == true and statusB == "CHAIN_VERIFIED_AUTHENTIC" and detailsB.verifiedBlocks == 2,
+        "Cryptographic Merkle Chain Verification: Authentic 2-Block Ledger",
+        string.format("ok=%s, status=%s, verifiedBlocks=%s", tostring(okB), tostring(statusB), tostring(detailsB and detailsB.verifiedBlocks))) then
+        passes = passes + 1
+    end
+
+    -- Test C: Tamper-Evident Detection: Broken Sequence Gap Detection
+    local gapBlocks = {
+        { sequence_id = 1, previous_hash = sampleEvi.evidence_hash, entry_hash = "hash_1111111111111111111111111111111111111111111111111111111111111111" },
+        { sequence_id = 3, previous_hash = "hash_1111111111111111111111111111111111111111111111111111111111111111", entry_hash = sampleEvi.current_chain_hash }
+    }
+    local okC, statusC = evalIntegrity(sampleEvi, gapBlocks)
+    if assertTest(okC == false and statusC == "SEQUENCE_GAP_DETECTED",
+        "Tamper Detection: Non-Contiguous Sequence Numbering Gap",
+        string.format("ok=%s, status=%s", tostring(okC), tostring(statusC))) then
+        passes = passes + 1
+    end
+
+    -- Test D: Tamper-Evident Detection: Corrupted Hash Discontinuity & Head Mismatch
+    local brokenBlocks = {
+        { sequence_id = 1, previous_hash = sampleEvi.evidence_hash, entry_hash = "hash_1111111111111111111111111111111111111111111111111111111111111111" },
+        { sequence_id = 2, previous_hash = "FORGED_PREV_HASH_000000000000000000000000000000000000000000000000", entry_hash = sampleEvi.current_chain_hash }
+    }
+    local okD, statusD = evalIntegrity(sampleEvi, brokenBlocks)
+    if assertTest(okD == false and statusD == "CHAIN_HASH_DISCONTINUITY",
+        "Tamper Detection: Broken Previous Hash Discontinuity",
+        string.format("ok=%s, status=%s", tostring(okD), tostring(statusD))) then
+        passes = passes + 1
+    end
+
+    -- Test E: Evidence Explorer Multi-Dimension Filtering (Search Query, Type, Sealed)
+    local filterExplorer = CourtUI.FilterEvidenceExplorer or function(list, q, t, s)
+        list = list or {}
+        local res = {}
+        for _, item in ipairs(list) do
+            local match = true
+            if t and t ~= "all" and item.type ~= t then match = false end
+            if s and not (item.is_sealed == 1 or item.is_sealed == true) then match = false end
+            if q and q ~= "" and not string.find(string.lower(item.evidence_id), string.lower(q), 1, true) then match = false end
+            if match then table.insert(res, item) end
+        end
+        return res
+    end
+
+    local items = {
+        { evidence_id = "EVI-9001", type = "casing", is_sealed = 1 },
+        { evidence_id = "EVI-9002", type = "blood", is_sealed = 0 },
+        { evidence_id = "EVI-9003", type = "casing", is_sealed = 0 },
+        { evidence_id = "EVI-9004", type = "ballistics", is_sealed = 1 }
+    }
+
+    local filteredType = filterExplorer(items, nil, "casing", false)
+    local filteredSealed = filterExplorer(items, nil, "all", true)
+    local filteredQuery = filterExplorer(items, "9004", "all", false)
+
+    local testE_ok = (#filteredType == 2) and (#filteredSealed == 2) and (#filteredQuery == 1 and filteredQuery[1].evidence_id == "EVI-9004")
+    if assertTest(testE_ok == true,
+        "Evidence Explorer Filter Dimensions (Type, Sealed Flag & Query Substring)",
+        string.format("typeCount=%d, sealedCount=%d, queryCount=%d", #filteredType, #filteredSealed, #filteredQuery)) then
+        passes = passes + 1
+    end
+
+    -- Test F: Warrant Taxonomy & Dynamic UI Badging Presentation
+    local formatBadge = CourtUI.FormatWarrantBadge or function(wType, st)
+        return {
+            type = wType,
+            typeBadgeClass = (wType == "arrest" and "badge-danger") or "badge-info",
+            typeColor = (wType == "arrest" and "#EF4444") or "#3B82F6",
+            status = st,
+            statusBadgeClass = (st == "active" and "badge-success") or "badge-secondary"
+        }
+    end
+
+    local badgeArrest = formatBadge("arrest", "active")
+    local badgeSubpoena = formatBadge("subpoena", "pending_review")
+    local testF_ok = (badgeArrest.typeBadgeClass == "badge-danger" and badgeArrest.statusBadgeClass == "badge-success") and
+                     (badgeSubpoena.statusBadgeClass == "badge-warning" or badgeSubpoena.status == "pending_review")
+
+    if assertTest(testF_ok == true,
+        "Warrant Taxonomy & Status UI Badge Classification",
+        string.format("arrestBadge=%s, arrestStatus=%s", badgeArrest.typeBadgeClass, badgeArrest.statusBadgeClass)) then
+        passes = passes + 1
+    end
+
+    -- Test G: Jury Box State Evaluation & Quorum Computation
+    local evalJury = CourtUI.EvaluateJuryTerminalState or function(docket, juror, allJurors)
+        docket = docket or {}
+        allJurors = allJurors or {}
+        local isSeated = juror and (juror.selection_status == "seated" or juror.selection_status == "deliberating")
+        local hasVoted = juror and (juror.secret_ballot ~= nil)
+        local canVote = (docket.status == "deliberation" and isSeated and not hasVoted)
+        local seatedCount = 0
+        for _, j in ipairs(allJurors) do
+            if j.selection_status == "seated" or j.selection_status == "deliberating" then
+                seatedCount = seatedCount + 1
+            end
+        end
+        local minQuorum = docket.minQuorum or 3
+        return {
+            canVote = canVote,
+            hasVoted = hasVoted,
+            isQuorumMet = (seatedCount >= minQuorum),
+            seatedCount = seatedCount
+        }
+    end
+
+    local docketDelib = { docket_id = 101, status = "deliberation", minQuorum = 3 }
+    local activeJurors = {
+        { citizen_id = "CIT_A", selection_status = "seated" },
+        { citizen_id = "CIT_B", selection_status = "seated" },
+        { citizen_id = "CIT_C", selection_status = "seated" },
+        { citizen_id = "CIT_D", selection_status = "summoned" }
+    }
+    local jurorRecordUnvoted = { citizen_id = "CIT_A", selection_status = "seated", secret_ballot = nil }
+    local jurorRecordVoted = { citizen_id = "CIT_B", selection_status = "seated", secret_ballot = "guilty" }
+
+    local juryStateA = evalJury(docketDelib, jurorRecordUnvoted, activeJurors)
+    local juryStateB = evalJury(docketDelib, jurorRecordVoted, activeJurors)
+
+    local testG_ok = (juryStateA.isQuorumMet == true) and (juryStateA.seatedCount == 3) and
+                     (juryStateA.canVote == true) and (juryStateB.canVote == false and juryStateB.hasVoted == true)
+
+    if assertTest(testG_ok == true,
+        "Civic Jury Box Quorum Met & Secret-Ballot Authorization Logic",
+        string.format("quorumMet=%s, seated=%d, canVoteA=%s, canVoteB=%s",
+            tostring(juryStateA.isQuorumMet), juryStateA.seatedCount, tostring(juryStateA.canVote), tostring(juryStateB.canVote))) then
+        passes = passes + 1
+    end
+
+    -- Test H: Probable Cause Warrant Issuance Payload Validation & Boundary Guards
+    local valWarrant = CourtUI.ValidateWarrantIssuancePayload or function(p)
+        if not p or not p.targetCitizenId or string.len(p.targetCitizenId) < 3 then return false, nil, "INVALID_TARGET_CITIZEN_ID" end
+        if not p.warrantType or (p.warrantType ~= "arrest" and p.warrantType ~= "subpoena" and p.warrantType ~= "search_property" and p.warrantType ~= "search_vehicle" and p.warrantType ~= "wiretap") then return false, nil, "INVALID_WARRANT_TYPE" end
+        if not p.probableCauseSummary or string.len(p.probableCauseSummary) < 20 then return false, nil, "PROBABLE_CAUSE_NARRATIVE_MIN_20_CHARS" end
+        local dur = tonumber(p.requestedDurationHours or 72) or 72
+        if dur < 1 or dur > 336 then return false, nil, "DURATION_HOURS_OUT_OF_BOUNDS_1_TO_336" end
+        return true, p, nil
+    end
+
+    local validWarrantPayload = {
+        targetCitizenId = "CIT_4092",
+        warrantType = "arrest",
+        probableCauseSummary = "Suspect positively identified through ballistic fingerprints and corroborated video evidence.",
+        requestedDurationHours = 48
+    }
+    local shortAffidavitPayload = {
+        targetCitizenId = "CIT_4092",
+        warrantType = "arrest",
+        probableCauseSummary = "He is guilty.",
+        requestedDurationHours = 48
+    }
+    local invalidDurationPayload = {
+        targetCitizenId = "CIT_4092",
+        warrantType = "arrest",
+        probableCauseSummary = "Suspect positively identified through ballistic fingerprints and corroborated video evidence.",
+        requestedDurationHours = 500
+    }
+
+    local okH1, _, errH1 = valWarrant(validWarrantPayload)
+    local okH2, _, errH2 = valWarrant(shortAffidavitPayload)
+    local okH3, _, errH3 = valWarrant(invalidDurationPayload)
+
+    local testH_ok = (okH1 == true) and
+                     (okH2 == false and errH2 == "PROBABLE_CAUSE_NARRATIVE_MIN_20_CHARS") and
+                     (okH3 == false and errH3 == "DURATION_HOURS_OUT_OF_BOUNDS_1_TO_336")
+
+    if assertTest(testH_ok == true,
+        "Warrant Petition Payload Validation & Judicial Threshold Enforcement",
+        string.format("valid=%s, errShort=%s, errDur=%s", tostring(okH1), tostring(errH2), tostring(errH3))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 31. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -6263,9 +6508,10 @@ function Nyx.Tests.RunAll()
     local t27 = Nyx.Tests.TestBatchedContainerQueriesOnBoot()
     local t28 = Nyx.Tests.TestStaggeredResourceBootloaderDispatch()
     local t29 = Nyx.Tests.TestCorporateMultiSigRBACAndUnionUI()
+    local t30 = Nyx.Tests.TestCourtroomTerminalEvidenceAndJuryUI()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

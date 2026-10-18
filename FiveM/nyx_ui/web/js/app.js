@@ -187,6 +187,339 @@ function handleDevMockNui(action, data) {
             ]
         };
     }
+    if (action === 'closeCourtTerminal') {
+        return { success: true };
+    }
+    if (action === 'court:getOverview') {
+        return {
+            success: true,
+            overview: {
+                citizenId: 'CIT_001',
+                job: 'judge',
+                isJudge: true,
+                isLawEnforcement: true,
+                dockets: [
+                    {
+                        docketId: 101,
+                        docket_id: 101,
+                        caseNumber: 'CR-2026-0042',
+                        case_number: 'CR-2026-0042',
+                        title: 'San Andreas Állam kontra Tyler Cross',
+                        caseType: 'criminal',
+                        case_type: 'criminal',
+                        status: 'deliberation',
+                        plaintiffName: 'San Andreas Állam Ügyészsége',
+                        plaintiff_name: 'San Andreas Állam Ügyészsége',
+                        defendantName: 'Tyler Cross (CIT_0921)',
+                        defendant_name: 'Tyler Cross (CIT_0921)',
+                        presidingJudgeName: 'Hon. Elena Rostova',
+                        presiding_judge_name: 'Hon. Elena Rostova',
+                        juryRequired: true,
+                        jury_required: 1,
+                        caseBrief: 'Fegyveres rablás és bűnszervezetben elkövetett pénzmosás vádja.',
+                        case_brief: 'Fegyveres rablás és bűnszervezetben elkövetett pénzmosás vádja.'
+                    }
+                ],
+                jurorRecord: {
+                    jury_id: 1,
+                    docket_id: 101,
+                    citizen_id: 'CIT_001',
+                    seat_index: 1,
+                    selection_status: 'seated'
+                },
+                activeDocketForJuror: 101,
+                juryDetails: {
+                    docketId: 101,
+                    status: 'deliberation',
+                    isSummoned: true,
+                    isSeated: true,
+                    hasVoted: false,
+                    jurors: [
+                        { seat: 1, citizenId: 'CIT_001', name: 'Marcus Bell', status: 'seated', checkedInAt: '10:05' },
+                        { seat: 2, citizenId: 'CIT_0488', name: 'Devon Lee', status: 'seated', checkedInAt: '10:07' },
+                        { seat: 3, citizenId: 'CIT_0991', name: 'Sarah Connor', status: 'seated', checkedInAt: '10:12' },
+                        { seat: 4, citizenId: 'CIT_1204', name: 'Alex Hunter', status: 'summoned', checkedInAt: null },
+                        { seat: 5, citizenId: 'CIT_1420', name: 'David Vance', status: 'summoned', checkedInAt: null },
+                        { seat: 6, citizenId: 'CIT_1880', name: 'Rachel Zane', status: 'summoned', checkedInAt: null }
+                    ],
+                    activeCount: 3,
+                    requiredQuorum: 3,
+                    quorumMet: true,
+                    ballotOpen: true
+                },
+                evidence: [
+                    {
+                        evidence_id: 'EVI-2026-001',
+                        docket_id: 101,
+                        exhibit_label: 'EX-01',
+                        type: 'casing',
+                        evidence_type: 'casing',
+                        label: '9mm hüvely (Legion Square)',
+                        current_custodian_id: 'OFF_204',
+                        current_facility: 'MRPD Vault 1',
+                        is_sealed: 1,
+                        is_contaminated: 0,
+                        chain_length: 3,
+                        created_at: '2026-10-18 09:15:00',
+                        collector_citizen_id: 'OFF_102',
+                        evidence_hash: '3f79666e679116e0ba6ea35e5345d7d981d806ff8278f66e85ffc610d40537f5',
+                        current_chain_hash: '9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b'
+                    },
+                    {
+                        evidence_id: 'EVI-2026-002',
+                        docket_id: 101,
+                        exhibit_label: 'EX-02',
+                        type: 'ballistics',
+                        evidence_type: 'ballistics',
+                        label: 'Combat Pistol (Serial: W-98214)',
+                        current_custodian_id: 'LAB_TECH_01',
+                        current_facility: 'Forensics Lab A',
+                        is_sealed: 1,
+                        is_contaminated: 0,
+                        chain_length: 2,
+                        created_at: '2026-10-18 09:30:00',
+                        collector_citizen_id: 'OFF_102',
+                        evidence_hash: 'a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0',
+                        current_chain_hash: 'b2c3d4e5f6a17890123456789abcdef0123456789abcdef0123456789abcdef0'
+                    },
+                    {
+                        evidence_id: 'EVI-2026-003',
+                        docket_id: null,
+                        exhibit_label: null,
+                        type: 'swab',
+                        evidence_type: 'swab',
+                        label: 'GSR Kézkenet minta',
+                        current_custodian_id: 'OFF_204',
+                        current_facility: 'MRPD Vault 1',
+                        is_sealed: 0,
+                        is_contaminated: 0,
+                        chain_length: 1,
+                        created_at: '2026-10-18 10:00:00',
+                        collector_citizen_id: 'OFF_204',
+                        evidence_hash: 'c3d4e5f6a1b27890123456789abcdef0123456789abcdef0123456789abcdef0',
+                        current_chain_hash: 'c3d4e5f6a1b27890123456789abcdef0123456789abcdef0123456789abcdef0'
+                    }
+                ],
+                pendingPetitions: [
+                    {
+                        petition_id: 101,
+                        target_citizen_id: 'CIT_0921',
+                        warrant_type: 'search_property',
+                        probable_cause_summary: 'Helyszíni ujjlenyomat és térfigyelő kamera alapján a gyanúsított a bűncselekményhez használt illegális lőfegyvert az ingatlanában rejtegeti.',
+                        target_entity_id: 'PROP-402',
+                        requested_duration_hours: 48,
+                        petitioner_citizen_id: 'OFF_204',
+                        created_at: '2026-10-18 09:45:00'
+                    }
+                ],
+                activeWarrants: [
+                    {
+                        warrant_id: 'WAR-2026-0042',
+                        target_citizen_id: 'CIT_0921',
+                        type: 'subpoena',
+                        subpoena_scope: 'all',
+                        cause_summary: 'Bűnszervezeti pénzmosás és vagyonkimentés gyanúja miatt a bíróság azonnali főkönyvi zárolást és teljes pénzügyi feltárást rendel el.',
+                        target_entity_id: 'BANK_RECORDS',
+                        expires_at: '2026-10-21 10:00:00',
+                        issued_by_citizen_id: 'CIT_001',
+                        status: 'active'
+                    },
+                    {
+                        warrant_id: 'WAR-2026-0041',
+                        target_citizen_id: 'CIT_0884',
+                        type: 'arrest',
+                        cause_summary: 'Közvetlen szökésben lévő fegyveres rabló azonosítva a helyszínen.',
+                        target_entity_id: null,
+                        expires_at: '2026-10-20 18:30:00',
+                        issued_by_citizen_id: 'CIT_001',
+                        status: 'active'
+                    }
+                ]
+            }
+        };
+    }
+    if (action === 'court:getEvidenceList') {
+        return {
+            success: true,
+            evidence: [
+                {
+                    evidence_id: 'EVI-2026-001',
+                    docket_id: 101,
+                    exhibit_label: 'EX-01',
+                    type: 'casing',
+                    evidence_type: 'casing',
+                    current_custodian_id: 'OFF_204',
+                    current_facility: 'MRPD Vault 1',
+                    is_sealed: 1,
+                    is_contaminated: 0,
+                    chain_length: 3,
+                    created_at: '2026-10-18 09:15:00',
+                    collector_citizen_id: 'OFF_102',
+                    evidence_hash: '3f79666e679116e0ba6ea35e5345d7d981d806ff8278f66e85ffc610d40537f5',
+                    current_chain_hash: '9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b'
+                },
+                {
+                    evidence_id: 'EVI-2026-002',
+                    docket_id: 101,
+                    exhibit_label: 'EX-02',
+                    type: 'ballistics',
+                    evidence_type: 'ballistics',
+                    current_custodian_id: 'LAB_TECH_01',
+                    current_facility: 'Forensics Lab A',
+                    is_sealed: 1,
+                    is_contaminated: 0,
+                    chain_length: 2,
+                    created_at: '2026-10-18 09:30:00',
+                    collector_citizen_id: 'OFF_102',
+                    evidence_hash: 'a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0',
+                    current_chain_hash: 'b2c3d4e5f6a17890123456789abcdef0123456789abcdef0123456789abcdef0'
+                },
+                {
+                    evidence_id: 'EVI-2026-003',
+                    docket_id: null,
+                    exhibit_label: null,
+                    type: 'swab',
+                    evidence_type: 'swab',
+                    current_custodian_id: 'OFF_204',
+                    current_facility: 'MRPD Vault 1',
+                    is_sealed: 0,
+                    is_contaminated: 0,
+                    chain_length: 1,
+                    created_at: '2026-10-18 10:00:00',
+                    collector_citizen_id: 'OFF_204',
+                    evidence_hash: 'c3d4e5f6a1b27890123456789abcdef0123456789abcdef0123456789abcdef0',
+                    current_chain_hash: 'c3d4e5f6a1b27890123456789abcdef0123456789abcdef0123456789abcdef0'
+                }
+            ]
+        };
+    }
+    if (action === 'court:getEvidenceChain') {
+        return {
+            success: true,
+            evidence: {
+                evidence_id: data.evidenceId || 'EVI-2026-001',
+                docket_id: 101,
+                exhibit_label: 'EX-01',
+                type: 'casing',
+                current_custodian_id: 'OFF_204',
+                current_facility: 'MRPD Vault 1',
+                is_sealed: 1,
+                is_contaminated: 0,
+                created_at: '2026-10-18 09:15:00',
+                collector_citizen_id: 'OFF_102',
+                evidence_hash: '3f79666e679116e0ba6ea35e5345d7d981d806ff8278f66e85ffc610d40537f5',
+                current_chain_hash: '9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b'
+            },
+            chain: [
+                {
+                    sequence_index: 0,
+                    action_type: 'COLLECTED',
+                    custodian_id: 'OFF_102',
+                    facility: 'Crime Scene (Legion Square)',
+                    notes: 'Helyszínen rögzített hüvely, sterile tasakban elhelyezve.',
+                    timestamp: '2026-10-18 09:15:00',
+                    prev_hash: 'GENESIS',
+                    block_hash: '3f79666e679116e0ba6ea35e5345d7d981d806ff8278f66e85ffc610d40537f5'
+                },
+                {
+                    sequence_index: 1,
+                    action_type: 'TRANSFERRED',
+                    custodian_id: 'LAB_TECH_01',
+                    facility: 'Forensics Lab A',
+                    notes: 'Ballisztikai összehasonlító mikroszkóp vizsgálatra átadva.',
+                    timestamp: '2026-10-18 09:40:00',
+                    prev_hash: '3f79666e679116e0ba6ea35e5345d7d981d806ff8278f66e85ffc610d40537f5',
+                    block_hash: '5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e'
+                },
+                {
+                    sequence_index: 2,
+                    action_type: 'VAULT_STORED',
+                    custodian_id: 'OFF_204',
+                    facility: 'MRPD Vault 1',
+                    notes: 'Bírósági tárgyalásra letétbe helyezve a főszéfben.',
+                    timestamp: '2026-10-18 10:10:00',
+                    prev_hash: '5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e',
+                    block_hash: '9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b'
+                }
+            ]
+        };
+    }
+    if (action === 'court:verifyEvidenceChain') {
+        showNotification({ type: 'success', title: 'SHA-256 HITELESÍTVE', message: `Bűnjel ${data.evidenceId} Merkle lánca 100%-ban érvényes és sértetlen!` });
+        return {
+            success: true,
+            status: 'VALID',
+            data: {
+                verified: true,
+                evidenceId: data.evidenceId,
+                chainLength: 3,
+                blockCount: 3,
+                rootHash: '3f79666e679116e0ba6ea35e5345d7d981d806ff8278f66e85ffc610d40537f5',
+                currentChainHash: '9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b'
+            }
+        };
+    }
+    if (action === 'court:castJuryVote') {
+        showNotification({ type: 'success', title: 'SZAVAZAT LEADVA', message: `Titkos szavazatod (${data.vote}) beérkezett az esküdtszéki urnába!` });
+        return { success: true };
+    }
+    if (action === 'court:seatJuror') {
+        showNotification({ type: 'success', title: 'HELY ELFOGLALVA', message: 'Sikeresen elfoglaltad a kijelölt esküdtszéki széket!' });
+        return { success: true };
+    }
+    if (action === 'court:summonJury') {
+        showNotification({ type: 'info', title: 'ÜLNÖKÖK BEHÍVVA', message: 'Hivatalos esküdtszéki idézés kiküldve 6 polgárnak!' });
+        return { success: true };
+    }
+    if (action === 'court:startTrial') {
+        showNotification({ type: 'info', title: 'TÁRGYALÁS MEGNYITVA', message: 'A bírósági tárgyalási szakasz elindult.' });
+        return { success: true };
+    }
+    if (action === 'court:startDeliberation') {
+        showNotification({ type: 'warning', title: 'TANÁCSKOZÁS MEGNYITVA', message: 'Az esküdtszék elvonult a zárt tanácskozóterembe.' });
+        return { success: true };
+    }
+    if (action === 'court:concludeTrial') {
+        showNotification({ type: 'success', title: 'ÍTÉLET KIHIRDETVE', message: `A per lezárult: ${data.verdictRuling || 'Ítélet'}` });
+        return { success: true };
+    }
+    if (action === 'court:petitionWarrant') {
+        showNotification({ type: 'success', title: 'KÉRVÉNY BENYÚJTVA', message: 'Parancskérelmed rögzítve az elnöklő bírónak.' });
+        return { success: true };
+    }
+    if (action === 'court:reviewPetition') {
+        showNotification({ type: 'info', title: 'KÉRVÉNY ELBÍRÁLVA', message: `Döntés rögzítve: ${data.decision} (#${data.petitionId})` });
+        return { success: true };
+    }
+    if (action === 'court:rescindWarrant') {
+        showNotification({ type: 'warning', title: 'PARANCS VISSZAVONVA', message: `A(z) ${data.warrantId} számú parancs visszavonva.` });
+        return { success: true };
+    }
+    if (action === 'court:getSubpoenaRecords') {
+        return {
+            success: true,
+            records: {
+                citizenId: data.targetCitizenId || 'CIT_0921',
+                bankBalance: 84500.00,
+                cashBalance: 12400.00,
+                accounts: [
+                    { id: 'CHK-9021', type: 'Folyószámla', balance: 45000.00, status: 'Aktív' },
+                    { id: 'SAV-4410', type: 'Megtakarítási Letét', balance: 39500.00, status: 'Aktív' }
+                ],
+                properties: [
+                    { id: 'PROP-402', address: '302 Alta St, Apt 14', value: 250000.00 },
+                    { id: 'GAR-109', address: 'Popular St Raktár #4', value: 180000.00 }
+                ],
+                corporateShares: [
+                    { factionId: 'corp_los_santos_logistics', name: 'Los Santos Freight & Logistics Corp.', sharesPercent: 12.5 }
+                ],
+                transactions: [
+                    { date: '2026-10-17 18:22', amount: -15000.00, memo: 'Nemzetközi Átutalás ACCT_OFFSHORE_88 felé' },
+                    { date: '2026-10-18 08:45', amount: 50000.00, memo: 'Ismeretlen Eredetű Készpénz Befizetés' }
+                ]
+            }
+        };
+    }
     return { success: true, devMode: true };
 }
 
@@ -250,6 +583,22 @@ const NyxState = {
         factionsList: [],
         data: null,
         selectedMemberCitId: null
+    },
+    court: {
+        isOpen: false,
+        activeTab: 'evidence',
+        isJudge: false,
+        dockets: [],
+        currentDocket: null,
+        evidenceList: [],
+        selectedEvidenceId: null,
+        chainBlocks: [],
+        verificationResult: null,
+        juryTerminal: null,
+        hasVoted: false,
+        pendingPetitions: [],
+        activeWarrants: [],
+        subpoenaRecords: null
     },
     activeDialog: null
 };
@@ -1399,6 +1748,777 @@ function renderFactionAudit(auditLogs) {
     });
 }
 
+// 12C. Courtroom Terminal & Forensic Explorer (nyx_judiciary)
+function openCourtTerminal(payload = {}) {
+    NyxState.court.isOpen = true;
+    const overlay = document.getElementById('court-overlay');
+    if (!overlay) return;
+
+    overlay.classList.remove('hidden');
+
+    if (payload.isJudge !== undefined) {
+        NyxState.court.isJudge = !!payload.isJudge;
+    }
+    const roleBadge = document.getElementById('court-role-badge');
+    if (roleBadge) {
+        if (NyxState.court.isJudge) {
+            roleBadge.textContent = 'ELNÖKLŐ BÍRÓ';
+            roleBadge.className = 'badge badge-warning';
+        } else {
+            roleBadge.textContent = 'POLGÁR / ÜLNÖK';
+            roleBadge.className = 'badge';
+        }
+    }
+
+    const initialTab = payload.activeTab || 'evidence';
+    setCourtTab(initialTab);
+
+    refreshCourtOverview();
+    refreshCourtEvidenceList();
+}
+
+function closeCourtTerminal() {
+    NyxState.court.isOpen = false;
+    const overlay = document.getElementById('court-overlay');
+    if (overlay) overlay.classList.add('hidden');
+
+    const subpDisclosure = document.getElementById('court-subpoena-disclosure');
+    if (subpDisclosure) subpDisclosure.classList.add('hidden');
+
+    postNui('closeCourtTerminal', {});
+}
+
+function setCourtTab(tabName) {
+    NyxState.court.activeTab = tabName;
+
+    document.querySelectorAll('.court-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
+
+    document.querySelectorAll('.court-tab-pane').forEach(pane => {
+        pane.classList.add('hidden');
+    });
+
+    const targetPane = document.getElementById(`court-tab-${tabName}`);
+    if (targetPane) {
+        targetPane.classList.remove('hidden');
+    }
+
+    if (tabName === 'evidence') {
+        setTimeout(() => document.getElementById('court-evidence-search')?.focus(), 50);
+    }
+}
+
+async function refreshCourtOverview() {
+    const res = await postNui('court:getOverview', {});
+    if (!res || !res.success || !res.overview) return;
+
+    const data = res.overview;
+    NyxState.court.isJudge = !!data.isJudge;
+
+    // Header role badge update
+    const roleBadge = document.getElementById('court-role-badge');
+    if (roleBadge) {
+        if (data.isJudge) {
+            roleBadge.textContent = 'ELNÖKLŐ BÍRÓ';
+            roleBadge.className = 'badge badge-warning';
+        } else if (data.jurorRecord) {
+            roleBadge.textContent = `ESKÜDT (SZÉK #${data.jurorRecord.seat_index || '?'})`;
+            roleBadge.className = 'badge badge-success';
+        } else if (data.isLawEnforcement) {
+            roleBadge.textContent = 'RENDVÉDELEM (LEO)';
+            roleBadge.className = 'badge badge-info';
+        } else {
+            roleBadge.textContent = 'POLGÁR';
+            roleBadge.className = 'badge';
+        }
+    }
+
+    // Active Docket & Case badge
+    NyxState.court.dockets = data.dockets || [];
+    const activeDocket = (NyxState.court.dockets.length > 0) ? NyxState.court.dockets[0] : null;
+    NyxState.court.currentDocket = activeDocket;
+
+    const caseBadge = document.getElementById('court-case-badge');
+    if (caseBadge) {
+        if (activeDocket) {
+            caseBadge.textContent = activeDocket.case_number || activeDocket.caseNumber || `DOCKET #${activeDocket.docket_id || activeDocket.docketId}`;
+            caseBadge.className = 'badge badge-outline';
+        } else {
+            caseBadge.textContent = 'NINCS AKTÍV TÁRGYALÁS';
+            caseBadge.className = 'badge badge-outline';
+        }
+    }
+
+    // Render Jury Tab
+    renderJuryDashboard(data.juryDetails, activeDocket, data.jurorRecord);
+
+    // Render Warrants & Petitions
+    NyxState.court.pendingPetitions = data.pendingPetitions || [];
+    NyxState.court.activeWarrants = data.activeWarrants || [];
+    renderWarrantsDashboard(NyxState.court.pendingPetitions, NyxState.court.activeWarrants);
+}
+
+async function refreshCourtEvidenceList() {
+    const search = document.getElementById('court-evidence-search')?.value?.trim() || '';
+    const typeFilter = document.getElementById('court-evidence-type-filter')?.value || 'all';
+    const sealedOnly = !!document.getElementById('court-evidence-sealed-check')?.checked;
+
+    const res = await postNui('court:getEvidenceList', {
+        search: search || undefined,
+        type: typeFilter !== 'all' ? typeFilter : undefined,
+        isSealedOnly: sealedOnly,
+        limit: 50,
+        offset: 0
+    });
+
+    if (res && res.success && Array.isArray(res.evidence)) {
+        NyxState.court.evidenceList = res.evidence;
+        renderCourtEvidenceList(res.evidence);
+    }
+}
+
+function renderCourtEvidenceList(items) {
+    const tbody = document.getElementById('court-evidence-rows');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!items || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">Nem található a szűrésnek megfelelő bűnjel.</td></tr>';
+        return;
+    }
+
+    items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = 'evidence-row-item';
+        tr.dataset.evidenceId = item.evidence_id;
+        if (NyxState.court.selectedEvidenceId === item.evidence_id) {
+            tr.classList.add('selected');
+        }
+
+        const typeLabel = (item.type || item.evidence_type || 'unknown').toUpperCase();
+        let statusBadge = '<span class="badge badge-outline">AKTÍV</span>';
+        if (item.is_contaminated == 1) {
+            statusBadge = '<span class="badge badge-danger">SZENNYEZETT</span>';
+        } else if (item.is_sealed == 1) {
+            statusBadge = '<span class="badge badge-success">LEPECSETELVE</span>';
+        }
+
+        const chainLen = item.chain_length || item.block_count || 1;
+
+        tr.innerHTML = `
+            <td style="font-family: var(--font-mono); font-weight: 600; color: var(--accent-amber);">${item.evidence_id}</td>
+            <td><span class="badge">${typeLabel}</span></td>
+            <td><span class="badge info">${chainLen} blokk</span></td>
+            <td>${statusBadge}</td>
+            <td><code>${item.current_custodian_id || '-'}</code></td>
+        `;
+
+        tr.addEventListener('click', () => {
+            document.querySelectorAll('#court-evidence-rows tr').forEach(r => r.classList.remove('selected'));
+            tr.classList.add('selected');
+            selectEvidenceItem(item.evidence_id);
+        });
+
+        tbody.appendChild(tr);
+    });
+}
+
+async function selectEvidenceItem(evidenceId) {
+    NyxState.court.selectedEvidenceId = evidenceId;
+    const res = await postNui('court:getEvidenceChain', { evidenceId: evidenceId });
+    if (!res || !res.success || !res.evidence) return;
+
+    const evidence = res.evidence;
+    const chain = res.chain || [];
+    NyxState.court.chainBlocks = chain;
+
+    // Unhide detail card, hide empty hint
+    const emptyHint = document.getElementById('court-evidence-empty-hint');
+    const detailCard = document.getElementById('court-evidence-detail-card');
+    if (emptyHint) emptyHint.classList.add('hidden');
+    if (detailCard) detailCard.classList.remove('hidden');
+
+    // Header info
+    const idEl = document.getElementById('court-detail-id');
+    if (idEl) idEl.textContent = evidence.evidence_id;
+
+    const typeBadge = document.getElementById('court-detail-type-badge');
+    if (typeBadge) typeBadge.textContent = (evidence.type || evidence.evidence_type || 'UNKNOWN').toUpperCase();
+
+    const sealedBadge = document.getElementById('court-detail-sealed-badge');
+    if (sealedBadge) sealedBadge.classList.toggle('hidden', evidence.is_sealed != 1);
+
+    const contamBadge = document.getElementById('court-detail-contam-badge');
+    if (contamBadge) contamBadge.classList.toggle('hidden', evidence.is_contaminated != 1);
+
+    const createdEl = document.getElementById('court-detail-created');
+    if (createdEl) {
+        createdEl.textContent = `Rögzítve: ${evidence.created_at || 'ISMERETLEN'} | Gyűjtő: ${evidence.collector_citizen_id || '-'}`;
+    }
+
+    // Hashes
+    const rootHashEl = document.getElementById('court-detail-root-hash');
+    if (rootHashEl) rootHashEl.textContent = evidence.evidence_hash || evidence.origin_hash || '--';
+
+    const headHashEl = document.getElementById('court-detail-head-hash');
+    if (headHashEl) headHashEl.textContent = evidence.current_chain_hash || evidence.current_head_hash || '--';
+
+    // Metadata pills
+    const custodianEl = document.getElementById('court-detail-custodian');
+    if (custodianEl) custodianEl.textContent = evidence.current_custodian_id || '-';
+
+    const facilityEl = document.getElementById('court-detail-facility');
+    if (facilityEl) facilityEl.textContent = evidence.current_facility || '-';
+
+    const docketEl = document.getElementById('court-detail-docket');
+    if (docketEl) docketEl.textContent = evidence.docket_id ? `#${evidence.docket_id}` : 'Nincs Iktatva';
+
+    const exhibitEl = document.getElementById('court-detail-exhibit');
+    if (exhibitEl) exhibitEl.textContent = evidence.exhibit_label || 'Nem Bírósági Tárgy';
+
+    // Reset verification result banner
+    const verifBanner = document.getElementById('court-verification-result');
+    if (verifBanner) {
+        verifBanner.className = 'verification-banner hidden';
+        verifBanner.innerHTML = '';
+    }
+
+    // Render timeline
+    renderEvidenceChainTimeline(chain);
+}
+
+function renderEvidenceChainTimeline(blocks) {
+    const container = document.getElementById('court-evidence-chain-timeline');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!blocks || blocks.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding: 16px;"><p>Nincsenek elérhető birtoklási blokkok.</p></div>';
+        return;
+    }
+
+    blocks.forEach((b, index) => {
+        const item = document.createElement('div');
+        item.className = 'timeline-block-card';
+
+        const actionType = b.action_type || 'TRANSFER';
+        let actionBadgeClass = 'info';
+        if (actionType === 'COLLECTED') actionBadgeClass = 'badge-success';
+        else if (actionType === 'VAULT_STORED') actionBadgeClass = 'badge-warning';
+        else if (actionType === 'COURT_PRESENTED') actionBadgeClass = 'badge-primary';
+
+        item.innerHTML = `
+            <div class="block-header-row">
+                <div class="block-title-info">
+                    <span class="block-index">#${b.sequence_index ?? index}</span>
+                    <span class="badge ${actionBadgeClass}">${actionType}</span>
+                    <span class="block-time">${b.timestamp || ''}</span>
+                </div>
+                <span class="block-actor">Őrző: <code>${b.custodian_id || '-'}</code></span>
+            </div>
+            <div class="block-meta-row">
+                <span class="block-facility"><i class="fa-solid fa-location-dot"></i> ${b.facility || 'Ismeretlen helyszín'}</span>
+                <span class="block-notes">${b.notes || ''}</span>
+            </div>
+            <div class="block-hash-chain">
+                <div class="hash-row"><span>PREV:</span> <code>${b.prev_hash || 'GENESIS'}</code></div>
+                <div class="hash-row"><span>HASH:</span> <code class="head-code">${b.block_hash || '--'}</code></div>
+            </div>
+        `;
+        container.appendChild(item);
+    });
+}
+
+async function verifyCurrentEvidenceChain() {
+    const evidenceId = NyxState.court.selectedEvidenceId;
+    if (!evidenceId) {
+        showNotification({ type: 'warning', title: 'NINCS KIVÁLASZTVA', message: 'Kérlek válassz ki egy bűnjelet a hitelesítéshez!' });
+        return;
+    }
+
+    const verifyBtn = document.getElementById('court-verify-chain-btn');
+    lockButtonAction(verifyBtn, async () => {
+        const res = await postNui('court:verifyEvidenceChain', { evidenceId: evidenceId });
+        const banner = document.getElementById('court-verification-result');
+        if (!banner) return;
+
+        banner.classList.remove('hidden');
+
+        if (res && res.success && (res.status === 'VALID' || res.status === 'OK' || res.verified)) {
+            const data = res.data || res;
+            const blockCount = data.blockCount || data.chainLength || NyxState.court.chainBlocks.length || 1;
+            const headHash = data.currentChainHash || data.headHash || '';
+            banner.className = 'verification-banner valid';
+            banner.innerHTML = `
+                <i class="fa-solid fa-circle-check icon-status"></i>
+                <div class="banner-body">
+                    <strong>KRIPTOGRÁFIAILAG HITELESÍTETT BŰNJEL (SÉRTETLEN)</strong>
+                    <div class="sub-line">SHA-256 Merkle folytonosság ellenőrizve. ${blockCount} láncblokk és fejhash kriptográfiailag érvényes.</div>
+                    <code class="hash-preview">HEAD: ${headHash}</code>
+                </div>
+            `;
+            showNotification({ type: 'success', title: 'SHA-256 IGAZOLVA', message: `Bűnjel ${evidenceId} integritása sértetlen.` });
+        } else {
+            banner.className = 'verification-banner invalid';
+            const reason = res?.status || res?.error || 'A hash integritási ellenőrzés meghiúsult.';
+            banner.innerHTML = `
+                <i class="fa-solid fa-triangle-exclamation icon-status"></i>
+                <div class="banner-body">
+                    <strong>INTEGRITÁSI HIBA / MÓDOSÍTOTT LÁNC</strong>
+                    <div class="sub-line">A lánc folytonossága megszakadt vagy utólag módosításra került: ${reason}</div>
+                </div>
+            `;
+            showNotification({ type: 'error', title: 'INTEGRITÁSI HIBA', message: reason });
+        }
+    });
+}
+
+function renderJuryDashboard(juryData, currentDocket, jurorRecord) {
+    // 1. Docket overview banner
+    const caseTypeEl = document.getElementById('court-jury-case-type');
+    const docketTitleEl = document.getElementById('court-jury-docket-title');
+    const partiesEl = document.getElementById('court-jury-parties');
+    const statusEl = document.getElementById('court-jury-docket-status');
+
+    if (currentDocket) {
+        if (caseTypeEl) caseTypeEl.textContent = (currentDocket.case_type || currentDocket.caseType || 'BÜNTETŐPER').toUpperCase();
+        if (docketTitleEl) docketTitleEl.textContent = `${currentDocket.case_number || currentDocket.caseNumber || ''}: ${currentDocket.title}`;
+        if (partiesEl) partiesEl.textContent = `Felperes: ${currentDocket.plaintiff_name || currentDocket.plaintiffName || 'Állam'} | Vádlott: ${currentDocket.defendant_name || currentDocket.defendantName || '-'}`;
+        if (statusEl) {
+            const st = (currentDocket.status || 'SCHEDULED').toUpperCase();
+            statusEl.textContent = st;
+            if (st === 'DELIBERATION') statusEl.className = 'badge badge-warning';
+            else if (st === 'IN_TRIAL') statusEl.className = 'badge badge-primary';
+            else if (st === 'CONCLUDED') statusEl.className = 'badge badge-success';
+            else statusEl.className = 'badge badge-outline';
+        }
+    } else {
+        if (docketTitleEl) docketTitleEl.textContent = 'Nincs folyamatban lévő bírósági tárgyalás';
+        if (partiesEl) partiesEl.textContent = 'A tárgyalóterem jelenleg szabad.';
+        if (statusEl) {
+            statusEl.textContent = 'SZABAD';
+            statusEl.className = 'badge badge-outline';
+        }
+    }
+
+    // 2. Seats and Quorum
+    const seatsContainer = document.getElementById('court-juror-seats');
+    const quorumBadge = document.getElementById('court-jury-quorum-badge');
+    if (seatsContainer) seatsContainer.innerHTML = '';
+
+    const jurors = (juryData && juryData.jurors) ? juryData.jurors : [];
+    const activeCount = juryData?.activeCount ?? jurors.filter(j => (j.status === 'seated' || j.selection_status === 'seated')).length;
+    const requiredQuorum = juryData?.requiredQuorum ?? 3;
+
+    if (quorumBadge) {
+        quorumBadge.textContent = `Kvórum: ${activeCount}/${requiredQuorum}`;
+        quorumBadge.className = activeCount >= requiredQuorum ? 'badge badge-success' : 'badge badge-warning';
+    }
+
+    for (let seat = 1; seat <= 6; seat++) {
+        const juror = jurors.find(j => (j.seat === seat || j.seat_index === seat));
+        const seatCard = document.createElement('div');
+        seatCard.className = 'juror-seat-card';
+
+        if (juror && (juror.status === 'seated' || juror.selection_status === 'seated')) {
+            seatCard.classList.add('seated');
+            seatCard.innerHTML = `
+                <div class="seat-top"><span class="seat-num">#${seat}</span><span class="badge badge-success">HELYÉN</span></div>
+                <div class="seat-name truncate">${juror.name || juror.citizenId || juror.citizen_id}</div>
+                <div class="seat-status">Bejelentkezve</div>
+            `;
+        } else if (juror && (juror.status === 'summoned' || juror.selection_status === 'summoned')) {
+            seatCard.classList.add('summoned');
+            seatCard.innerHTML = `
+                <div class="seat-top"><span class="seat-num">#${seat}</span><span class="badge badge-warning">IDÉZVE</span></div>
+                <div class="seat-name truncate">${juror.name || juror.citizenId || juror.citizen_id}</div>
+                <div class="seat-status">Érkezésre vár...</div>
+            `;
+        } else {
+            seatCard.classList.add('vacant');
+            seatCard.innerHTML = `
+                <div class="seat-top"><span class="seat-num">#${seat}</span><span class="badge badge-outline">ÜRES</span></div>
+                <div class="seat-name">Szabad Szék</div>
+                <div class="seat-status">-</div>
+            `;
+        }
+        seatsContainer?.appendChild(seatCard);
+    }
+
+    // Check-in bar for summoned citizens
+    const checkinBar = document.getElementById('court-juror-checkin-bar');
+    if (checkinBar) {
+        const isSummonedNotSeated = jurorRecord && (jurorRecord.selection_status === 'summoned');
+        checkinBar.classList.toggle('hidden', !isSummonedNotSeated);
+    }
+
+    // 3. Secret Ballot Box
+    const ballotBadge = document.getElementById('court-ballot-open-badge');
+    const isDeliberation = (currentDocket?.status === 'deliberation');
+    const ballotOpen = !!(isDeliberation && (juryData?.ballotOpen ?? true));
+
+    if (ballotBadge) {
+        if (ballotOpen) {
+            ballotBadge.textContent = 'SZAVAZÁS NYITVA';
+            ballotBadge.className = 'badge badge-success';
+        } else {
+            ballotBadge.textContent = 'SZAVAZÁS ZÁRVA';
+            ballotBadge.className = 'badge badge-warning';
+        }
+    }
+
+    const hasVoted = !!(jurorRecord?.secret_ballot || juryData?.hasVoted || NyxState.court.hasVoted);
+    const voteStatusBanner = document.getElementById('court-vote-status-banner');
+    const voteStatusText = document.getElementById('court-vote-status-text');
+
+    const ballotBtns = [
+        document.getElementById('court-vote-guilty-btn'),
+        document.getElementById('court-vote-notguilty-btn'),
+        document.getElementById('court-vote-abstain-btn')
+    ];
+
+    ballotBtns.forEach(btn => {
+        if (btn) btn.disabled = !ballotOpen || hasVoted;
+    });
+
+    if (voteStatusBanner) {
+        if (hasVoted) {
+            voteStatusBanner.classList.remove('hidden');
+            if (voteStatusText) voteStatusText.textContent = 'Titkos szavazatod biztonságosan rögzítve az urnában.';
+        } else {
+            voteStatusBanner.classList.add('hidden');
+        }
+    }
+
+    // 4. Judge Controls
+    const judgeControls = document.getElementById('court-judge-controls');
+    if (judgeControls) {
+        judgeControls.classList.toggle('hidden', !NyxState.court.isJudge);
+    }
+}
+
+async function castJuryBallot(vote) {
+    const docket = NyxState.court.currentDocket;
+    if (!docket) {
+        showNotification({ type: 'warning', title: 'NINCS ÜGY', message: 'Nincs aktív ügy a szavazáshoz.' });
+        return;
+    }
+
+    const docketId = docket.docket_id || docket.docketId;
+    const btn = document.querySelector(`.ballot-choice-btn[data-vote="${vote}"]`);
+
+    lockButtonAction(btn, async () => {
+        const res = await postNui('court:castJuryVote', {
+            docketId: docketId,
+            vote: vote
+        });
+
+        if (res && res.success) {
+            NyxState.court.hasVoted = true;
+            showNotification({ type: 'success', title: 'SZAVAZAT LEADVA', message: 'A titkos szavazatod az urnába került!' });
+            refreshCourtOverview();
+        } else {
+            showNotification({ type: 'error', title: 'SZAVAZÁS SIKERTELEN', message: res?.error || 'Nem adható le szavazat.' });
+        }
+    });
+}
+
+async function checkInJuror() {
+    const docket = NyxState.court.currentDocket;
+    if (!docket) return;
+
+    const checkinBtn = document.getElementById('court-juror-checkin-btn');
+    lockButtonAction(checkinBtn, async () => {
+        const res = await postNui('court:seatJuror', {
+            docketId: docket.docket_id || docket.docketId
+        });
+
+        if (res && res.success) {
+            showNotification({ type: 'success', title: 'HELY ELFOGLALVA', message: 'Sikeresen elfoglaltad a helyed az esküdtszékben!' });
+            refreshCourtOverview();
+        } else {
+            showNotification({ type: 'error', title: 'BEJELENTKEZÉS SIKERTELEN', message: res?.error || 'Hiba történt.' });
+        }
+    });
+}
+
+function renderWarrantsDashboard(petitions, activeWarrants) {
+    // 1. Pending Petitions
+    const petCountBadge = document.getElementById('court-petitions-count');
+    if (petCountBadge) petCountBadge.textContent = `${petitions.length} kérvény`;
+
+    const petList = document.getElementById('court-petitions-list');
+    if (petList) {
+        petList.innerHTML = '';
+        if (petitions.length === 0) {
+            petList.innerHTML = '<div class="empty-state" style="padding: 18px;"><p>Nincsenek elbírálásra váró rendvédelmi kérvények.</p></div>';
+        } else {
+            petitions.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'petition-item-card';
+
+                const targetCit = p.target_citizen_id || p.targetCitizenId;
+                const petId = p.petition_id || p.petitionId;
+                const typeLabel = (p.warrant_type || p.warrantType || 'arrest').toUpperCase();
+                const hours = p.requested_duration_hours || p.requestedDurationHours || 72;
+                const cause = p.probable_cause_summary || p.probableCauseSummary || '-';
+                const entity = p.target_entity_id || p.targetEntityId || '';
+
+                let judgeActions = '';
+                if (NyxState.court.isJudge) {
+                    judgeActions = `
+                        <div class="petition-actions-row">
+                            <button class="btn btn-success btn-sm btn-approve" data-id="${petId}"><i class="fa-solid fa-stamp"></i> Jóváhagyás</button>
+                            <button class="btn btn-danger btn-sm btn-reject" data-id="${petId}"><i class="fa-solid fa-xmark"></i> Elutasítás</button>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="petition-card-header">
+                        <div class="title-col">
+                            <span class="badge badge-warning">${typeLabel}</span>
+                            <strong class="target-name">Cél: <code>${targetCit}</code></strong>
+                        </div>
+                        <span class="duration-label"><i class="fa-regular fa-clock"></i> ${hours} óra</span>
+                    </div>
+                    ${entity ? `<div class="target-entity"><i class="fa-solid fa-crosshairs"></i> Objektum / Rendszám: <strong>${entity}</strong></div>` : ''}
+                    <p class="affidavit-text">${cause}</p>
+                    <div class="petitioner-foot">Kérelmező: <code>${p.petitioner_citizen_id || p.petitionerCitizenId || 'LEO'}</code></div>
+                    ${judgeActions}
+                `;
+
+                if (NyxState.court.isJudge) {
+                    card.querySelector('.btn-approve')?.addEventListener('click', () => {
+                        reviewWarrantPetition(petId, 'approved');
+                    });
+                    card.querySelector('.btn-reject')?.addEventListener('click', () => {
+                        reviewWarrantPetition(petId, 'rejected');
+                    });
+                }
+
+                petList.appendChild(card);
+            });
+        }
+    }
+
+    // 2. Active Warrants
+    const warCountBadge = document.getElementById('court-active-warrants-count');
+    if (warCountBadge) warCountBadge.textContent = `${activeWarrants.length} aktív`;
+
+    const warList = document.getElementById('court-active-warrants-list');
+    if (warList) {
+        warList.innerHTML = '';
+        if (activeWarrants.length === 0) {
+            warList.innerHTML = '<div class="empty-state" style="padding: 18px;"><p>Nincsenek aktív bírói parancsok érvényben.</p></div>';
+        } else {
+            activeWarrants.forEach(w => {
+                const card = document.createElement('div');
+                card.className = 'warrant-item-card';
+
+                const warId = w.warrant_id || w.warrantId;
+                const targetCit = w.target_citizen_id || w.targetCitizenId;
+                const type = w.type || w.warrantType || 'arrest';
+                const typeLabel = type.toUpperCase();
+                const expires = w.expires_at || w.expiresAt || 'Aktív';
+                const cause = w.cause_summary || w.causeSummary || '';
+
+                let extraActions = '';
+                if (type === 'subpoena') {
+                    extraActions += `<button class="btn btn-secondary btn-sm btn-subpoena" data-cit="${targetCit}"><i class="fa-solid fa-vault"></i> Főkönyvi Feltárás</button>`;
+                }
+                if (NyxState.court.isJudge) {
+                    extraActions += `<button class="btn btn-danger btn-sm btn-rescind" data-id="${warId}"><i class="fa-solid fa-ban"></i> Visszavonás</button>`;
+                }
+
+                card.innerHTML = `
+                    <div class="warrant-card-header">
+                        <div>
+                            <span class="badge badge-success">${typeLabel}</span>
+                            <span class="warrant-id"><code>${warId}</code></span>
+                        </div>
+                        <span class="badge badge-outline"><i class="fa-solid fa-fingerprint"></i> HITELESÍTVE</span>
+                    </div>
+                    <div class="warrant-target">Célszemély: <strong>${targetCit}</strong></div>
+                    <p class="warrant-cause truncate-2">${cause}</p>
+                    <div class="warrant-footer">
+                        <span class="exp-date"><i class="fa-regular fa-calendar"></i> Lejár: ${expires}</span>
+                        <div class="warrant-btns">${extraActions}</div>
+                    </div>
+                `;
+
+                card.querySelector('.btn-subpoena')?.addEventListener('click', () => {
+                    openSubpoenaDisclosure(targetCit);
+                });
+
+                card.querySelector('.btn-rescind')?.addEventListener('click', () => {
+                    rescindWarrant(warId);
+                });
+
+                warList.appendChild(card);
+            });
+        }
+    }
+}
+
+async function submitWarrantPetition() {
+    const targetCit = document.getElementById('court-input-target-citid')?.value?.trim();
+    const warrantType = document.getElementById('court-select-warrant-type')?.value;
+    const duration = parseInt(document.getElementById('court-input-duration')?.value || '72', 10);
+    const scope = document.getElementById('court-select-subpoena-scope')?.value || 'all';
+    const entity = document.getElementById('court-input-target-entity')?.value?.trim();
+    const cause = document.getElementById('court-input-cause-summary')?.value?.trim();
+
+    if (!targetCit || targetCit.length < 3) {
+        showNotification({ type: 'error', title: 'HIÁNYZÓ ADAT', message: 'Kérlek add meg a célszemély állampolgári azonosítóját!' });
+        return;
+    }
+
+    if (!cause || cause.length < 20) {
+        showNotification({ type: 'error', title: 'ELÉGTELEN INDOKLÁS', message: 'A bírói parancs kérelemnek legalább 20 karakter részletes megalapozott indoklást kell tartalmaznia!' });
+        return;
+    }
+
+    const submitBtn = document.getElementById('court-submit-petition-btn');
+    lockButtonAction(submitBtn, async () => {
+        const res = await postNui('court:petitionWarrant', {
+            targetCitizenId: targetCit,
+            warrantType: warrantType,
+            requestedDurationHours: duration,
+            subpoenaScope: warrantType === 'subpoena' ? scope : undefined,
+            targetEntityId: entity || undefined,
+            probableCauseSummary: cause
+        });
+
+        if (res && res.success) {
+            showNotification({ type: 'success', title: 'KÉRVÉNY BENYÚJTVA', message: 'A hivatalos parancskérelmed továbbítva a bíróság felé.' });
+            // Reset inputs
+            document.getElementById('court-input-target-citid').value = '';
+            document.getElementById('court-input-target-entity').value = '';
+            document.getElementById('court-input-cause-summary').value = '';
+            refreshCourtOverview();
+        } else {
+            showNotification({ type: 'error', title: 'BENYÚJTÁS SIKERTELEN', message: res?.error || 'Nem rendelkezel rendvédelmi felhatalmazással.' });
+        }
+    });
+}
+
+async function reviewWarrantPetition(petitionId, decision) {
+    const res = await postNui('court:reviewPetition', {
+        petitionId: petitionId,
+        decision: decision
+    });
+
+    if (res && res.success) {
+        showNotification({ type: 'info', title: 'KÉRVÉNY ELBÍRÁLVA', message: `Kérvény #${petitionId} sikeresen elbírálva (${decision})!` });
+        refreshCourtOverview();
+    } else {
+        showNotification({ type: 'error', title: 'ELBÍRÁLÁS SIKERTELEN', message: res?.error || 'Hiba a kérvény feldolgozásakor.' });
+    }
+}
+
+async function rescindWarrant(warrantId) {
+    openDialog({
+        title: 'Bírói Parancs Visszavonása',
+        message: `Biztosan megsemmisíted és hatályon kívül helyezed a(z) ${warrantId} számú parancsot?`,
+        onConfirm: async () => {
+            const res = await postNui('court:rescindWarrant', { warrantId: warrantId, reason: 'Judicial order to quash' });
+            if (res && res.success) {
+                showNotification({ type: 'warning', title: 'PARANCS VISSZAVONVA', message: `Parancs #${warrantId} visszavonásra került.` });
+                refreshCourtOverview();
+            } else {
+                showNotification({ type: 'error', title: 'VISSZAVONÁS SIKERTELEN', message: res?.error || 'Nem sikerült visszavonni a parancsot.' });
+            }
+        }
+    });
+}
+
+async function openSubpoenaDisclosure(citizenId) {
+    const disclosureEl = document.getElementById('court-subpoena-disclosure');
+    const targetLabel = document.getElementById('court-subpoena-target-label');
+    const content = document.getElementById('court-subpoena-content');
+    if (!disclosureEl || !content) return;
+
+    disclosureEl.classList.remove('hidden');
+    if (targetLabel) targetLabel.textContent = `Célszemély: ${citizenId}`;
+    content.innerHTML = '<div class="empty-state" style="padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> Főkönyvi adatok lekérése...</div>';
+
+    const res = await postNui('court:getSubpoenaRecords', { targetCitizenId: citizenId });
+    if (!res || !res.success || !res.records) {
+        content.innerHTML = '<div class="empty-state" style="padding: 20px; color: var(--accent-red);"><p>A főkönyvi adatok lekérdezése sikertelen vagy nincs érvényes idézés.</p></div>';
+        return;
+    }
+
+    const rec = res.records;
+    const bank = (rec.bankBalance || rec.bank || 0).toLocaleString();
+    const cash = (rec.cashBalance || rec.cash || 0).toLocaleString();
+
+    let accountsHtml = '';
+    (rec.accounts || []).forEach(a => {
+        accountsHtml += `
+            <div class="subp-item">
+                <span><code>${a.id}</code> (${a.type})</span>
+                <strong style="color: var(--accent-emerald);">$${(a.balance || 0).toLocaleString()}</strong>
+            </div>
+        `;
+    });
+
+    let propsHtml = '';
+    (rec.properties || []).forEach(p => {
+        propsHtml += `
+            <div class="subp-item">
+                <span><code>${p.id}</code>: ${p.address}</span>
+                <span style="color: var(--accent-cyan);">$${(p.value || 0).toLocaleString()}</span>
+            </div>
+        `;
+    });
+
+    let sharesHtml = '';
+    (rec.corporateShares || []).forEach(s => {
+        sharesHtml += `
+            <div class="subp-item">
+                <span>${s.name || s.factionId}</span>
+                <strong style="color: var(--accent-amber);">${s.sharesPercent || s.equity}%</strong>
+            </div>
+        `;
+    });
+
+    let txHtml = '';
+    (rec.transactions || []).forEach(t => {
+        const amt = Number(t.amount || 0);
+        txHtml += `
+            <div class="subp-item tx">
+                <div><span class="time">${t.date || ''}</span> <span class="memo">${t.memo || ''}</span></div>
+                <strong style="color: ${amt >= 0 ? 'var(--accent-emerald)' : 'var(--accent-red)'}; font-family: var(--font-mono);">${amt >= 0 ? '+' : ''}$${amt.toLocaleString()}</strong>
+            </div>
+        `;
+    });
+
+    content.innerHTML = `
+        <div class="subp-kpis">
+            <div class="subp-kpi"><span>Főkönyvi Bankszámla:</span> <strong>$${bank}</strong></div>
+            <div class="subp-kpi"><span>Készpénzállomány:</span> <strong>$${cash}</strong></div>
+        </div>
+        <div class="subp-section">
+            <h5><i class="fa-solid fa-credit-card"></i> Pénzintézeti Fiókok & Számlák</h5>
+            ${accountsHtml || '<div class="subp-empty">Nincs rögzített folyószámla.</div>'}
+        </div>
+        <div class="subp-section">
+            <h5><i class="fa-solid fa-building"></i> Nyilvántartott Ingatlanvagyon</h5>
+            ${propsHtml || '<div class="subp-empty">Nincs bejegyzett ingatlan.</div>'}
+        </div>
+        <div class="subp-section">
+            <h5><i class="fa-solid fa-chart-pie"></i> Vállalati Tulajdonrészek & Részvények</h5>
+            ${sharesHtml || '<div class="subp-empty">Nincs társasági tulajdonrész.</div>'}
+        </div>
+        <div class="subp-section">
+            <h5><i class="fa-solid fa-clock-rotate-left"></i> Legutóbbi Tranzakciós Napló</h5>
+            ${txHtml || '<div class="subp-empty">Nincs friss tranzakció.</div>'}
+        </div>
+    `;
+}
+
 // 13. Global NUI Envelope Dispatcher
 window.addEventListener('message', (event) => {
     const packet = event.data;
@@ -1472,6 +2592,13 @@ window.addEventListener('message', (event) => {
         openFactionDashboard(packet.payload);
     } else if (action === 'FACTION_DASHBOARD_CLOSE') {
         closeFactionDashboard();
+    }
+
+    // Courtroom Terminal & Forensic Explorer
+    else if (action === 'COURT_TERMINAL_OPEN') {
+        openCourtTerminal(packet.payload);
+    } else if (action === 'COURT_TERMINAL_CLOSE') {
+        closeCourtTerminal();
     }
 });
 
@@ -1775,6 +2902,111 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Courtroom Terminal & Forensic Explorer UI Listeners
+    document.getElementById('court-close-btn')?.addEventListener('click', closeCourtTerminal);
+
+    document.querySelectorAll('.court-tab').forEach(btn => {
+        btn.addEventListener('click', () => setCourtTab(btn.dataset.tab));
+    });
+
+    document.getElementById('court-evidence-search')?.addEventListener('input', () => {
+        refreshCourtEvidenceList();
+    });
+
+    document.getElementById('court-evidence-type-filter')?.addEventListener('change', () => {
+        refreshCourtEvidenceList();
+    });
+
+    document.getElementById('court-evidence-sealed-check')?.addEventListener('change', () => {
+        refreshCourtEvidenceList();
+    });
+
+    document.getElementById('court-evidence-refresh-btn')?.addEventListener('click', () => {
+        refreshCourtEvidenceList();
+    });
+
+    document.getElementById('court-verify-chain-btn')?.addEventListener('click', verifyCurrentEvidenceChain);
+
+    document.getElementById('court-juror-checkin-btn')?.addEventListener('click', checkInJuror);
+
+    document.getElementById('court-vote-guilty-btn')?.addEventListener('click', () => castJuryBallot('guilty'));
+    document.getElementById('court-vote-notguilty-btn')?.addEventListener('click', () => castJuryBallot('not_guilty'));
+    document.getElementById('court-vote-abstain-btn')?.addEventListener('click', () => castJuryBallot('abstain'));
+
+    document.getElementById('court-summon-jury-btn')?.addEventListener('click', async () => {
+        const docket = NyxState.court.currentDocket;
+        if (!docket) return;
+        const btn = document.getElementById('court-summon-jury-btn');
+        lockButtonAction(btn, async () => {
+            const res = await postNui('court:summonJury', { docketId: docket.docket_id || docket.docketId });
+            if (res && res.success) {
+                showNotification({ type: 'info', title: 'ÜLNÖKÖK BEHÍVVA', message: 'Hivatalos esküdtszéki idézés kiküldve 6 polgárnak!' });
+                refreshCourtOverview();
+            }
+        });
+    });
+
+    document.getElementById('court-start-trial-btn')?.addEventListener('click', async () => {
+        const docket = NyxState.court.currentDocket;
+        if (!docket) return;
+        const btn = document.getElementById('court-start-trial-btn');
+        lockButtonAction(btn, async () => {
+            const res = await postNui('court:startTrial', { docketId: docket.docket_id || docket.docketId });
+            if (res && res.success) {
+                showNotification({ type: 'success', title: 'TÁRGYALÁS MEGNYITVA', message: 'A bírósági tárgyalás hivatalosan elkezdődött!' });
+                refreshCourtOverview();
+            }
+        });
+    });
+
+    document.getElementById('court-start-deliberation-btn')?.addEventListener('click', async () => {
+        const docket = NyxState.court.currentDocket;
+        if (!docket) return;
+        const btn = document.getElementById('court-start-deliberation-btn');
+        lockButtonAction(btn, async () => {
+            const res = await postNui('court:startDeliberation', { docketId: docket.docket_id || docket.docketId });
+            if (res && res.success) {
+                showNotification({ type: 'warning', title: 'TANÁCSKOZÁS MEGNYITVA', message: 'Az esküdtszék elvonult titkos tanácskozásra.' });
+                refreshCourtOverview();
+            }
+        });
+    });
+
+    document.getElementById('court-conclude-trial-btn')?.addEventListener('click', async () => {
+        const docket = NyxState.court.currentDocket;
+        if (!docket) return;
+        const verdict = document.getElementById('court-verdict-select')?.value || 'guilty';
+        openDialog({
+            title: 'Ítélet Kihirdetése & Per Lezárása',
+            message: `Biztosan lezárod az ügyet és kihirdeted a(z) "${verdict.toUpperCase()}" bírói határozatot?`,
+            onConfirm: async () => {
+                const res = await postNui('court:concludeTrial', {
+                    docketId: docket.docket_id || docket.docketId,
+                    verdictRuling: verdict
+                });
+                if (res && res.success) {
+                    showNotification({ type: 'success', title: 'PER LEZÁRVA', message: 'Az ítélet rögzítve az állami archívumban.' });
+                    refreshCourtOverview();
+                } else {
+                    showNotification({ type: 'error', title: 'SIKERTELEN LEZÁRÁS', message: res?.error || 'Hiba történt.' });
+                }
+            }
+        });
+    });
+
+    document.getElementById('court-select-warrant-type')?.addEventListener('change', (e) => {
+        const scopeGroup = document.getElementById('court-group-subpoena-scope');
+        if (scopeGroup) {
+            scopeGroup.classList.toggle('hidden', e.target.value !== 'subpoena');
+        }
+    });
+
+    document.getElementById('court-submit-petition-btn')?.addEventListener('click', submitWarrantPetition);
+
+    document.getElementById('court-subpoena-close-btn')?.addEventListener('click', () => {
+        document.getElementById('court-subpoena-disclosure')?.classList.add('hidden');
+    });
+
     // Dialog Confirm & Cancel
     document.getElementById('dialog-confirm-btn')?.addEventListener('click', () => closeDialog(true));
     document.getElementById('dialog-cancel-btn')?.addEventListener('click', () => closeDialog(false));
@@ -1835,6 +3067,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (NyxState.faction.isOpen) {
                 closeFactionDashboard();
+                return;
+            }
+            if (NyxState.court.isOpen) {
+                const subpDisclosure = document.getElementById('court-subpoena-disclosure');
+                if (subpDisclosure && !subpDisclosure.classList.contains('hidden')) {
+                    subpDisclosure.classList.add('hidden');
+                    return;
+                }
+                closeCourtTerminal();
                 return;
             }
             if (NyxState.mdt.isOpen) {
@@ -1986,6 +3227,14 @@ function initBrowserDevMode() {
             closeFactionDashboard();
         } else {
             openFactionDashboard();
+        }
+    });
+
+    document.getElementById('dev-btn-court')?.addEventListener('click', () => {
+        if (NyxState.court.isOpen) {
+            closeCourtTerminal();
+        } else {
+            openCourtTerminal({ isJudge: true, activeTab: 'evidence' });
         }
     });
 

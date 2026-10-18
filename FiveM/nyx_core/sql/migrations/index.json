@@ -32,5 +32,6 @@
   "031_inactivity_reclamation_and_stewardship.sql",
   "032_press_media_whistleblower_and_print_circulation.sql",
   "033_bootloader_staggered_dispatch_and_audit.sql",
-  "034_factions_corporate_ui_and_rbac_audit.sql"
+  "034_factions_corporate_ui_and_rbac_audit.sql",
+  "035_judiciary_courtroom_terminal_and_evidence_audit.sql"
 ]

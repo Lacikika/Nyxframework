@@ -426,6 +426,171 @@ CreateThread(function()
         exports['nyx_core']:RegisterRPC("judiciary:getLockers", function(src)
             return { success = true, lockers = Config.Forensics and Config.Forensics.Lockers or {} }
         end)
+
+        -- ====================================================================
+        -- Courtroom Terminal & Forensic Explorer UI RPC Endpoints
+        -- ====================================================================
+
+        -- Query full courtroom terminal overview
+        exports['nyx_core']:RegisterRPC("judiciary:getCourtOverview", function(src)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local citId = player.citizenId
+            local job = player:getMetadata("job") or "unemployed"
+            local isJudge = (job == "judge" or job == "doj") or player:hasPermission("admin")
+            local isLEO = (job == "police" or job == "sheriff" or job == "statepolice" or job == "marshal" or isJudge)
+
+            -- 1. Active Dockets
+            local dockets = Nyx.Judiciary.GetActiveDockets() or {}
+
+            -- 2. Check if user is summoned/seated/deliberating juror on any active docket
+            local myJuryRecord = nil
+            local activeDocketForJuror = nil
+            local juryRows = MySQL.query.await([[
+                SELECT j.`jury_id`, j.`docket_id`, j.`citizen_id`, j.`seat_index`, j.`selection_status`,
+                       j.`secret_ballot`, j.`stipend_paid`, d.`title` AS `docket_title`, d.`status` AS `docket_status`
+                FROM `nyx_judiciary_juries` j
+                INNER JOIN `nyx_judiciary_dockets` d ON j.`docket_id` = d.`docket_id`
+                WHERE j.`citizen_id` = ? AND d.`status` IN ('scheduled', 'in_trial', 'deliberation')
+                LIMIT 1
+            ]], { citId })
+
+            if juryRows and #juryRows > 0 then
+                myJuryRecord = juryRows[1]
+                activeDocketForJuror = juryRows[1].docket_id
+            end
+
+            -- 3. Recent forensic evidence records (top 25)
+            local evidenceList = Nyx.Judiciary.GetEvidenceList(nil, nil, false, 25, 0)
+
+            -- 4. Pending Petitions & Active Warrants
+            local pendingPetitions = {}
+            local activeWarrants = {}
+            if isJudge or isLEO then
+                pendingPetitions = Nyx.Judiciary.GetPendingPetitions() or {}
+                activeWarrants = Nyx.Judiciary.GetActiveWarrants() or {}
+            end
+
+            -- 5. Jury status if juror or judge
+            local juryDetails = nil
+            if activeDocketForJuror then
+                juryDetails = Nyx.Judiciary.GetJuryStatus(activeDocketForJuror)
+            elseif #dockets > 0 and isJudge then
+                juryDetails = Nyx.Judiciary.GetJuryStatus(dockets[1].docketId)
+            end
+
+            return {
+                success = true,
+                overview = {
+                    citizenId = citId,
+                    job = job,
+                    isJudge = isJudge,
+                    isLawEnforcement = isLEO,
+                    dockets = dockets,
+                    jurorRecord = myJuryRecord,
+                    activeDocketForJuror = activeDocketForJuror,
+                    juryDetails = juryDetails,
+                    evidence = evidenceList,
+                    pendingPetitions = pendingPetitions,
+                    activeWarrants = activeWarrants
+                }
+            }
+        end)
+
+        -- Query evidence list with filters & pagination
+        exports['nyx_core']:RegisterRPC("judiciary:getEvidenceList", function(src, payload)
+            payload = payload or {}
+            local rows = Nyx.Judiciary.GetEvidenceList(payload.search, payload.type, payload.isSealedOnly, payload.limit, payload.offset)
+            return { success = true, evidence = rows }
+        end)
+
+        -- Query single evidence record with full chronological custody chain
+        exports['nyx_core']:RegisterRPC("judiciary:getEvidenceChain", function(src, evidenceId)
+            if not evidenceId then return { success = false, error = "INVALID_INPUT" } end
+            local evidence = MySQL.single.await([[
+                SELECT `evidence_id`, `docket_id`, `type`, `evidence_hash`, `collector_citizen_id`,
+                       `current_custodian_id`, `current_facility`, `current_chain_hash`, `chain_length`,
+                       `is_contaminated`, `contamination_source`, `is_sealed`, `metadata`, `lab_analysis`,
+                       `exhibit_label`, `verified_by_judge_at`, `created_at`
+                FROM `nyx_judiciary_evidence`
+                WHERE `evidence_id` = ? OR `evidence_hash` = ?
+            ]], { evidenceId, evidenceId })
+
+            if not evidence then
+                return { success = false, error = "EVIDENCE_NOT_FOUND" }
+            end
+
+            local meta = {}
+            if type(evidence.metadata) == "string" then
+                local ok, parsed = pcall(json.decode, evidence.metadata)
+                if ok and type(parsed) == "table" then meta = parsed end
+            elseif type(evidence.metadata) == "table" then
+                meta = evidence.metadata
+            end
+            evidence.metadata = meta
+
+            local lab = {}
+            if type(evidence.lab_analysis) == "string" then
+                local ok, parsed = pcall(json.decode, evidence.lab_analysis)
+                if ok and type(parsed) == "table" then lab = parsed end
+            elseif type(evidence.lab_analysis) == "table" then
+                lab = evidence.lab_analysis
+            end
+            evidence.lab_analysis = lab
+
+            local blocks = Nyx.Judiciary.GetEvidenceChainOfCustody(evidence.evidence_id)
+
+            return {
+                success = true,
+                evidence = evidence,
+                chain = blocks
+            }
+        end)
+
+        -- Execute full SHA-256 chain verification & log audit entry
+        exports['nyx_core']:RegisterRPC("judiciary:verifyEvidenceChain", function(src, evidenceId)
+            local player = Nyx.GetPlayer(src)
+            local citId = player and player.citizenId or "CIT_UNKNOWN"
+            local job = player and player:getMetadata("job") or ""
+            local isJudge = (job == "judge" or job == "doj")
+
+            local ok, status, data = Nyx.Judiciary.VerifyChainOfCustody(evidenceId)
+
+            -- Log formal verification in audit table
+            local rootHash = data and data.rootHash or ""
+            local headHash = data and data.currentChainHash or ""
+            local chainLen = data and data.chainLength or 0
+
+            Nyx.Judiciary.LogEvidenceVerification(evidenceId, citId, status, ok, chainLen, rootHash, headHash)
+
+            if ok and isJudge then
+                MySQL.prepare.await([[
+                    UPDATE `nyx_judiciary_evidence`
+                    SET `verified_by_judge_at` = CURRENT_TIMESTAMP
+                    WHERE `evidence_id` = ?
+                ]], { evidenceId })
+            end
+
+            return { success = ok, status = status, data = data }
+        end)
+
+        -- Conclude trial session with verdict ruling
+        exports['nyx_core']:RegisterRPC("judiciary:concludeTrial", function(src, payload)
+            local player = Nyx.GetPlayer(src)
+            if not player then return { success = false, error = "UNAUTHENTICATED" } end
+
+            local job = player:getMetadata("job")
+            if job ~= "judge" and job ~= "doj" and not player:hasPermission("admin") then
+                return { success = false, error = "UNAUTHORIZED_JUDICIAL_ACCESS" }
+            end
+
+            local docketId = type(payload) == "table" and payload.docketId or payload
+            local verdict = type(payload) == "table" and payload.verdictRuling or "guilty"
+
+            local ok, res = Nyx.Judiciary.ConcludeTrial(docketId, verdict)
+            return { success = ok, result = res, error = (not ok and res or nil) }
+        end)
     end
 
     -- 2. Evidence Sweeper Background Task (every 60s)
