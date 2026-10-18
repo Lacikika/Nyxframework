@@ -97,6 +97,22 @@ function Nyx.UI.SanitizePayload(data)
     if data.reviewNotes and type(data.reviewNotes) == "string" then sanitized.reviewNotes = string.sub(data.reviewNotes, 1, 512) end
     if data.limit and type(data.limit) == "number" then sanitized.limit = math.max(1, math.min(100, math.floor(data.limit))) end
     if data.offset and type(data.offset) == "number" then sanitized.offset = math.max(0, math.min(10000, math.floor(data.offset))) end
+    -- Parliamentary Ranked-Choice Voting & Legislation parameters
+    if data.sessionId and (type(data.sessionId) == "string" or type(data.sessionId) == "number") then sanitized.sessionId = tostring(data.sessionId) end
+    if data.candidateId and (type(data.candidateId) == "string" or type(data.candidateId) == "number") then sanitized.candidateId = tostring(data.candidateId) end
+    if data.preferences and type(data.preferences) == "table" then sanitized.preferences = data.preferences end
+    if data.displayName and type(data.displayName) == "string" then sanitized.displayName = string.sub(data.displayName, 1, 96) end
+    if data.party and type(data.party) == "string" then sanitized.party = string.sub(data.party, 1, 96) end
+    if data.platform and type(data.platform) == "string" then sanitized.platform = string.sub(data.platform, 1, 1024) end
+    if data.slogan and type(data.slogan) == "string" then sanitized.slogan = string.sub(data.slogan, 1, 128) end
+    if data.receiptHash and type(data.receiptHash) == "string" then sanitized.receiptHash = string.sub(data.receiptHash, 1, 64) end
+    if data.officeId and type(data.officeId) == "string" then sanitized.officeId = string.sub(data.officeId, 1, 32) end
+    if data.filterLawId and type(data.filterLawId) == "string" then sanitized.filterLawId = string.sub(data.filterLawId, 1, 32) end
+    if data.categoryFilter and type(data.categoryFilter) == "string" then sanitized.categoryFilter = string.sub(data.categoryFilter, 1, 32) end
+    if data.activeTab and type(data.activeTab) == "string" then sanitized.activeTab = string.sub(data.activeTab, 1, 32) end
+    if data.actions and type(data.actions) == "table" then sanitized.actions = data.actions end
+    if data.billPayload and type(data.billPayload) == "table" then sanitized.billPayload = data.billPayload end
+    if data.description and type(data.description) == "string" then sanitized.description = string.sub(data.description, 1, 1024) end
     if data.payload and type(data.payload) == "table" then
         sanitized.payload = Nyx.UI.SanitizePayload(data.payload)
     end
@@ -479,6 +495,135 @@ Nyx.UI.SafeNUICallback("court:getSubpoenaRecords", function(data, cb)
     end
     cb({ success = false, error = "RPC_UNAVAILABLE" })
 end)
+
+-- Parliamentary Ranked-Choice Voting & Legislation Callbacks
+Nyx.UI.SafeNUICallback("closeParliamentUI", function(_, cb)
+    Nyx.UI.SetFocus(false, false)
+    cb({ success = true })
+end)
+
+Nyx.UI.SafeNUICallback("parliament:getOverview", function(_, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:getOverview")
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("parliament:getActiveSessions", function(_, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:getActiveSessions")
+        return cb(res or {})
+    end
+    cb({})
+end)
+
+Nyx.UI.SafeNUICallback("parliament:getCandidates", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:getCandidates", data and data.sessionId)
+        return cb(res or {})
+    end
+    cb({})
+end)
+
+Nyx.UI.SafeNUICallback("parliament:castBallot", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:castBallot", data and data.sessionId, data and data.preferences)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("parliament:verifyReceipt", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:verifyReceipt", data and data.sessionId, data and data.receiptHash)
+        return cb(res or { verified = false })
+    end
+    cb({ verified = false })
+end)
+
+Nyx.UI.SafeNUICallback("parliament:registerCandidate", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:registerCandidate", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("parliament:endorseCandidate", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:endorseCandidate", data and data.candidateId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("parliament:getPenalCode", function(_, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:getPenalCode")
+        return cb(res or {})
+    end
+    cb({})
+end)
+
+Nyx.UI.SafeNUICallback("parliament:getLawBook", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local filter = data and (data.categoryFilter or data.category) or "ALL"
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:getLawBook", filter)
+        return cb(res or {})
+    end
+    cb({})
+end)
+
+Nyx.UI.SafeNUICallback("parliament:getOfficials", function(_, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:getOfficials")
+        return cb(res or {})
+    end
+    cb({})
+end)
+
+Nyx.UI.SafeNUICallback("parliament:getTabulationAudit", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:getTabulationAudit", data and data.sessionId)
+        return cb(res or {})
+    end
+    cb({})
+end)
+
+Nyx.UI.SafeNUICallback("parliament:proposeBill", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local payload = data and (data.billPayload or data)
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:proposeBill", payload)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("parliament:fileRecallPetition", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:fileRecallPetition", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("parliament:signRecallPetition", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:signRecallPetition", data and (data.petitionId or data.id))
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("parliament:getAmendmentAudit", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("parliament:getAmendmentAudit", data and data.filterLawId)
+        return cb(res or {})
+    end
+    cb({})
+end)
+
 
 -- 5. Intercept Universal Notification Triggers across All Framework Modules
 RegisterNetEvent("nyx:ui:notify", function(data)

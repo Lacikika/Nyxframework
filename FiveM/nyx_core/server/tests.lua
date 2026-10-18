@@ -6473,7 +6473,256 @@ function Nyx.Tests.TestCourtroomTerminalEvidenceAndJuryUI()
     return passes == total
 end
 
--- 31. Master Test Runner
+-- 31. Test Parliamentary Ranked-Choice Voting & Legislation UI Engine
+function Nyx.Tests.TestParliamentRankedChoiceAndLegislationUI()
+    print("^3[Nyx:Tests] Running Parliamentary Ranked-Choice Voting & Legislation UI Suite...^7")
+    local passes = 0
+    local total = 6
+
+    local ParliamentUI = Nyx.ParliamentUI or {}
+
+    -- Sub-test A: Candidate Nomination Payload Validation & String Sanitization
+    local valCandidate = ParliamentUI.ValidateCandidatePayload or function(payload)
+        if not payload or type(payload) ~= "table" then return false, "INVALID_PAYLOAD_STRUCTURE" end
+        local sessionId = tonumber(payload.sessionId)
+        if not sessionId or sessionId <= 0 then return false, "INVALID_SESSION_ID" end
+        local displayName = payload.displayName
+        if not displayName or type(displayName) ~= "string" or string.len(displayName) < 3 or string.len(displayName) > 64 then
+            return false, "INVALID_DISPLAY_NAME"
+        end
+        local party = payload.party
+        if not party or type(party) ~= "string" or string.len(party) < 2 or string.len(party) > 64 then
+            return false, "INVALID_PARTY"
+        end
+        local platform = payload.platform
+        if not platform or type(platform) ~= "string" or string.len(platform) < 10 or string.len(platform) > 2000 then
+            return false, "INVALID_PLATFORM"
+        end
+        local slogan = payload.slogan
+        if slogan ~= nil then
+            if type(slogan) ~= "string" or string.len(slogan) > 128 then return false, "INVALID_SLOGAN" end
+        end
+        return true, {
+            sessionId = sessionId,
+            displayName = displayName,
+            party = party,
+            slogan = slogan or "",
+            platform = platform
+        }
+    end
+
+    local validCand = {
+        sessionId = 101,
+        displayName = "Elena Vance",
+        party = "Civic Coalition",
+        slogan = "Transparent Governance for All",
+        platform = "Complete municipal administrative audit, civic infrastructure upgrades, and local business tax credits."
+    }
+    local shortNameCand = { sessionId = 101, displayName = "E", party = "Party", platform = "Valid platform length 123" }
+    local shortPlatformCand = { sessionId = 101, displayName = "Elena Vance", party = "Party", platform = "Too short" }
+
+    local okA1, cleanA1 = valCandidate(validCand)
+    local okA2, errA2 = valCandidate(shortNameCand)
+    local okA3, errA3 = valCandidate(shortPlatformCand)
+
+    local testA_ok = (okA1 == true and cleanA1.displayName == "Elena Vance" and cleanA1.slogan == "Transparent Governance for All") and
+                     (okA2 == false and errA2 == "INVALID_DISPLAY_NAME") and
+                     (okA3 == false and errA3 == "INVALID_PLATFORM")
+
+    if assertTest(testA_ok == true,
+        "Candidate Nomination Payload Validation & Invariant Guardrails",
+        string.format("validOk=%s, shortNameErr=%s, shortPlatErr=%s", tostring(okA1), tostring(errA2), tostring(errA3))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Democratic Endorsement Threshold & State Transitions
+    local valEndorse = ParliamentUI.ValidateEndorsement or function(citizenId, candidate)
+        if not citizenId or string.len(citizenId) < 2 then return false, "INVALID_CITIZEN_ID" end
+        if not candidate or type(candidate) ~= "table" then return false, "INVALID_CANDIDATE" end
+        if candidate.citizen_id == citizenId then return false, "CANNOT_ENDORSE_SELF" end
+        local existingEndorsements = candidate.endorsements or 0
+        local threshold = 5
+        local willReachThreshold = (existingEndorsements + 1) >= threshold
+        return true, {
+            newCount = existingEndorsements + 1,
+            reachesThreshold = willReachThreshold,
+            isVerified = willReachThreshold or (candidate.is_verified == 1 or candidate.is_verified == true)
+        }
+    end
+
+    local candUnderThreshold = { candidate_id = 1, citizen_id = "CIT_4001", endorsements = 4, is_verified = false }
+    local okB1, endorseState1 = valEndorse("CIT_9002", candUnderThreshold)
+    local okB2, errB2 = valEndorse("CIT_4001", candUnderThreshold)
+
+    local testB_ok = (okB1 == true and endorseState1.newCount == 5 and endorseState1.reachesThreshold == true and endorseState1.isVerified == true) and
+                     (okB2 == false and errB2 == "CANNOT_ENDORSE_SELF")
+
+    if assertTest(testB_ok == true,
+        "Endorsement Threshold State Transitions & Anti-Self Endorsement Guard",
+        string.format("reachOk=%s, newCount=%s, selfErr=%s", tostring(okB1), tostring(endorseState1 and endorseState1.newCount), tostring(errB2))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Statutory Bound Checking for Legislative Bill Proposals
+    local valBill = ParliamentUI.ValidateBillProposal or function(bill, law)
+        if not bill or type(bill) ~= "table" then return false, "INVALID_BILL_PAYLOAD" end
+        if not bill.title or string.len(bill.title) < 5 then return false, "INVALID_BILL_TITLE" end
+        if not bill.description or string.len(bill.description) < 10 then return false, "INVALID_BILL_DESCRIPTION" end
+        local field = bill.field
+        if field ~= "fine" and field ~= "months" and field ~= "rate" then return false, "INVALID_FIELD_SELECTOR" end
+        local proposed = tonumber(bill.proposedValue)
+        if not proposed then return false, "INVALID_PROPOSED_NUMERIC_VALUE" end
+
+        if law then
+            if field == "fine" and law.fine_min ~= nil and law.fine_max ~= nil then
+                if proposed < law.fine_min or proposed > law.fine_max then return false, "PROPOSED_VALUE_OUT_OF_STATUTORY_BOUNDS" end
+            elseif field == "months" and law.prison_months_min ~= nil and law.prison_months_max ~= nil then
+                if proposed < law.prison_months_min or proposed > law.prison_months_max then return false, "PROPOSED_VALUE_OUT_OF_STATUTORY_BOUNDS" end
+            elseif field == "rate" and law.tax_rate_min ~= nil and law.tax_rate_max ~= nil then
+                if proposed < law.tax_rate_min or proposed > law.tax_rate_max then return false, "PROPOSED_VALUE_OUT_OF_STATUTORY_BOUNDS" end
+            end
+        end
+        return true, { title = bill.title, field = field, proposedValue = proposed }
+    end
+
+    local mockLawFine = { law_id = "PC-101", fine_min = 5000, fine_max = 30000, fine_default = 15000 }
+    local mockLawTax = { law_id = "TX-401", tax_rate_min = 0.01, tax_rate_max = 0.15, tax_rate_default = 0.08 }
+
+    local validBillPayload = { title = "Public Safety Adjustment", description = "Increase penal deterrence for armed offenses.", field = "fine", proposedValue = 20000 }
+    local excessiveBillPayload = { title = "Draconian Penal Levy", description = "Excessive fine exceeding statutory limit.", field = "fine", proposedValue = 50000 }
+    local validTaxBillPayload = { title = "Retail Sales Tax Cut", description = "Stimulate municipal business commerce.", field = "rate", proposedValue = 0.05 }
+
+    local okC1 = valBill(validBillPayload, mockLawFine)
+    local okC2, errC2 = valBill(excessiveBillPayload, mockLawFine)
+    local okC3 = valBill(validTaxBillPayload, mockLawTax)
+
+    local testC_ok = (okC1 == true) and (okC2 == false and errC2 == "PROPOSED_VALUE_OUT_OF_STATUTORY_BOUNDS") and (okC3 == true)
+
+    if assertTest(testC_ok == true,
+        "Statutory Bounding Enforcement for Penal Fines & Millage Tax Proposals",
+        string.format("validFine=%s, excessiveErr=%s, validTax=%s", tostring(okC1), tostring(errC2), tostring(okC3))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Penal Code Explorer Multidimensional Filtering
+    local filterLaws = ParliamentUI.FilterPenalCode or function(laws, query, category)
+        laws = laws or {}
+        local results = {}
+        local q = query and string.lower(query) or ""
+        local cat = category and string.lower(category) or "all"
+        for _, l in ipairs(laws) do
+            local matchesCat = (cat == "all") or (string.lower(l.category or "") == cat)
+            local matchesQ = (q == "") or (string.find(string.lower(l.law_id or ""), q, 1, true) ~= nil) or
+                             (string.find(string.lower(l.name or ""), q, 1, true) ~= nil)
+            if matchesCat and matchesQ then
+                table.insert(results, l)
+            end
+        end
+        return results
+    end
+
+    local sampleLaws = {
+        { law_id = "PC-101", name = "Armed Robbery", category = "penal_felony" },
+        { law_id = "PC-102", name = "Aggravated Assault", category = "penal_felony" },
+        { law_id = "PC-201", name = "Disorderly Conduct", category = "penal_misdemeanor" },
+        { law_id = "PC-301", name = "Speeding Over 50mph", category = "penal_infraction" },
+        { law_id = "TX-401", name = "General Sales Tax", category = "fiscal_policy" }
+    }
+
+    local felonies = filterLaws(sampleLaws, nil, "penal_felony")
+    local fiscal = filterLaws(sampleLaws, nil, "fiscal_policy")
+    local searchRob = filterLaws(sampleLaws, "robbery", "all")
+
+    local testD_ok = (#felonies == 2) and (#fiscal == 1) and (#searchRob == 1 and searchRob[1].law_id == "PC-101")
+
+    if assertTest(testD_ok == true,
+        "Penal Code Explorer Filter Dimensions (Category, Fiscal & Substring Query)",
+        string.format("felonies=%d, fiscal=%d, searchRob=%d", #felonies, #fiscal, #searchRob)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: UI Statute Taxonomy Badging & Cryptographic Ballot Receipt Formulation
+    local formatBadge = ParliamentUI.FormatStatuteBadge or function(cat)
+        if cat == "penal_felony" then return { badgeClass = "badge-danger", label = "BŰNTETT" }
+        elseif cat == "penal_misdemeanor" then return { badgeClass = "badge-warning", label = "VÉTSÉG" }
+        elseif cat == "penal_infraction" then return { badgeClass = "badge-info", label = "SZABÁLYSÉRTÉS" }
+        elseif cat == "fiscal_policy" then return { badgeClass = "badge-primary", label = "PÉNZÜGY" }
+        else return { badgeClass = "badge-outline", label = "EGYÉB" }
+        end
+    end
+
+    local formatReceipt = ParliamentUI.FormatBallotReceipt or function(sessionId, ballotHash, timestamp)
+        local shortHash = string.sub(ballotHash or "00000000", 1, 8)
+        local year = timestamp and os.date("%Y", timestamp) or "2026"
+        return string.format("NYX-BALLOT-%s-%s", string.upper(shortHash), tostring(year))
+    end
+
+    local bFelony = formatBadge("penal_felony")
+    local bFiscal = formatBadge("fiscal_policy")
+    local receipt = formatReceipt(101, "a7f3e849c2b1", 1776510000)
+
+    local testE_ok = (bFelony.badgeClass == "badge-danger" and bFelony.label == "BŰNTETT") and
+                     (bFiscal.badgeClass == "badge-primary" and bFiscal.label == "PÉNZÜGY") and
+                     (string.sub(receipt, 1, 19) == "NYX-BALLOT-A7F3E849")
+
+    if assertTest(testE_ok == true,
+        "Statute Badging Taxonomy & Cryptographic Ballot Receipt Formulation",
+        string.format("bFelony=%s, bFiscal=%s, receipt=%s", bFelony.badgeClass, bFiscal.badgeClass, receipt)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Ranked-Choice Ballot Preference Array Verification & Completeness Checks
+    local evalPrefs = ParliamentUI.EvaluateBallotPreferences or function(preferences, availableCandidates)
+        if not preferences or type(preferences) ~= "table" or #preferences == 0 then
+            return false, "BALLOT_PREFERENCES_EMPTY"
+        end
+        local seen = {}
+        local validCandidateMap = {}
+        if availableCandidates then
+            for _, c in ipairs(availableCandidates) do
+                validCandidateMap[c.candidate_id or c] = true
+            end
+        end
+
+        for rank, cid in ipairs(preferences) do
+            local numId = tonumber(cid)
+            if not numId or numId <= 0 then return false, "INVALID_CANDIDATE_ID_AT_RANK_" .. tostring(rank) end
+            if seen[numId] then return false, "DUPLICATE_CANDIDATE_PREFERENCE_AT_RANK_" .. tostring(rank) end
+            if availableCandidates and not validCandidateMap[numId] then
+                return false, "UNRECOGNIZED_CANDIDATE_AT_RANK_" .. tostring(rank)
+            end
+            seen[numId] = true
+        end
+
+        return true, { rankedCount = #preferences, primaryChoice = tonumber(preferences[1]) }
+    end
+
+    local availableCands = { { candidate_id = 1 }, { candidate_id = 2 }, { candidate_id = 3 } }
+    local validPrefs = { 2, 1, 3 }
+    local dupPrefs = { 1, 2, 1 }
+    local emptyPrefs = {}
+    local unknownPrefs = { 1, 99 }
+
+    local okF1, resF1 = evalPrefs(validPrefs, availableCands)
+    local okF2, errF2 = evalPrefs(dupPrefs, availableCands)
+    local okF3, errF3 = evalPrefs(emptyPrefs, availableCands)
+    local okF4, errF4 = evalPrefs(unknownPrefs, availableCands)
+
+    local testF_ok = (okF1 == true and resF1.rankedCount == 3 and resF1.primaryChoice == 2) and
+                     (okF2 == false and string.find(errF2, "DUPLICATE") ~= nil) and
+                     (okF3 == false and errF3 == "BALLOT_PREFERENCES_EMPTY") and
+                     (okF4 == false and string.find(errF4, "UNRECOGNIZED") ~= nil)
+
+    if assertTest(testF_ok == true,
+        "Ranked-Choice Ballot Preference Deduplication & Candidate Recognition",
+        string.format("valid=%s, dupErr=%s, emptyErr=%s, unkErr=%s", tostring(okF1), tostring(errF2), tostring(errF3), tostring(errF4))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 32. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -6509,9 +6758,10 @@ function Nyx.Tests.RunAll()
     local t28 = Nyx.Tests.TestStaggeredResourceBootloaderDispatch()
     local t29 = Nyx.Tests.TestCorporateMultiSigRBACAndUnionUI()
     local t30 = Nyx.Tests.TestCourtroomTerminalEvidenceAndJuryUI()
+    local t31 = Nyx.Tests.TestParliamentRankedChoiceAndLegislationUI()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

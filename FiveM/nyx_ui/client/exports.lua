@@ -40,6 +40,16 @@ exports('CloseCourtTerminal', function()
     Nyx.UI.Send("court", "COURT_TERMINAL_CLOSE", {})
 end)
 
+exports('OpenParliamentUI', function(data)
+    Nyx.UI.SetFocus(true, true)
+    Nyx.UI.Send("parliament", "PARLIAMENT_UI_OPEN", data or {})
+end)
+
+exports('CloseParliamentUI', function()
+    Nyx.UI.SetFocus(false, false)
+    Nyx.UI.Send("parliament", "PARLIAMENT_UI_CLOSE", {})
+end)
+
 exports('OpenView', function(viewName, data)
     if viewName == "faction_commerce_terminal" or viewName == "corporate" or viewName == "factions" or viewName == "union" then
         Nyx.UI.SetFocus(true, true)
@@ -48,6 +58,10 @@ exports('OpenView', function(viewName, data)
     elseif viewName == "court" or viewName == "courtroom" or viewName == "judiciary" then
         Nyx.UI.SetFocus(true, true)
         Nyx.UI.Send("court", "COURT_TERMINAL_OPEN", data or {})
+        return true
+    elseif viewName == "parliament" or viewName == "voting" or viewName == "ballot" or viewName == "election" or viewName == "legislation" or viewName == "penalcode" then
+        Nyx.UI.SetFocus(true, true)
+        Nyx.UI.Send("parliament", "PARLIAMENT_UI_OPEN", data or {})
         return true
     elseif viewName == "freight_board" then
         Nyx.UI.SetFocus(true, true)

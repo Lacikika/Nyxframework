@@ -48,7 +48,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Judicial Chain-of-Custody, Warrants & Jury UI (`nyx_ui` & `nyx_judiciary`)**
   - **Implementation:** Visual courtroom terminal app: SHA-256 evidence integrity explorer, secret-ballot jury voting box, and judge probable-cause warrant issuance screen.
 
-- [ ] **Feature: Parliamentary Ranked-Choice Voting & Legislation UI (`nyx_ui` & `nyx_parliament`)**
+- [x] **Feature: Parliamentary Ranked-Choice Voting & Legislation UI (`nyx_ui` & `nyx_parliament`)**
   - **Implementation:** Interactive Instant-Runoff Voting (IRV) ballot interface, candidate endorsement registration portal, and live penal code amendment reader.
 
 - [ ] **Feature: Property Blind-Auction & Stewardship Portal (`nyx_ui` & `nyx_properties`)**
@@ -107,6 +107,38 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Parliamentary Ranked-Choice Voting & Legislation UI (`nyx_ui` & `nyx_parliament`)**
+  - **Database Migration (`036_parliament_voting_ui_and_legislation_audit.sql`, `index.json`)**:
+    - Created `nyx_parliament_amendment_audit` immutable audit ledger (`audit_id`, `session_id`, `law_id`, `field`, `old_value`, `new_value`, `enacted_by_session_title`, `enacted_at`).
+    - Extended `nyx_parliament_sessions` table with `sponsor_citizen_id` and `category` columns for citizen bill sponsorship.
+    - Extended `nyx_parliament_candidates` table with `campaign_slogan` column.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 36) and mirrored to `FiveM/nyx_parliament/sql/migrations/`.
+  - **Shared Pure Lua 5.4 Logic Engine (`nyx_parliament/shared/legislation_ui.lua`, `fxmanifest.lua`)**:
+    - Implemented `Nyx.ParliamentUI.ValidateCandidatePayload` enforcing display name length, party bounds, campaign slogan limits, and platform narrative minimums.
+    - Implemented `Nyx.ParliamentUI.ValidateEndorsement` guarding against self-endorsement, candidate status validation, threshold tracking ($5$ signatures), and automatic verified qualification toggling.
+    - Implemented `Nyx.ParliamentUI.ValidateBillProposal` enforcing statutory bounding for penal fines, prison months, and millage tax rates.
+    - Implemented `Nyx.ParliamentUI.FilterPenalCode` providing multi-dimensional case-insensitive substring searching across ID, title, description, and category filtering (`penal_felony`, `penal_misdemeanor`, `penal_infraction`, `fiscal_policy`, `zoning`).
+    - Implemented `Nyx.ParliamentUI.FormatStatuteBadge` and `FormatBallotReceipt` (`NYX-BALLOT-<HEX>-<YEAR>`).
+    - Implemented `Nyx.ParliamentUI.EvaluateBallotPreferences` verifying deduplication, candidate recognition, and completeness.
+    - Registered `shared/legislation_ui.lua` in `FiveM/nyx_parliament/fxmanifest.lua`.
+  - **Server-Side RPC Enhancements & Enactment Audit (`nyx_parliament/server/`)**:
+    - *Enactment Audit Subsystem (`enactment.lua`)*: Updated `Nyx.Parliament.EnactBill` to record prior law values and persist immutable amendment audit records into `nyx_parliament_amendment_audit`.
+    - *RPC Dispatcher (`main.lua`)*: Registered `parliament:getOverview` (returning unified sessions, candidates, laws, officials, amendments, and citizen state) and `parliament:getAmendmentAudit`.
+    - *Candidate Registration Subsystem (`elections.lua`)*: Integrated `Nyx.ParliamentUI.ValidateCandidatePayload`, accepts campaign slogan, and persists into database.
+    - *Server Exports (`exports.lua`)*: Exported `GetOverview` and `GetAmendmentAuditLogs`.
+  - **Client-Side Dispatch & UI Bridge (`nyx_parliament/client/`, `nyx_ui/client/`)**:
+    - *Parliament Client (`legislation_ui.lua`)*: Routed all views through `exports['nyx_ui']:OpenParliamentUI(options)` with fallback; added chat commands `/parliament`, `/ballot`, `/vote`, `/penalcode`, `/laws`.
+    - *UI Bridge (`bridge.lua`, `exports.lua`)*: Whitelisted parliament parameters (`sessionId`, `candidateId`, `preferences`, `displayName`, `party`, `platform`, `slogan`, `receiptHash`, `officeId`, `filterLawId`, `categoryFilter`, `activeTab`, `actions`, `billPayload`) in `SanitizePayload`. Registered 16 safe NUI callbacks (`closeParliamentUI`, `parliament:getOverview`, `parliament:getActiveSessions`, `parliament:getCandidates`, `parliament:castBallot`, `parliament:verifyReceipt`, `parliament:registerCandidate`, `parliament:endorseCandidate`, `parliament:getPenalCode`, `parliament:getLawBook`, `parliament:getOfficials`, `parliament:getTabulationAudit`, `parliament:proposeBill`, `parliament:fileRecallPetition`, `parliament:signRecallPetition`, `parliament:getAmendmentAudit`).
+    - *Master Exports (`exports.lua`)*: Exported `OpenParliamentUI`, `CloseParliamentUI`, and mapped `parliament`, `voting`, `ballot`, `election`, `legislation`, `penalcode` in `OpenView`.
+  - **Web Single-Frame CEF SPA (`nyx_ui/web/`)**:
+    - *HTML (`index.html`)*: Section 8D `#parliament-overlay` modal featuring 3 tabs (Interactive IRV Ballot & Live Tabulation, Candidate Endorsements & Petitions, Live Penal Code & Statute Amendments). Added `#dev-btn-parliament` to dev mode bar and `#parliament-submodal-recall` submodal dialog.
+    - *CSS (`css/app.css`)*: Section 18 styling strictly adhering to CEF render budget (high-opacity dark surfaces `rgba(12, 15, 22, 0.96)`, zero GPU shaders, no `backdrop-filter`, no `blur()`, touch targets $\ge 40$px, WCAG AA+ contrast).
+    - *JavaScript (`js/app.js`)*: Added `NyxState.parliament` reactive state, message listeners (`PARLIAMENT_UI_OPEN`/`CLOSE`), tab switching, interactive preference reordering (up/down shift), secret-ballot submission with cryptographic receipt formulation, receipt verification banner rendering, live instant-runoff tabulation audit viewer, candidate nomination with collateral checking, citizen endorsement with progress bars, recall petition creation/signing, live statute filter and KPI pills, legislative bill proposal submission with statutory boundary hints, double-submit exploit locking (`lockButtonAction`), hierarchical submodal escape handling, and browser dev mode mock telemetry.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestParliamentRankedChoiceAndLegislationUI()` (Test 31) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_parliament_voting_legislation_ui.py` covering candidate payload validation, endorsement thresholds, bill proposal statutory bounds, penal code filtering, ballot receipt formatting, preference ranking deduplication, migration 036 schema, web HTML structure, CEF CSS render budget, JS state handlers, and bridge registration (11/11 passing).
+    - Full pytest suite: 266/266 tests passing (100% pass rate).
+    - Verified clean passes across all 14 resources, 210 Lua files, and all 36 SQL migrations via `scripts/validator.py` and `scripts/verify.ps1`.
 - **[2026-10-18] Feature: Judicial Chain-of-Custody, Warrants & Jury UI (`nyx_ui` & `nyx_judiciary`)**
   - **Database Migration (`035_judiciary_courtroom_terminal_and_evidence_audit.sql`, `index.json`)**:
     - Created `nyx_judiciary_evidence_verifications` table recording immutable evidence chain validation audits (`verification_id`, `evidence_id`, `verifier_citizen_id`, `status`, `is_valid`, `chain_length`, `root_hash`, `current_chain_hash`, `verified_at`).

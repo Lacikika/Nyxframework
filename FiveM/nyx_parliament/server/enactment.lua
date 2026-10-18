@@ -35,6 +35,7 @@ function Nyx.Parliament.EnactBill(session)
     for _, act in ipairs(actions) do
         local law = Nyx.Parliament.Laws[act.targetLawId]
         if law then
+            local oldVal = law.currentValue and law.currentValue[act.field] and tonumber(law.currentValue[act.field]) or nil
             local numVal = tonumber(act.newValue)
             law.currentValue[act.field] = numVal
             law.lastAmended = session.session_id
@@ -45,6 +46,15 @@ function Nyx.Parliament.EnactBill(session)
                 SET `current_value` = JSON_SET(`current_value`, ?, ?), `last_amended_by_session` = ?
                 WHERE `law_id` = ?
             ]], { jsonPath, numVal, session.session_id, act.targetLawId })
+
+            -- Persist immutable legislative amendment audit record
+            pcall(function()
+                MySQL.prepare.await([[
+                    INSERT INTO `nyx_parliament_amendment_audit`
+                        (`session_id`, `law_id`, `field`, `old_value`, `new_value`, `enacted_by_session_title`)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ]], { session.session_id, act.targetLawId, act.field, oldVal, numVal, session.title or session.session_id })
+            end)
 
             -- Real-time downstream propagation: Intercept nyx_treasury tax rates
             if act.targetLawId == "tax:sales_rate" and act.field == "rate" then

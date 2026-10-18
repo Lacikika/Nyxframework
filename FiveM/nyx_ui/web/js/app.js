@@ -520,6 +520,148 @@ function handleDevMockNui(action, data) {
             }
         };
     }
+    // Parliamentary Mock Handlers for Desktop Dev Mode
+    if (action === 'closeParliamentUI') {
+        return { success: true };
+    }
+    if (action === 'parliament:getOverview' || action === 'parliament:getActiveSessions') {
+        const mockSessions = [
+            { session_id: 101, title: '2026. Évi Általános Parlamenti Választás', session_type: 'ELECTION', status: 'ACTIVE', quorum_target: 5, current_votes: 12, starts_at: '2026-10-15 08:00', ends_at: '2026-10-25 20:00' },
+            { session_id: 102, title: '2026. Gazdasági Reform & Adópolitikai Népszavazás', session_type: 'REFERENDUM', status: 'ACTIVE', quorum_target: 10, current_votes: 7, starts_at: '2026-10-10 00:00', ends_at: '2026-10-20 23:59' },
+            { session_id: 103, title: '2026. Őszi Időközi Képviselőválasztás', session_type: 'ELECTION', status: 'CONCLUDED', quorum_target: 5, current_votes: 18, starts_at: '2026-09-01 08:00', ends_at: '2026-09-10 20:00' }
+        ];
+        const mockCandidates = [
+            { candidate_id: 1, session_id: 101, citizen_id: 'CIT_0144', display_name: 'Elena Vance', party: 'Polgári Szövetség a Jövőért', campaign_slogan: 'Átlátható önkormányzat, biztonságos utcák mindenkinek!', platform: 'Teljes közigazgatási digitalizáció, a kisvállalkozások adóterheinek csökkentése és a rendvédelmi erők belső felülvizsgálata.', endorsements_count: 7, is_verified: 1 },
+            { candidate_id: 2, session_id: 101, citizen_id: 'CIT_0891', display_name: 'Marcus Brody', party: 'Munkás és Iparosok Pártja', campaign_slogan: 'Méltó bérek, erős szakszervezetek, tiszta ipar.', platform: 'A kollektív szerződések kiterjesztése, veszélyességi pótlékok emelése és a logisztikai dolgozók védelme a kizsákmányolás ellen.', endorsements_count: 5, is_verified: 1 },
+            { candidate_id: 3, session_id: 101, citizen_id: 'CIT_0320', display_name: 'Sarah Connor', party: 'Független Reformmozgalom', campaign_slogan: 'Közbiztonság és zéró tolerancia a korrupcióval szemben.', platform: 'A büntető törvénykönyv szigorítása szervezett bűnözési tényállások esetén és a bírósági esküdtszékek digitalizációja.', endorsements_count: 3, is_verified: 0 },
+            { candidate_id: 4, session_id: 101, citizen_id: 'CIT_0665', display_name: 'Julian Sterling', party: 'Szabadpiaci Koalíció', campaign_slogan: 'Dereguláció, alacsony adók, virágzó vállalkozások.', platform: 'Közteherviselési reform, az önkormányzati transzferadók 1%-ra csökkentése és a kikötői szabadkereskedelmi övezet bővítése.', endorsements_count: 2, is_verified: 0 }
+        ];
+        const mockLaws = [
+            { law_id: 'PC-101', name: 'Fegyveres Rablás (Armed Robbery)', category: 'penal_felony', fine_default: 15000, fine_min: 5000, fine_max: 30000, prison_months_default: 24, prison_months_min: 12, prison_months_max: 60, updated_at: '2026-10-01 12:00' },
+            { law_id: 'PC-102', name: 'Kábítószer-kereskedelem (Drug Trafficking)', category: 'penal_felony', fine_default: 25000, fine_min: 10000, fine_max: 50000, prison_months_default: 36, prison_months_min: 18, prison_months_max: 72, updated_at: '2026-09-18 15:30' },
+            { law_id: 'PC-201', name: 'Garázdaság és Rendbontás (Disorderly Conduct)', category: 'penal_misdemeanor', fine_default: 2500, fine_min: 500, fine_max: 8000, prison_months_default: 6, prison_months_min: 0, prison_months_max: 12, updated_at: '2026-08-14 09:20' },
+            { law_id: 'PC-301', name: 'Közúti Gyorshajtás (Severe Speeding)', category: 'penal_infraction', fine_default: 1200, fine_min: 200, fine_max: 3000, prison_months_default: 0, prison_months_min: 0, prison_months_max: 0, updated_at: '2026-07-22 11:10' },
+            { law_id: 'TX-401', name: 'Általános Kiskereskedelmi Adó (Retail Sales Tax)', category: 'fiscal_policy', tax_rate_default: 0.08, tax_rate_min: 0.01, tax_rate_max: 0.15, fine_default: 0, prison_months_default: 0, updated_at: '2026-10-12 18:00' },
+            { law_id: 'TX-402', name: 'Társasági Vagyontranszfer Adó (Asset Transfer Tax)', category: 'fiscal_policy', tax_rate_default: 0.02, tax_rate_min: 0.00, tax_rate_max: 0.10, fine_default: 0, prison_months_default: 0, updated_at: '2026-06-05 14:00' }
+        ];
+        const mockAmendments = [
+            { audit_id: 1, session_id: 103, law_id: 'PC-101', field: 'fine', old_value: '10000', new_value: '15000', enacted_by_session_title: '2026. Őszi Rendvédelmi Módosító Csomag', enacted_at: '2026-10-01 12:00' },
+            { audit_id: 2, session_id: 103, law_id: 'TX-401', field: 'rate', old_value: '0.07', new_value: '0.08', enacted_by_session_title: 'Költségvetési Stabilitási Törvény', enacted_at: '2026-10-12 18:00' }
+        ];
+        const mockPetitions = [
+            { petition_id: 501, office_id: 'district_commissioner', sponsor_citizen_id: 'CIT_0144', reason: 'A választási ígéretek súlyos megszegése és az ipari körzet elhanyagolása.', signatures_count: 5, threshold: 5, status: 'THRESHOLD_MET', created_at: '2026-10-14 09:30' },
+            { petition_id: 502, office_id: 'mayor', sponsor_citizen_id: 'CIT_0891', reason: 'A kikötői sztrájktörő intézkedések miatti bizalomvesztés.', signatures_count: 3, threshold: 5, status: 'COLLECTING', created_at: '2026-10-16 11:20' }
+        ];
+        const mockOfficials = [
+            { office_id: 'mayor', title: 'City Mayor', holder_citizen_id: 'CIT_0010', holder_name: 'Arthur Pendelton', term_start: '2025-01-01', term_end: '2027-01-01' },
+            { office_id: 'chief_magistrate', title: 'Chief Magistrate', holder_citizen_id: 'CIT_0012', holder_name: 'Helena Cross', term_start: '2024-06-01', term_end: '2028-06-01' },
+            { office_id: 'district_commissioner', title: 'District Commissioner', holder_citizen_id: 'CIT_0055', holder_name: 'Roger Sterling', term_start: '2025-06-01', term_end: '2026-12-31' }
+        ];
+        return {
+            success: true,
+            sessions: mockSessions,
+            candidates: mockCandidates,
+            laws: mockLaws,
+            amendments: mockAmendments,
+            petitions: mockPetitions,
+            officials: mockOfficials
+        };
+    }
+    if (action === 'parliament:getCandidates') {
+        return [
+            { candidate_id: 1, session_id: data.sessionId || 101, citizen_id: 'CIT_0144', display_name: 'Elena Vance', party: 'Polgári Szövetség a Jövőért', campaign_slogan: 'Átlátható önkormányzat, biztonságos utcák mindenkinek!', platform: 'Teljes közigazgatási digitalizáció, a kisvállalkozások adóterheinek csökkentése és a rendvédelmi erők belső felülvizsgálata.', endorsements_count: 7, is_verified: 1 },
+            { candidate_id: 2, session_id: data.sessionId || 101, citizen_id: 'CIT_0891', display_name: 'Marcus Brody', party: 'Munkás és Iparosok Pártja', campaign_slogan: 'Méltó bérek, erős szakszervezetek, tiszta ipar.', platform: 'A kollektív szerződések kiterjesztése, veszélyességi pótlékok emelése és a logisztikai dolgozók védelme a kizsákmányolás ellen.', endorsements_count: 5, is_verified: 1 },
+            { candidate_id: 3, session_id: data.sessionId || 101, citizen_id: 'CIT_0320', display_name: 'Sarah Connor', party: 'Független Reformmozgalom', campaign_slogan: 'Közbiztonság és zéró tolerancia a korrupcióval szemben.', platform: 'A büntető törvénykönyv szigorítása szervezett bűnözési tényállások esetén és a bírósági esküdtszékek digitalizációja.', endorsements_count: 3, is_verified: 0 },
+            { candidate_id: 4, session_id: data.sessionId || 101, citizen_id: 'CIT_0665', display_name: 'Julian Sterling', party: 'Szabadpiaci Koalíció', campaign_slogan: 'Dereguláció, alacsony adók, virágzó vállalkozások.', platform: 'Közteherviselési reform, az önkormányzati transzferadók 1%-ra csökkentése és a kikötői szabadkereskedelmi övezet bővítése.', endorsements_count: 2, is_verified: 0 }
+        ];
+    }
+    if (action === 'parliament:castBallot') {
+        const hash = 'NYX-BALLOT-' + Math.random().toString(36).substring(2, 7).toUpperCase() + '-2026';
+        showNotification({ type: 'success', title: 'SZAVAZAT HITELÍTVE', message: `Preferenciás szavazatod rögzítve az urnában. Nyugtakód: ${hash}` });
+        return { success: true, receiptHash: hash, sessionId: data.sessionId };
+    }
+    if (action === 'parliament:verifyReceipt') {
+        const hash = data.receiptHash || '';
+        if (hash.startsWith('NYX-BALLOT-')) {
+            return {
+                verified: true,
+                session: '2026. Évi Általános Parlamenti Választás',
+                timestamp: '2026-10-18 10:24:12',
+                rankedCount: 3,
+                preferences: ['Elena Vance', 'Marcus Brody', 'Sarah Connor'],
+                hash: hash
+            };
+        }
+        return { verified: false, error: 'A megadott nyugtakód nem található az auditált főkönyvben.' };
+    }
+    if (action === 'parliament:registerCandidate') {
+        showNotification({ type: 'success', title: 'JELÖLTSÉG BEJEGYEZVE', message: `${data.displayName} hivatalosan nyilvántartásba véve.` });
+        return { success: true, candidateId: Math.floor(Math.random() * 1000) + 10 };
+    }
+    if (action === 'parliament:endorseCandidate') {
+        showNotification({ type: 'success', title: 'TÁMOGATÁS RÖGZÍTVE', message: 'Támogatói aláírásod rögzítésre került.' });
+        return { success: true, endorsements: 6, verified: true };
+    }
+    if (action === 'parliament:getPenalCode' || action === 'parliament:getLawBook') {
+        return [
+            { law_id: 'PC-101', name: 'Fegyveres Rablás (Armed Robbery)', category: 'penal_felony', fine_default: 15000, fine_min: 5000, fine_max: 30000, prison_months_default: 24, prison_months_min: 12, prison_months_max: 60, updated_at: '2026-10-01 12:00' },
+            { law_id: 'PC-102', name: 'Kábítószer-kereskedelem (Drug Trafficking)', category: 'penal_felony', fine_default: 25000, fine_min: 10000, fine_max: 50000, prison_months_default: 36, prison_months_min: 18, prison_months_max: 72, updated_at: '2026-09-18 15:30' },
+            { law_id: 'PC-201', name: 'Garázdaság és Rendbontás (Disorderly Conduct)', category: 'penal_misdemeanor', fine_default: 2500, fine_min: 500, fine_max: 8000, prison_months_default: 6, prison_months_min: 0, prison_months_max: 12, updated_at: '2026-08-14 09:20' },
+            { law_id: 'PC-301', name: 'Közúti Gyorshajtás (Severe Speeding)', category: 'penal_infraction', fine_default: 1200, fine_min: 200, fine_max: 3000, prison_months_default: 0, prison_months_min: 0, prison_months_max: 0, updated_at: '2026-07-22 11:10' },
+            { law_id: 'TX-401', name: 'Általános Kiskereskedelmi Adó (Retail Sales Tax)', category: 'fiscal_policy', tax_rate_default: 0.08, tax_rate_min: 0.01, tax_rate_max: 0.15, fine_default: 0, prison_months_default: 0, updated_at: '2026-10-12 18:00' },
+            { law_id: 'TX-402', name: 'Társasági Vagyontranszfer Adó (Asset Transfer Tax)', category: 'fiscal_policy', tax_rate_default: 0.02, tax_rate_min: 0.00, tax_rate_max: 0.10, fine_default: 0, prison_months_default: 0, updated_at: '2026-06-05 14:00' }
+        ];
+    }
+    if (action === 'parliament:getTabulationAudit') {
+        return {
+            status: 'CONCLUDED',
+            winnerId: 2,
+            rounds: [
+                {
+                    round: 1,
+                    tallies: { '1': 4, '2': 4, '3': 3, '4': 1 },
+                    percentages: { '1': 33.3, '2': 33.3, '3': 25.0, '4': 8.3 },
+                    eliminated: 4,
+                    elected: null,
+                    exhaustedBallots: 0
+                },
+                {
+                    round: 2,
+                    tallies: { '1': 5, '2': 5, '3': 2 },
+                    percentages: { '1': 41.7, '2': 41.7, '3': 16.7 },
+                    eliminated: 3,
+                    elected: null,
+                    exhaustedBallots: 0
+                },
+                {
+                    round: 3,
+                    tallies: { '1': 5, '2': 7 },
+                    percentages: { '1': 41.7, '2': 58.3 },
+                    eliminated: 1,
+                    elected: 2,
+                    exhaustedBallots: 0
+                }
+            ]
+        };
+    }
+    if (action === 'parliament:proposeBill') {
+        showNotification({ type: 'success', title: 'TÖRVÉNYJAVASLAT BENYÚJTVA', message: 'Törvényjavaslatod rögzítésre került és szavazásra lesz bocsátva.' });
+        return { success: true, sessionId: 105 };
+    }
+    if (action === 'parliament:fileRecallPetition') {
+        showNotification({ type: 'warning', title: 'VISSZAHÍVÁSI PETÍCIÓ MEGNYITVA', message: 'A petíció aláírásgyűjtése megkezdődött.' });
+        return { success: true, petitionId: 503 };
+    }
+    if (action === 'parliament:signRecallPetition') {
+        showNotification({ type: 'info', title: 'ALÁÍRÁS RÖGZÍTVE', message: 'Aláírásoddal hitelesítetted a visszahívási petíciót.' });
+        return { success: true, signaturesCount: 4, threshold: 5 };
+    }
+    if (action === 'parliament:getAmendmentAudit') {
+        return [
+            { audit_id: 1, session_id: 103, law_id: 'PC-101', field: 'fine', old_value: '10000', new_value: '15000', enacted_by_session_title: '2026. Őszi Rendvédelmi Módosító Csomag', enacted_at: '2026-10-01 12:00' },
+            { audit_id: 2, session_id: 103, law_id: 'TX-401', field: 'rate', old_value: '0.07', new_value: '0.08', enacted_by_session_title: 'Költségvetési Stabilitási Törvény', enacted_at: '2026-10-12 18:00' }
+        ];
+    }
     return { success: true, devMode: true };
 }
 
@@ -599,6 +741,19 @@ const NyxState = {
         pendingPetitions: [],
         activeWarrants: [],
         subpoenaRecords: null
+    },
+    parliament: {
+        isOpen: false,
+        activeTab: 'ballot',
+        sessions: [],
+        selectedSessionId: null,
+        candidates: [],
+        rankedCandidateIds: [],
+        laws: [],
+        amendments: [],
+        petitions: [],
+        officials: [],
+        citizenVotes: {}
     },
     activeDialog: null
 };
@@ -2512,11 +2667,784 @@ async function openSubpoenaDisclosure(citizenId) {
             <h5><i class="fa-solid fa-chart-pie"></i> Vállalati Tulajdonrészek & Részvények</h5>
             ${sharesHtml || '<div class="subp-empty">Nincs társasági tulajdonrész.</div>'}
         </div>
-        <div class="subp-section">
-            <h5><i class="fa-solid fa-clock-rotate-left"></i> Legutóbbi Tranzakciós Napló</h5>
-            ${txHtml || '<div class="subp-empty">Nincs friss tranzakció.</div>'}
-        </div>
-    `;
+// 12D. Parliamentary Ranked-Choice Voting & Legislation Terminal
+function openParliamentUI(payload) {
+    NyxState.parliament.isOpen = true;
+    const overlay = document.getElementById('parliament-overlay');
+    if (overlay) overlay.classList.remove('hidden');
+
+    if (payload && payload.activeTab) {
+        NyxState.parliament.activeTab = payload.activeTab;
+    }
+
+    setParliamentTab(NyxState.parliament.activeTab || 'ballot');
+
+    if (payload && payload.sessions) {
+        NyxState.parliament.sessions = payload.sessions || [];
+        NyxState.parliament.candidates = payload.candidates || [];
+        NyxState.parliament.laws = payload.laws || [];
+        NyxState.parliament.amendments = payload.amendments || [];
+        NyxState.parliament.petitions = payload.petitions || [];
+        NyxState.parliament.officials = payload.officials || [];
+        renderParliamentOverviewData();
+    } else {
+        refreshParliamentOverview();
+    }
+}
+
+function closeParliamentUI() {
+    NyxState.parliament.isOpen = false;
+    const overlay = document.getElementById('parliament-overlay');
+    if (overlay) overlay.classList.add('hidden');
+
+    const recallModal = document.getElementById('parliament-submodal-recall');
+    if (recallModal) recallModal.classList.add('hidden');
+
+    postNui('closeParliamentUI', {});
+}
+
+function setParliamentTab(tabName) {
+    NyxState.parliament.activeTab = tabName;
+
+    // Update Tab Buttons
+    document.querySelectorAll('.parliament-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+    });
+
+    // Update Tab Panes
+    const ballotPane = document.getElementById('parliament-tab-ballot');
+    const candPane = document.getElementById('parliament-tab-candidates');
+    const lawsPane = document.getElementById('parliament-tab-laws');
+
+    if (ballotPane) ballotPane.classList.toggle('hidden', tabName !== 'ballot');
+    if (candPane) candPane.classList.toggle('hidden', tabName !== 'candidates');
+    if (lawsPane) lawsPane.classList.toggle('hidden', tabName !== 'laws');
+
+    playWebBeep(640, 'sine', 0.04);
+
+    if (tabName === 'ballot') {
+        renderParliamentBallot();
+    } else if (tabName === 'candidates') {
+        renderParliamentCandidates();
+    } else if (tabName === 'laws') {
+        renderParliamentLaws();
+    }
+}
+
+async function refreshParliamentOverview() {
+    const res = await postNui('parliament:getOverview', {});
+    if (res && res.success) {
+        NyxState.parliament.sessions = res.sessions || [];
+        NyxState.parliament.candidates = res.candidates || [];
+        NyxState.parliament.laws = res.laws || [];
+        NyxState.parliament.amendments = res.amendments || [];
+        NyxState.parliament.petitions = res.petitions || [];
+        NyxState.parliament.officials = res.officials || [];
+        renderParliamentOverviewData();
+    }
+}
+
+function renderParliamentOverviewData() {
+    const sessionSelect = document.getElementById('parliament-session-select');
+    const nomSessionSelect = document.getElementById('parliament-nomination-session-select');
+
+    if (sessionSelect) {
+        sessionSelect.innerHTML = '';
+        NyxState.parliament.sessions.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.session_id;
+            opt.textContent = `${s.title} (${s.session_type || 'ELECTION'})`;
+            sessionSelect.appendChild(opt);
+        });
+
+        if (NyxState.parliament.sessions.length > 0) {
+            if (!NyxState.parliament.selectedSessionId || !NyxState.parliament.sessions.some(s => s.session_id === NyxState.parliament.selectedSessionId)) {
+                // Pick first active session or first session
+                const active = NyxState.parliament.sessions.find(s => (s.status || '').toUpperCase() === 'ACTIVE') || NyxState.parliament.sessions[0];
+                NyxState.parliament.selectedSessionId = active.session_id;
+            }
+            sessionSelect.value = NyxState.parliament.selectedSessionId;
+        }
+    }
+
+    if (nomSessionSelect) {
+        nomSessionSelect.innerHTML = '';
+        NyxState.parliament.sessions.filter(s => (s.status || '').toUpperCase() === 'ACTIVE').forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.session_id;
+            opt.textContent = `${s.title} [#${s.session_id}]`;
+            nomSessionSelect.appendChild(opt);
+        });
+    }
+
+    // Header status
+    const headerStatus = document.getElementById('parliament-header-status');
+    if (headerStatus) {
+        const cur = NyxState.parliament.sessions.find(s => s.session_id === NyxState.parliament.selectedSessionId);
+        headerStatus.textContent = cur ? (cur.status || 'AKTÍV').toUpperCase() : 'ÜLÉSSZAK';
+    }
+
+    renderParliamentBallot();
+    renderParliamentCandidates();
+    renderParliamentLaws();
+    renderParliamentAmendments();
+    renderParliamentPetitions();
+}
+
+function renderParliamentBallot() {
+    const currentSession = NyxState.parliament.sessions.find(s => s.session_id === NyxState.parliament.selectedSessionId);
+    const typeBadge = document.getElementById('parliament-session-type-badge');
+    const quorumBadge = document.getElementById('parliament-session-quorum-badge');
+
+    if (currentSession) {
+        if (typeBadge) typeBadge.textContent = (currentSession.session_type || 'ELECTION').toUpperCase();
+        if (quorumBadge) quorumBadge.textContent = `Kvórum: ${currentSession.current_votes || 0}/${currentSession.quorum_target || 5}`;
+    }
+
+    const sessionCandidates = NyxState.parliament.candidates.filter(c => c.session_id === NyxState.parliament.selectedSessionId);
+
+    // Synchronize rankedCandidateIds: keep current order if valid, append new, remove missing
+    const existing = NyxState.parliament.rankedCandidateIds.filter(id => sessionCandidates.some(c => c.candidate_id === id));
+    sessionCandidates.forEach(c => {
+        if (!existing.includes(c.candidate_id)) {
+            existing.push(c.candidate_id);
+        }
+    });
+    NyxState.parliament.rankedCandidateIds = existing;
+
+    const countBadge = document.getElementById('parliament-ballot-count-badge');
+    if (countBadge) countBadge.textContent = `${NyxState.parliament.rankedCandidateIds.length} rangsorolva`;
+
+    const container = document.getElementById('parliament-ballot-candidate-list');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (NyxState.parliament.rankedCandidateIds.length === 0) {
+        container.innerHTML = '<div class="empty-state"><i class="fa-solid fa-users-slash empty-icon"></i><p>Ehhez az ülésszakhoz még nincsenek jóváhagyott jelöltek.</p></div>';
+        return;
+    }
+
+    NyxState.parliament.rankedCandidateIds.forEach((candId, idx) => {
+        const cand = sessionCandidates.find(c => c.candidate_id === candId);
+        if (!cand) return;
+
+        const rankNum = idx + 1;
+        const item = document.createElement('div');
+        item.className = 'ballot-candidate-row';
+        item.innerHTML = `
+            <div class="candidate-rank-badge">#${rankNum}</div>
+            <div class="candidate-info-block">
+                <div class="candidate-primary-line">
+                    <strong class="cand-name">${cand.display_name}</strong>
+                    <span class="cand-party-pill">${cand.party || 'Független'}</span>
+                </div>
+                <div class="cand-slogan">${cand.campaign_slogan || cand.platform || 'Állampolgári program elérhető.'}</div>
+            </div>
+            <div class="candidate-reorder-actions">
+                <button class="rank-btn up-btn" data-id="${candId}" data-dir="-1" title="Előrébb rangsorolás" ${idx === 0 ? 'disabled' : ''}>
+                    <i class="fa-solid fa-chevron-up"></i>
+                </button>
+                <button class="rank-btn down-btn" data-id="${candId}" data-dir="1" title="Hátrébb rangsorolás" ${idx === NyxState.parliament.rankedCandidateIds.length - 1 ? 'disabled' : ''}>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+            </div>
+        `;
+
+        item.querySelector('.up-btn')?.addEventListener('click', () => shiftParliamentCandidate(candId, -1));
+        item.querySelector('.down-btn')?.addEventListener('click', () => shiftParliamentCandidate(candId, 1));
+
+        container.appendChild(item);
+    });
+}
+
+function shiftParliamentCandidate(candId, delta) {
+    const list = NyxState.parliament.rankedCandidateIds;
+    const curIdx = list.indexOf(candId);
+    if (curIdx === -1) return;
+    const targetIdx = curIdx + delta;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+
+    const temp = list[curIdx];
+    list[curIdx] = list[targetIdx];
+    list[targetIdx] = temp;
+
+    playWebBeep(780, 'sine', 0.03);
+    renderParliamentBallot();
+}
+
+async function castParliamentBallot() {
+    const sessionId = NyxState.parliament.selectedSessionId;
+    if (!sessionId) {
+        showNotification({ type: 'warning', title: 'NINCS ÜLÉSSZAK', message: 'Válassz ki egy aktív választási ülésszakot!' });
+        return;
+    }
+
+    const preferences = NyxState.parliament.rankedCandidateIds;
+    if (!preferences || preferences.length === 0) {
+        showNotification({ type: 'warning', title: 'ÜRES SZAVAZÓLAP', message: 'Kérlek rangsorolj legalább egy jelöltet a szavazat leadásához!' });
+        return;
+    }
+
+    const castBtn = document.getElementById('parliament-cast-ballot-btn');
+    lockButtonAction(castBtn, async () => {
+        const res = await postNui('parliament:castBallot', {
+            sessionId: sessionId,
+            preferences: preferences
+        });
+
+        if (res && res.success) {
+            playWebBeep(920, 'triangle', 0.12);
+            const proofBanner = document.getElementById('parliament-cast-proof-banner');
+            const proofHashEl = document.getElementById('parliament-proof-hash');
+            if (proofBanner && proofHashEl) {
+                proofHashEl.textContent = res.receiptHash || 'NYX-BALLOT-VALIDATED';
+                proofBanner.classList.remove('hidden');
+            }
+
+            const receiptInput = document.getElementById('parliament-receipt-input');
+            if (receiptInput && res.receiptHash) {
+                receiptInput.value = res.receiptHash;
+            }
+
+            showNotification({
+                type: 'success',
+                title: 'SZAVAZAT HITELÍTVE',
+                message: `Titkos preferenciás szavazatod sikeresen rögzítve az urnában. Nyugtakód mentve.`
+            });
+        } else {
+            showNotification({
+                type: 'error',
+                title: 'SZAVAZÁS SIKERTELEN',
+                message: res?.error || 'A szavazat leadása meghiúsult. Kérlek ellenőrizd az ülésszak státuszát!'
+            });
+        }
+    });
+}
+
+async function verifyParliamentReceipt() {
+    const receiptInput = document.getElementById('parliament-receipt-input');
+    const hash = receiptInput ? receiptInput.value.trim() : '';
+
+    if (!hash) {
+        showNotification({ type: 'warning', title: 'HIÁNYZÓ NYUGTAKÓD', message: 'Kérlek add meg az ellenőrizni kívánt NYX-BALLOT-... nyugtakódot!' });
+        return;
+    }
+
+    const verifyBtn = document.getElementById('parliament-verify-receipt-btn');
+    lockButtonAction(verifyBtn, async () => {
+        const res = await postNui('parliament:verifyReceipt', {
+            sessionId: NyxState.parliament.selectedSessionId,
+            receiptHash: hash
+        });
+
+        const banner = document.getElementById('parliament-receipt-verify-banner');
+        if (!banner) return;
+        banner.classList.remove('hidden');
+
+        if (res && (res.verified || res.success)) {
+            playWebBeep(880, 'sine', 0.08);
+            banner.className = 'verification-banner valid';
+            const prefStr = Array.isArray(res.preferences) ? res.preferences.join(' → ') : 'Rangsorolt Preferenciák Rögzítve';
+            banner.innerHTML = `
+                <i class="fa-solid fa-circle-check icon-status"></i>
+                <div class="banner-body">
+                    <strong>HITELÍTETT BÁMULATOS SZAVAZATI NYUGTA (ÉRVÉNYES)</strong>
+                    <div class="sub-line">Ülésszak: ${res.session || 'Aktuális Választás'} | Időbélyeg: ${res.timestamp || '2026'}</div>
+                    <div class="sub-line">Rangsorolt jelöltek: <code>${prefStr}</code></div>
+                    <code class="hash-preview">HASH: ${hash}</code>
+                </div>
+            `;
+            showNotification({ type: 'success', title: 'NYUGTA IGAZOLVA', message: 'A szavazólap sértetlenül szerepel az auditált urnában.' });
+        } else {
+            banner.className = 'verification-banner invalid';
+            banner.innerHTML = `
+                <i class="fa-solid fa-triangle-exclamation icon-status"></i>
+                <div class="banner-body">
+                    <strong>ÉRVÉNYTELEN VAGY NEM LÉTEZŐ NYUGTA</strong>
+                    <div class="sub-line">A megadott hash kód (${hash}) nem szerepel a kiválasztott ülésszak választási főkönyvében.</div>
+                </div>
+            `;
+            showNotification({ type: 'error', title: 'NYUGTA HIBA', message: res?.error || 'A nyugtakód nem található.' });
+        }
+    });
+}
+
+async function refreshParliamentTabulation() {
+    const refreshBtn = document.getElementById('parliament-refresh-tabulation-btn');
+    lockButtonAction(refreshBtn, async () => {
+        const res = await postNui('parliament:getTabulationAudit', {
+            sessionId: NyxState.parliament.selectedSessionId
+        });
+
+        const emptyHint = document.getElementById('parliament-tabulation-empty-hint');
+        const roundsContainer = document.getElementById('parliament-tabulation-rounds-container');
+        if (!roundsContainer) return;
+
+        if (res && res.rounds && res.rounds.length > 0) {
+            if (emptyHint) emptyHint.classList.add('hidden');
+            roundsContainer.classList.remove('hidden');
+            roundsContainer.innerHTML = '';
+
+            res.rounds.forEach(r => {
+                const roundCard = document.createElement('div');
+                roundCard.className = 'tabulation-round-card';
+
+                let talliesHtml = '';
+                const sortedCands = Object.keys(r.tallies || {}).sort((a, b) => (r.tallies[b] || 0) - (r.tallies[a] || 0));
+
+                sortedCands.forEach(cid => {
+                    const candObj = NyxState.parliament.candidates.find(c => String(c.candidate_id) === String(cid));
+                    const name = candObj ? candObj.display_name : `Jelölt #${cid}`;
+                    const votes = r.tallies[cid] || 0;
+                    const pct = r.percentages ? (r.percentages[cid] || 0) : 0;
+                    const isEliminated = String(r.eliminated) === String(cid);
+                    const isElected = String(r.elected) === String(cid);
+
+                    let statusTag = '';
+                    if (isElected) statusTag = '<span class="badge badge-success">MEGVÁLASZTVA (GYŐZTES)</span>';
+                    else if (isEliminated) statusTag = '<span class="badge badge-danger">KIESETT</span>';
+
+                    talliesHtml += `
+                        <div class="tally-row">
+                            <div class="tally-cand-info">
+                                <span>${name}</span>
+                                <div>${statusTag} <strong class="tally-num">${votes} szavazat (${pct}%)</strong></div>
+                            </div>
+                            <div class="tally-bar-track">
+                                <div class="tally-bar-fill ${isElected ? 'winner' : ''} ${isEliminated ? 'eliminated' : ''}" style="width: ${Math.min(100, pct)}%;"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                roundCard.innerHTML = `
+                    <div class="round-card-header">
+                        <h5><i class="fa-solid fa-rotate"></i> ${r.round}. Számlálási Forduló</h5>
+                        <span class="sub-text">Elhasznált szavazatok: ${r.exhaustedBallots || 0}</span>
+                    </div>
+                    <div class="round-tallies-body">
+                        ${talliesHtml}
+                    </div>
+                `;
+                roundsContainer.appendChild(roundCard);
+            });
+        } else {
+            if (emptyHint) emptyHint.classList.remove('hidden');
+            roundsContainer.classList.add('hidden');
+            showNotification({ type: 'info', title: 'TABULÁCIÓ FOLYAMATBAN', message: 'Az urnazárás még nem történt meg, nincs véglegesített IRV jegyzőkönyv.' });
+        }
+    });
+}
+
+function renderParliamentCandidates() {
+    const grid = document.getElementById('parliament-candidates-grid');
+    const badge = document.getElementById('parliament-candidates-count-badge');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+    const candidates = NyxState.parliament.candidates || [];
+    if (badge) badge.textContent = `${candidates.length} jelölt`;
+
+    if (candidates.length === 0) {
+        grid.innerHTML = '<div class="empty-state"><i class="fa-solid fa-users-viewfinder empty-icon"></i><p>Jelenleg nincsenek regisztrált jelöltek.</p></div>';
+        return;
+    }
+
+    candidates.forEach(c => {
+        const card = document.createElement('div');
+        card.className = 'candidate-card card-surface';
+
+        const endorsements = c.endorsements_count || 0;
+        const threshold = 5;
+        const pct = Math.min(100, Math.round((endorsements / threshold) * 100));
+        const isVerified = (c.is_verified === 1 || c.is_verified === true || endorsements >= threshold);
+
+        card.innerHTML = `
+            <div class="cand-card-header">
+                <div>
+                    <h5 class="cand-name">${c.display_name}</h5>
+                    <span class="cand-party-tag">${c.party || 'Független'}</span>
+                </div>
+                ${isVerified ? '<span class="badge badge-success"><i class="fa-solid fa-certificate"></i> HITELESÍTVE</span>' : '<span class="badge badge-warning"><i class="fa-solid fa-clock"></i> ALÁÍRÁSGYŰJTÉS</span>'}
+            </div>
+            <p class="cand-slogan-text">"${c.campaign_slogan || 'Egy élhetőbb és átláthatóbb városért!'}"</p>
+            <div class="cand-platform-box">
+                <span class="platform-label">Választási Program:</span>
+                <p class="platform-text">${c.platform || 'Nincs részletes platform rögzítve.'}</p>
+            </div>
+            <div class="cand-endorsement-status">
+                <div class="endorse-meta">
+                    <span>Támogatói Aláírások:</span>
+                    <strong>${endorsements} / ${threshold}</strong>
+                </div>
+                <div class="endorse-bar-track">
+                    <div class="endorse-bar-fill" style="width: ${pct}%;"></div>
+                </div>
+            </div>
+            <div class="cand-card-footer">
+                <button class="btn btn-secondary btn-sm btn-block cand-endorse-btn" data-id="${c.candidate_id}" ${isVerified ? 'disabled' : ''}>
+                    <i class="fa-solid fa-handshake"></i> ${isVerified ? 'Kvórum Elérve' : 'Jelölt Támogatása (Endorse)'}
+                </button>
+            </div>
+        `;
+
+        card.querySelector('.cand-endorse-btn')?.addEventListener('click', () => endorseParliamentCandidate(c.candidate_id));
+        grid.appendChild(card);
+    });
+}
+
+async function endorseParliamentCandidate(candidateId) {
+    const res = await postNui('parliament:endorseCandidate', { candidateId: candidateId });
+    if (res && res.success) {
+        playWebBeep(740, 'sine', 0.06);
+        const cand = NyxState.parliament.candidates.find(c => c.candidate_id === candidateId);
+        if (cand) {
+            cand.endorsements_count = res.endorsements || ((cand.endorsements_count || 0) + 1);
+            if (res.verified) cand.is_verified = 1;
+        }
+        renderParliamentCandidates();
+        showNotification({ type: 'success', title: 'TÁMOGATÁS RÖGZÍTVE', message: 'Támogatói aláírásod rögzítésre került az állampolgári névjegyzékben.' });
+    } else {
+        showNotification({ type: 'error', title: 'TÁMOGATÁS MEGSZAKADT', message: res?.error || 'Nem sikerült támogatni a jelöltet (esetleg már aláírtad vagy nincs érvényes személyid).' });
+    }
+}
+
+async function submitParliamentCandidacy() {
+    const sessionSelect = document.getElementById('parliament-nomination-session-select');
+    const sessionId = sessionSelect ? parseInt(sessionSelect.value, 10) : null;
+    const nameInput = document.getElementById('parliament-input-cand-name');
+    const partyInput = document.getElementById('parliament-input-cand-party');
+    const sloganInput = document.getElementById('parliament-input-cand-slogan');
+    const platformInput = document.getElementById('parliament-input-cand-platform');
+
+    const name = nameInput ? nameInput.value.trim() : '';
+    const party = partyInput ? partyInput.value.trim() : '';
+    const slogan = sloganInput ? sloganInput.value.trim() : '';
+    const platform = platformInput ? platformInput.value.trim() : '';
+
+    if (!sessionId) {
+        showNotification({ type: 'warning', title: 'HIÁNYZÓ ÜLÉSSZAK', message: 'Válassz ki egy aktív ülésszakot a jelöltséghez!' });
+        return;
+    }
+    if (name.length < 3) {
+        showNotification({ type: 'warning', title: 'ÉRVÉNYTELEN NÉV', message: 'A jelölt neve legalább 3 karakter kell legyen!' });
+        return;
+    }
+    if (party.length < 2) {
+        showNotification({ type: 'warning', title: 'ÉRVÉNYTELEN PÁRT', message: 'Add meg a jelölő párt vagy független státusz megnevezését!' });
+        return;
+    }
+    if (platform.length < 10) {
+        showNotification({ type: 'warning', title: 'RÖVID PLATFORM', message: 'Kérlek fejtsd ki a választási programodat legalább 10 karakterben!' });
+        return;
+    }
+
+    const submitBtn = document.getElementById('parliament-submit-candidacy-btn');
+    lockButtonAction(submitBtn, async () => {
+        const res = await postNui('parliament:registerCandidate', {
+            sessionId: sessionId,
+            displayName: name,
+            party: party,
+            slogan: slogan,
+            platform: platform
+        });
+
+        if (res && res.success) {
+            playWebBeep(880, 'sine', 0.08);
+            if (nameInput) nameInput.value = '';
+            if (partyInput) partyInput.value = '';
+            if (sloganInput) sloganInput.value = '';
+            if (platformInput) platformInput.value = '';
+
+            showNotification({ type: 'success', title: 'JELÖLTSÉG BEJEGYEZVE', message: 'Választási jelöltséged sikeresen regisztrálva. Az aláírásgyűjtés megkezdődött.' });
+            refreshParliamentOverview();
+        } else {
+            showNotification({ type: 'error', title: 'JELÖLÉS MEGSZAKÍTVA', message: res?.error || 'A kaució levonása vagy a regisztráció meghiúsult.' });
+        }
+    });
+}
+
+function renderParliamentLaws() {
+    const searchInput = document.getElementById('parliament-laws-search');
+    const catSelect = document.getElementById('parliament-laws-cat-filter');
+    const searchVal = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const catVal = catSelect ? catSelect.value : 'all';
+
+    const laws = NyxState.parliament.laws || [];
+
+    // Filter
+    const filtered = laws.filter(l => {
+        const matchesCat = (catVal === 'all') || (l.category === catVal);
+        const matchesSearch = !searchVal ||
+            (l.law_id || '').toLowerCase().includes(searchVal) ||
+            (l.name || '').toLowerCase().includes(searchVal) ||
+            (l.description || '').toLowerCase().includes(searchVal);
+        return matchesCat && matchesSearch;
+    });
+
+    // Update KPI counters
+    const kpiTotal = document.getElementById('parliament-kpi-total');
+    const kpiFelonies = document.getElementById('parliament-kpi-felonies');
+    const kpiMisdemeanors = document.getElementById('parliament-kpi-misdemeanors');
+    const kpiInfractions = document.getElementById('parliament-kpi-infractions');
+    const kpiFiscal = document.getElementById('parliament-kpi-fiscal');
+
+    if (kpiTotal) kpiTotal.textContent = laws.length;
+    if (kpiFelonies) kpiFelonies.textContent = laws.filter(l => l.category === 'penal_felony').length;
+    if (kpiMisdemeanors) kpiMisdemeanors.textContent = laws.filter(l => l.category === 'penal_misdemeanor').length;
+    if (kpiInfractions) kpiInfractions.textContent = laws.filter(l => l.category === 'penal_infraction').length;
+    if (kpiFiscal) kpiFiscal.textContent = laws.filter(l => l.category === 'fiscal_policy').length;
+
+    // Table rows
+    const tbody = document.getElementById('parliament-laws-rows');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center sub-text">Nem található egyező jogszabály a megadott szűrők alapján.</td></tr>';
+    } else {
+        filtered.forEach(l => {
+            const tr = document.createElement('tr');
+
+            let badgeHtml = '<span class="badge badge-outline">EGYÉB</span>';
+            if (l.category === 'penal_felony') badgeHtml = '<span class="badge badge-danger">BŰNTETT</span>';
+            else if (l.category === 'penal_misdemeanor') badgeHtml = '<span class="badge badge-warning">VÉTSÉG</span>';
+            else if (l.category === 'penal_infraction') badgeHtml = '<span class="badge badge-info">SZABÁLYSÉRTÉS</span>';
+            else if (l.category === 'fiscal_policy') badgeHtml = '<span class="badge badge-primary">PÉNZÜGY</span>';
+
+            const fineStr = l.tax_rate_default !== undefined
+                ? `${((l.tax_rate_default || 0) * 100).toFixed(1)}% Adókulcs`
+                : `$${Number(l.fine_default || 0).toLocaleString()}`;
+
+            const prisonStr = l.prison_months_default !== undefined ? `${l.prison_months_default} hó` : '-';
+
+            let boundsStr = '-';
+            if (l.fine_min !== undefined && l.fine_max !== undefined) {
+                boundsStr = `$${l.fine_min.toLocaleString()} - $${l.fine_max.toLocaleString()}`;
+            } else if (l.tax_rate_min !== undefined && l.tax_rate_max !== undefined) {
+                boundsStr = `${(l.tax_rate_min * 100).toFixed(1)}% - ${(l.tax_rate_max * 100).toFixed(1)}%`;
+            }
+
+            tr.innerHTML = `
+                <td><code>${l.law_id}</code></td>
+                <td><strong>${l.name}</strong></td>
+                <td>${badgeHtml}</td>
+                <td style="font-family: var(--font-mono); color: var(--accent-amber);">${fineStr}</td>
+                <td style="font-family: var(--font-mono); color: var(--accent-red);">${prisonStr}</td>
+                <td class="sub-text">${boundsStr}</td>
+                <td class="sub-text">${l.updated_at || 'Hatályos'}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Populate bill proposal law dropdown
+    const billLawSelect = document.getElementById('parliament-select-bill-law');
+    if (billLawSelect && billLawSelect.children.length === 0) {
+        laws.forEach(l => {
+            const opt = document.createElement('option');
+            opt.value = l.law_id;
+            opt.textContent = `${l.law_id} - ${l.name}`;
+            billLawSelect.appendChild(opt);
+        });
+        updateParliamentBillBoundsHint();
+    }
+}
+
+function updateParliamentBillBoundsHint() {
+    const billLawSelect = document.getElementById('parliament-select-bill-law');
+    const billFieldSelect = document.getElementById('parliament-select-bill-field');
+    const hintEl = document.getElementById('parliament-bill-bounds-hint');
+    if (!billLawSelect || !billFieldSelect || !hintEl) return;
+
+    const lawId = billLawSelect.value;
+    const field = billFieldSelect.value;
+    const law = (NyxState.parliament.laws || []).find(l => l.law_id === lawId);
+
+    if (!law) {
+        hintEl.textContent = 'Törvényes határ: -';
+        return;
+    }
+
+    if (field === 'fine') {
+        const min = law.fine_min ?? 0;
+        const max = law.fine_max ?? 100000;
+        hintEl.textContent = `Törvényes határ (Bírság): $${min.toLocaleString()} - $${max.toLocaleString()} (Jelenleg: $${(law.fine_default || 0).toLocaleString()})`;
+    } else if (field === 'months') {
+        const min = law.prison_months_min ?? 0;
+        const max = law.prison_months_max ?? 120;
+        hintEl.textContent = `Törvényes határ (Elzárás): ${min} - ${max} hónap (Jelenleg: ${law.prison_months_default || 0} hó)`;
+    } else if (field === 'rate') {
+        const min = law.tax_rate_min ?? 0.00;
+        const max = law.tax_rate_max ?? 0.15;
+        hintEl.textContent = `Törvényes határ (Adókulcs): ${(min * 100).toFixed(1)}% - ${(max * 100).toFixed(1)}% (Jelenleg: ${((law.tax_rate_default || 0) * 100).toFixed(1)}%)`;
+    }
+}
+
+async function submitParliamentBill() {
+    const title = document.getElementById('parliament-input-bill-title')?.value.trim() || '';
+    const desc = document.getElementById('parliament-input-bill-desc')?.value.trim() || '';
+    const lawId = document.getElementById('parliament-select-bill-law')?.value || '';
+    const field = document.getElementById('parliament-select-bill-field')?.value || 'fine';
+    const rawVal = document.getElementById('parliament-input-bill-newval')?.value;
+    const newVal = parseFloat(rawVal);
+
+    if (title.length < 5) {
+        showNotification({ type: 'warning', title: 'HIÁNYZÓ CÍM', message: 'Adj meg egy értelmes törvényjavaslati címet (min 5 karakter)!' });
+        return;
+    }
+    if (desc.length < 10) {
+        showNotification({ type: 'warning', title: 'HIÁNYZÓ INDOKLÁS', message: 'Kérlek részletesen indokold a javaslatot legalább 10 karakterben!' });
+        return;
+    }
+    if (isNaN(newVal)) {
+        showNotification({ type: 'warning', title: 'ÉRVÉNYTELEN ÉRTÉK', message: 'Kérlek adj meg egy érvényes számértéket az új törvényes határhoz!' });
+        return;
+    }
+
+    const submitBtn = document.getElementById('parliament-submit-bill-btn');
+    lockButtonAction(submitBtn, async () => {
+        const res = await postNui('parliament:proposeBill', {
+            billPayload: {
+                title: title,
+                description: desc,
+                category: 'LEGISLATION',
+                field: field,
+                proposedValue: newVal,
+                lawId: lawId
+            }
+        });
+
+        if (res && res.success) {
+            playWebBeep(920, 'sine', 0.1);
+            showNotification({ type: 'success', title: 'TÖRVÉNYJAVASLAT BENYÚJTVA', message: 'A javaslat sikeresen rögzítve és szavazásra bocsátva.' });
+            document.getElementById('parliament-input-bill-title').value = '';
+            document.getElementById('parliament-input-bill-desc').value = '';
+            document.getElementById('parliament-input-bill-newval').value = '';
+            refreshParliamentOverview();
+        } else {
+            showNotification({ type: 'error', title: 'BENYÚJTÁS SIKERTELEN', message: res?.error || 'A javaslat elutasítva. Ellenőrizd a letétet és a törvényes határokat!' });
+        }
+    });
+}
+
+function renderParliamentAmendments() {
+    const container = document.getElementById('parliament-recent-amendments-list');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const amendments = NyxState.parliament.amendments || [];
+    if (amendments.length === 0) {
+        container.innerHTML = '<div class="empty-state-mini sub-text">Nincsenek friss módosítások rögzítve.</div>';
+        return;
+    }
+
+    amendments.slice(0, 5).forEach(a => {
+        const item = document.createElement('div');
+        item.className = 'amendment-log-item';
+        item.innerHTML = `
+            <div class="amendment-header-line">
+                <span class="amendment-law-id"><code>${a.law_id}</code></span>
+                <span class="amendment-date sub-text">${a.enacted_at || ''}</span>
+            </div>
+            <div class="amendment-title"><strong>${a.enacted_by_session_title || 'Parlamenti Törvénycsomag'}</strong></div>
+            <div class="amendment-diff-line">
+                <span>${a.field.toUpperCase()}:</span>
+                <del>${a.old_value}</del> <i class="fa-solid fa-arrow-right-long"></i> <ins>${a.new_value}</ins>
+            </div>
+        `;
+        container.appendChild(item);
+    });
+}
+
+function renderParliamentPetitions() {
+    const container = document.getElementById('parliament-petitions-list');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const petitions = NyxState.parliament.petitions || [];
+    if (petitions.length === 0) {
+        container.innerHTML = '<div class="empty-state-mini sub-text">Jelenleg nincs aktív visszahívási kezdeményezés.</div>';
+        return;
+    }
+
+    petitions.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'petition-card';
+
+        const sigs = p.signatures_count || 0;
+        const thresh = p.threshold || 5;
+        const isMet = sigs >= thresh;
+
+        item.innerHTML = `
+            <div class="petition-header-row">
+                <span class="petition-office-title"><strong>${(p.office_id || 'TISZTSÉG').toUpperCase()}</strong></span>
+                <span class="badge ${isMet ? 'badge-danger' : 'badge-warning'}">${isMet ? 'KÜSZÖB ELÉRVE' : `${sigs}/${thresh} ALÁÍRÁS`}</span>
+            </div>
+            <p class="petition-reason-text">"${p.reason || 'Nincs részletes indoklás.'}"</p>
+            <div class="petition-footer-row">
+                <span class="sub-text">Kezdeményező: <code>${p.sponsor_citizen_id || '-'}</code></span>
+                <button class="btn btn-secondary btn-sm petition-sign-btn" data-id="${p.petition_id}" ${isMet ? 'disabled' : ''}>
+                    <i class="fa-solid fa-file-signature"></i> ${isMet ? 'Népszavazás Kiírva' : 'Aláírás'}
+                </button>
+            </div>
+        `;
+
+        item.querySelector('.petition-sign-btn')?.addEventListener('click', () => signParliamentPetition(p.petition_id));
+        container.appendChild(item);
+    });
+}
+
+async function signParliamentPetition(petitionId) {
+    const res = await postNui('parliament:signRecallPetition', { petitionId: petitionId });
+    if (res && res.success) {
+        playWebBeep(780, 'sine', 0.05);
+        showNotification({ type: 'success', title: 'ALÁÍRÁS SIKERES', message: 'Támogattad a tisztviselő visszahívására irányuló kezdeményezést.' });
+        refreshParliamentOverview();
+    } else {
+        showNotification({ type: 'error', title: 'ALÁÍRÁS SIKERTELEN', message: res?.error || 'Már aláírtad ezt a petíciót vagy érvénytelen állampolgár státusz.' });
+    }
+}
+
+function openParliamentRecallModal() {
+    const modal = document.getElementById('parliament-submodal-recall');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeParliamentRecallModal() {
+    const modal = document.getElementById('parliament-submodal-recall');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function submitParliamentRecall() {
+    const officeSelect = document.getElementById('parliament-recall-office-select');
+    const reasonInput = document.getElementById('parliament-recall-reason-input');
+
+    const office = officeSelect ? officeSelect.value : 'mayor';
+    const reason = reasonInput ? reasonInput.value.trim() : '';
+
+    if (reason.length < 10) {
+        showNotification({ type: 'warning', title: 'RÖVID INDOKLÁS', message: 'Kérlek indokold a visszahívást legalább 10 karakterben!' });
+        return;
+    }
+
+    const submitBtn = document.getElementById('parliament-recall-submit-btn');
+    lockButtonAction(submitBtn, async () => {
+        const res = await postNui('parliament:fileRecallPetition', {
+            officeId: office,
+            reason: reason
+        });
+
+        if (res && res.success) {
+            playWebBeep(920, 'sine', 0.1);
+            showNotification({ type: 'success', title: 'PETÍCIÓ MEGNYITVA', message: 'Visszahívási petíció hivatalosan bejegyezve az aláírásgyűjtéshez.' });
+            if (reasonInput) reasonInput.value = '';
+            closeParliamentRecallModal();
+            refreshParliamentOverview();
+        } else {
+            showNotification({ type: 'error', title: 'PETÍCIÓ SIKERTELEN', message: res?.error || 'Nem sikerült elindítani a petíciót.' });
+        }
+    });
 }
 
 // 13. Global NUI Envelope Dispatcher
@@ -2599,6 +3527,13 @@ window.addEventListener('message', (event) => {
         openCourtTerminal(packet.payload);
     } else if (action === 'COURT_TERMINAL_CLOSE') {
         closeCourtTerminal();
+    }
+
+    // Parliamentary Ranked-Choice Voting & Legislation Terminal
+    else if (action === 'PARLIAMENT_UI_OPEN') {
+        openParliamentUI(packet.payload);
+    } else if (action === 'PARLIAMENT_UI_CLOSE') {
+        closeParliamentUI();
     }
 });
 
@@ -3007,6 +3942,41 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('court-subpoena-disclosure')?.classList.add('hidden');
     });
 
+    // Parliamentary Voting & Legislation Listeners
+    document.getElementById('parliament-close-btn')?.addEventListener('click', closeParliamentUI);
+
+    document.querySelectorAll('.parliament-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.getAttribute('data-tab');
+            if (tab) setParliamentTab(tab);
+        });
+    });
+
+    document.getElementById('parliament-session-select')?.addEventListener('change', (e) => {
+        NyxState.parliament.selectedSessionId = parseInt(e.target.value, 10);
+        NyxState.parliament.rankedCandidateIds = [];
+        const proofBanner = document.getElementById('parliament-cast-proof-banner');
+        if (proofBanner) proofBanner.classList.add('hidden');
+        renderParliamentOverviewData();
+    });
+
+    document.getElementById('parliament-cast-ballot-btn')?.addEventListener('click', castParliamentBallot);
+    document.getElementById('parliament-verify-receipt-btn')?.addEventListener('click', verifyParliamentReceipt);
+    document.getElementById('parliament-refresh-tabulation-btn')?.addEventListener('click', refreshParliamentTabulation);
+
+    document.getElementById('parliament-submit-candidacy-btn')?.addEventListener('click', submitParliamentCandidacy);
+    document.getElementById('parliament-btn-open-recall')?.addEventListener('click', openParliamentRecallModal);
+    document.getElementById('parliament-submodal-recall-close')?.addEventListener('click', closeParliamentRecallModal);
+    document.getElementById('parliament-recall-cancel-btn')?.addEventListener('click', closeParliamentRecallModal);
+    document.getElementById('parliament-recall-submit-btn')?.addEventListener('click', submitParliamentRecall);
+
+    document.getElementById('parliament-laws-search')?.addEventListener('input', renderParliamentLaws);
+    document.getElementById('parliament-laws-cat-filter')?.addEventListener('change', renderParliamentLaws);
+
+    document.getElementById('parliament-select-bill-law')?.addEventListener('change', updateParliamentBillBoundsHint);
+    document.getElementById('parliament-select-bill-field')?.addEventListener('change', updateParliamentBillBoundsHint);
+    document.getElementById('parliament-submit-bill-btn')?.addEventListener('click', submitParliamentBill);
+
     // Dialog Confirm & Cancel
     document.getElementById('dialog-confirm-btn')?.addEventListener('click', () => closeDialog(true));
     document.getElementById('dialog-cancel-btn')?.addEventListener('click', () => closeDialog(false));
@@ -3050,6 +4020,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const parliamentRecallSubmodal = document.getElementById('parliament-submodal-recall');
+            if (parliamentRecallSubmodal && !parliamentRecallSubmodal.classList.contains('hidden')) {
+                parliamentRecallSubmodal.classList.add('hidden');
+                return;
+            }
+
             const dialogOverlay = document.getElementById('dialog-overlay');
             if (dialogOverlay && !dialogOverlay.classList.contains('hidden')) {
                 closeDialog(false);
@@ -3076,6 +4052,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 closeCourtTerminal();
+                return;
+            }
+            if (NyxState.parliament.isOpen) {
+                closeParliamentUI();
                 return;
             }
             if (NyxState.mdt.isOpen) {
@@ -3235,6 +4215,14 @@ function initBrowserDevMode() {
             closeCourtTerminal();
         } else {
             openCourtTerminal({ isJudge: true, activeTab: 'evidence' });
+        }
+    });
+
+    document.getElementById('dev-btn-parliament')?.addEventListener('click', () => {
+        if (NyxState.parliament.isOpen) {
+            closeParliamentUI();
+        } else {
+            openParliamentUI({ activeTab: 'ballot' });
         }
     });
 

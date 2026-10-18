@@ -22,6 +22,7 @@
             <button id="dev-btn-treasury"><i class="fa-solid fa-scale-balanced"></i> Treasury</button>
             <button id="dev-btn-faction"><i class="fa-solid fa-building-user"></i> Corp/Union</button>
             <button id="dev-btn-court"><i class="fa-solid fa-scale-balanced"></i> Court</button>
+            <button id="dev-btn-parliament"><i class="fa-solid fa-landmark"></i> Parliament</button>
             <button id="dev-btn-freight"><i class="fa-solid fa-truck"></i> Freight</button>
             <button id="dev-btn-interact"><i class="fa-solid fa-crosshairs"></i> Target</button>
             <button id="dev-btn-place"><i class="fa-solid fa-arrows-up-down-left-right"></i> Place</button>
@@ -1119,6 +1120,312 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================
+             8D. PARLIAMENTARY RANKED-CHOICE VOTING & LEGISLATION UI (`nyx_parliament`)
+             ================================================================ -->
+        <div id="parliament-overlay" class="modal-backdrop hidden">
+            <div class="modal-dialog parliament-dialog">
+                <div class="modal-header parliament-header">
+                    <div class="header-left">
+                        <i class="fa-solid fa-landmark icon-accent cyan"></i>
+                        <div>
+                            <div class="header-title-row">
+                                <h3 id="parliament-header-title">San Andreas Városi Közgyűlés & Törvényhozás</h3>
+                                <span id="parliament-role-badge" class="badge">POLGÁR</span>
+                                <span id="parliament-session-badge" class="badge badge-outline">NINCS AKTÍV SZAVAZÁS</span>
+                            </div>
+                            <span class="sub-heading">Decentralized Civic Parliament, Instant-Runoff Voting (IRV) & Live Penal Code Reader</span>
+                        </div>
+                    </div>
+                    <div class="parliament-header-kpi">
+                        <span class="kpi-micro-label">PARLAMENTI STÁTUSZ</span>
+                        <span id="parliament-header-status" class="kpi-micro-val">ÜLÉSSZAK</span>
+                    </div>
+                    <button id="parliament-close-btn" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <div class="parliament-nav-tabs">
+                    <button class="parliament-tab active" data-tab="ballot" id="parliament-tab-btn-ballot"><i class="fa-solid fa-check-to-slot"></i> Rangsorolt Szavazólap & IRV Urna</button>
+                    <button class="parliament-tab" data-tab="candidates" id="parliament-tab-btn-candidates"><i class="fa-solid fa-user-tie"></i> Jelöltállítás & Támogatói Portál</button>
+                    <button class="parliament-tab" data-tab="laws" id="parliament-tab-btn-laws"><i class="fa-solid fa-book-bookmark"></i> Hatályos Btk. & Törvénytár</button>
+                </div>
+
+                <div class="modal-body parliament-body">
+                    <!-- Tab 1: Interactive Ranked-Choice Ballot & IRV Tabulation -->
+                    <div id="parliament-tab-ballot" class="parliament-tab-pane">
+                        <div class="parliament-session-bar card-surface">
+                            <div class="session-bar-left">
+                                <label for="parliament-session-select"><i class="fa-solid fa-calendar-check"></i> Választási Ülésszak:</label>
+                                <select id="parliament-session-select" class="modal-select">
+                                    <!-- Dynamic active sessions -->
+                                </select>
+                                <span id="parliament-session-type-badge" class="badge badge-primary">ELECTION</span>
+                                <span id="parliament-session-quorum-badge" class="badge badge-outline">Kvórum: 0/5</span>
+                            </div>
+                            <div class="session-bar-right">
+                                <input type="text" id="parliament-receipt-input" placeholder="NYX-BALLOT-..." class="modal-input search-input">
+                                <button id="parliament-verify-receipt-btn" class="btn btn-secondary btn-sm"><i class="fa-solid fa-shield-check"></i> Nyugta Ellenőrzése</button>
+                            </div>
+                        </div>
+
+                        <!-- Verification Result Proof Banner -->
+                        <div id="parliament-receipt-verify-banner" class="verification-banner hidden"></div>
+
+                        <div class="parliament-ballot-layout">
+                            <!-- Left: Interactive Ballot Ranking Form -->
+                            <div class="ballot-ranking-col card-surface">
+                                <div class="card-header-row">
+                                    <div>
+                                        <h4 class="card-title"><i class="fa-solid fa-list-ol"></i> Rangsorolt Preferenciás Szavazólap</h4>
+                                        <span class="card-subtitle">Állítsd a jelölteket preferenciád sorrendjébe a fel/le gombokkal.</span>
+                                    </div>
+                                    <span id="parliament-ballot-count-badge" class="badge badge-success">0 rangsorolva</span>
+                                </div>
+
+                                <div id="parliament-ballot-candidate-list" class="ballot-candidates-list">
+                                    <!-- Dynamic draggable/ordered candidate rows -->
+                                </div>
+
+                                <div class="ballot-actions-row">
+                                    <button id="parliament-cast-ballot-btn" class="btn btn-primary btn-block"><i class="fa-solid fa-envelope-open-text"></i> Titkos Preferenciás Szavazat Leadása</button>
+                                </div>
+
+                                <!-- Cast Ballot Receipt Proof -->
+                                <div id="parliament-cast-proof-banner" class="verification-banner hidden">
+                                    <i class="fa-solid fa-circle-check"></i>
+                                    <div>
+                                        <strong>Szavazat Sikeresen Hitelesítve!</strong>
+                                        <div class="proof-hash-line">Nyugtakód: <code id="parliament-proof-hash">--</code></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right: Instant-Runoff Tabulation Audit -->
+                            <div class="ballot-tabulation-col card-surface">
+                                <div class="card-header-row">
+                                    <div>
+                                        <h4 class="card-title"><i class="fa-solid fa-chart-pie"></i> Auditált Eredményszámlálás (IRV Audit)</h4>
+                                        <span class="card-subtitle">Fordulónkénti kiesés, szavazatátcsoportosítás és győztes kihirdetés.</span>
+                                    </div>
+                                    <button id="parliament-refresh-tabulation-btn" class="btn btn-secondary btn-sm" title="Frissítés"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                </div>
+
+                                <div id="parliament-tabulation-empty-hint" class="empty-state">
+                                    <i class="fa-solid fa-chart-column empty-icon"></i>
+                                    <p>Ez az ülésszak még aktív. A számlálási jegyzőkönyv az urnazárás és feldolgozás után jelenik meg.</p>
+                                </div>
+
+                                <div id="parliament-tabulation-rounds-container" class="tabulation-rounds-list hidden">
+                                    <!-- Dynamic round tally cards -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Candidate Endorsements & Petitions Portal -->
+                    <div id="parliament-tab-candidates" class="parliament-tab-pane hidden">
+                        <div class="candidates-dashboard-layout">
+                            <!-- Left: Registered Candidates List -->
+                            <div class="candidates-list-col card-surface">
+                                <div class="card-header-row">
+                                    <div>
+                                        <h4 class="card-title"><i class="fa-solid fa-id-card-clip"></i> Nyilvántartásba Vett Jelöltek</h4>
+                                        <span class="card-subtitle">Állampolgári jelöltek, pártok, platformok és aláírásgyűjtési státusz.</span>
+                                    </div>
+                                    <span id="parliament-candidates-count-badge" class="badge badge-outline">0 jelölt</span>
+                                </div>
+
+                                <div id="parliament-candidates-grid" class="candidates-roster-grid">
+                                    <!-- Dynamic candidate cards -->
+                                </div>
+                            </div>
+
+                            <!-- Right: Candidacy Nomination Form & Recall Petitions -->
+                            <div class="candidates-action-col">
+                                <!-- Candidate Nomination Form -->
+                                <div class="card-surface candidate-form-card">
+                                    <h4 class="card-title"><i class="fa-solid fa-feather-pointed"></i> Választási Jelöltség Bejelentése</h4>
+                                    <span class="card-subtitle">Hivatalos indulás képviselői vagy polgármesteri tisztségért ($2,500 letét).</span>
+
+                                    <div class="nomination-form">
+                                        <div class="form-group">
+                                            <label>Célzott Választási Ülésszak</label>
+                                            <select id="parliament-nomination-session-select" class="modal-select">
+                                                <!-- Dynamic election sessions -->
+                                            </select>
+                                        </div>
+                                        <div class="form-row-2">
+                                            <div class="form-group">
+                                                <label>Jelölt Neve</label>
+                                                <input type="text" id="parliament-input-cand-name" placeholder="Pl. Elena Vance" class="modal-input" maxlength="64">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Párt / Szervezet</label>
+                                                <input type="text" id="parliament-input-cand-party" placeholder="Pl. Polgári Szövetség / Független" class="modal-input" maxlength="64">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Kampány Slogan</label>
+                                            <input type="text" id="parliament-input-cand-slogan" placeholder="Pl. Egy élhető és biztonságos városért!" class="modal-input" maxlength="128">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Választási Program / Platform (min 10 betű)</label>
+                                            <textarea id="parliament-input-cand-platform" rows="3" placeholder="Írd le a céljaidat, adópolitikai vagy közigazgatási reformterveidet..." class="modal-input"></textarea>
+                                        </div>
+                                        <button id="parliament-submit-candidacy-btn" class="btn btn-primary btn-block"><i class="fa-solid fa-stamp"></i> Jelöltség Hivatalos Benyújtása ($2,500 Kaució)</button>
+                                    </div>
+                                </div>
+
+                                <!-- Recall Petitions Card -->
+                                <div class="card-surface recall-petitions-card">
+                                    <div class="card-header-row">
+                                        <div>
+                                            <h4 class="card-title"><i class="fa-solid fa-user-xmark"></i> Visszahívási Kérvények (Recall Petitions)</h4>
+                                            <span class="card-subtitle">Elnökök és tisztviselők elmozdítását kezdeményező népi petíciók.</span>
+                                        </div>
+                                        <button id="parliament-btn-open-recall" class="btn btn-secondary btn-sm"><i class="fa-solid fa-plus"></i> Új Petíció</button>
+                                    </div>
+
+                                    <div id="parliament-petitions-list" class="petitions-list">
+                                        <!-- Dynamic recall petition cards -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Live Penal Code & Statute Amendments -->
+                    <div id="parliament-tab-laws" class="parliament-tab-pane hidden">
+                        <div class="laws-header-bar card-surface">
+                            <div class="filter-controls-row">
+                                <input type="text" id="parliament-laws-search" placeholder="Keresés törvénycikk, bűncselekmény vagy kulcsszó alapján..." class="modal-input search-input">
+                                <select id="parliament-laws-cat-filter" class="modal-select">
+                                    <option value="all">Minden kategória</option>
+                                    <option value="penal_felony">Bűntett (Felony)</option>
+                                    <option value="penal_misdemeanor">Vétség (Misdemeanor)</option>
+                                    <option value="penal_infraction">Szabálysértés (Infraction)</option>
+                                    <option value="fiscal_policy">Közpénzügy & Adók (Fiscal)</option>
+                                    <option value="zoning">Területrendezés (Zoning)</option>
+                                </select>
+                            </div>
+                            <div class="laws-kpi-row">
+                                <div class="kpi-pill"><span class="kpi-tag">ÖSSZES:</span> <strong id="parliament-kpi-total">0</strong></div>
+                                <div class="kpi-pill danger"><span class="kpi-tag">BŰNTETT:</span> <strong id="parliament-kpi-felonies">0</strong></div>
+                                <div class="kpi-pill warning"><span class="kpi-tag">VÉTSÉG:</span> <strong id="parliament-kpi-misdemeanors">0</strong></div>
+                                <div class="kpi-pill info"><span class="kpi-tag">SZABÁLYSÉRTÉS:</span> <strong id="parliament-kpi-infractions">0</strong></div>
+                                <div class="kpi-pill primary"><span class="kpi-tag">PÉNZÜGY:</span> <strong id="parliament-kpi-fiscal">0</strong></div>
+                            </div>
+                        </div>
+
+                        <div class="laws-dashboard-layout">
+                            <!-- Left: Comprehensive Statutes Table -->
+                            <div class="laws-table-col card-surface">
+                                <div class="table-container laws-table-wrapper">
+                                    <table class="nyx-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Cikkely ID</th>
+                                                <th>Megnevezés / Tényállás</th>
+                                                <th>Kategória</th>
+                                                <th>Bírság ($)</th>
+                                                <th>Börtön (Hó)</th>
+                                                <th>Törvényes Keretek (Min - Max)</th>
+                                                <th>Utolsó Módosítás</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="parliament-laws-rows">
+                                            <!-- Dynamic statutes -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Right: Recent Ratified Amendments & Bill Proposal -->
+                            <div class="laws-action-col">
+                                <!-- Recent Enacted Amendments Ticker -->
+                                <div class="card-surface recent-amendments-card">
+                                    <h4 class="card-title"><i class="fa-solid fa-scroll"></i> Nemrég Hatályba Lépett Módosítások</h4>
+                                    <span class="card-subtitle">A parlament által megszavazott és ratifikált törvénycikkek.</span>
+                                    <div id="parliament-recent-amendments-list" class="amendments-history-list">
+                                        <!-- Dynamic amendment logs -->
+                                    </div>
+                                </div>
+
+                                <!-- Legislative Bill Proposal Panel -->
+                                <div class="card-surface bill-form-card">
+                                    <h4 class="card-title"><i class="fa-solid fa-file-pen"></i> Törvényjavaslat Benyújtása</h4>
+                                    <span class="card-subtitle">Hivatalos jogszabály-módosítás beterjesztése népszavazásra ($5,000 letét).</span>
+
+                                    <div class="bill-form">
+                                        <div class="form-group">
+                                            <label>Törvényjavaslat Címe</label>
+                                            <input type="text" id="parliament-input-bill-title" placeholder="Pl. Közlekedésbiztonsági Reformtörvény" class="modal-input" maxlength="96">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Részletes Indoklás</label>
+                                            <textarea id="parliament-input-bill-desc" rows="2" placeholder="Miért szükséges a módosítás? Milyen hatása lesz a gazdaságra?" class="modal-input"></textarea>
+                                        </div>
+                                        <div class="form-row-2">
+                                            <div class="form-group">
+                                                <label>Módosítandó Törvény</label>
+                                                <select id="parliament-select-bill-law" class="modal-select">
+                                                    <!-- Dynamic laws options -->
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Módosítandó Érték / Mező</label>
+                                                <select id="parliament-select-bill-field" class="modal-select">
+                                                    <option value="fine">Bírság (Fine $)</option>
+                                                    <option value="months">Elzárás (Months)</option>
+                                                    <option value="rate">Adókulcs (Rate 0.00 - 0.15)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Javasolt Új Érték</label>
+                                            <input type="number" step="any" id="parliament-input-bill-newval" placeholder="Pl. 2000 vagy 0.05" class="modal-input">
+                                            <span id="parliament-bill-bounds-hint" class="sub-text">Törvényes határ: -</span>
+                                        </div>
+                                        <button id="parliament-submit-bill-btn" class="btn btn-primary btn-block"><i class="fa-solid fa-gavel"></i> Törvényjavaslat Beterjesztése ($5,000 Kaució)</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submodal: Recall Petition Creation Dialog -->
+        <div id="parliament-submodal-recall" class="modal-backdrop hidden">
+            <div class="modal-dialog submodal-dialog">
+                <div class="modal-header">
+                    <h4><i class="fa-solid fa-triangle-exclamation icon-accent amber"></i> Visszahívási Petíció Indítása</h4>
+                    <button id="parliament-submodal-recall-close" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <p class="submodal-instruction">Visszahívási petíció indításához legalább 5 állampolgári aláírás szükséges. Ha a küszöb teljesül, automatikus népszavazás íródik ki a tisztviselő elmozdításáról.</p>
+                    <div class="form-group">
+                        <label>Visszahívandó Tisztség</label>
+                        <select id="parliament-recall-office-select" class="modal-select">
+                            <option value="mayor">City Mayor (Polgármester)</option>
+                            <option value="chief_magistrate">Chief Magistrate (Főbíró)</option>
+                            <option value="district_commissioner">District Commissioner (Körzeti Megbízott)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Visszahívás Indoklása (min 10 karakter)</label>
+                        <textarea id="parliament-recall-reason-input" rows="4" placeholder="Indokold meg, hogy a tisztviselő miért vesztette el a választók bizalmát..." class="modal-input"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="parliament-recall-cancel-btn" class="btn btn-secondary">Mégse</button>
+                    <button id="parliament-recall-submit-btn" class="btn btn-danger"><i class="fa-solid fa-user-xmark"></i> Petíció Hivatalos Indítása</button>
                 </div>
             </div>
         </div>

@@ -74,3 +74,19 @@ end)
 exports("HydrateLaws", function()
     return Nyx.Parliament.HydrateLaws()
 end)
+
+exports("GetOverview", function(src)
+    return exports['nyx_core']:TriggerRPCAwait and exports['nyx_core']:TriggerRPCAwait("parliament:getOverview")
+end)
+
+exports("GetAmendmentAuditLogs", function(filterLawId)
+    local query = "SELECT * FROM `nyx_parliament_amendment_audit`"
+    local params = {}
+    if filterLawId and #filterLawId > 0 then
+        query = query .. " WHERE `law_id` = ?"
+        params[#params + 1] = filterLawId
+    end
+    query = query .. " ORDER BY `enacted_at` DESC LIMIT 50"
+    return MySQL.query.await(query, params) or {}
+end)
+

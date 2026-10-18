@@ -9,13 +9,29 @@ Nyx = Nyx or {}
 Nyx.Parliament = Nyx.Parliament or {}
 
 -- 1. Register Candidate for an Election Session
-function Nyx.Parliament.RegisterCandidate(src, sessionId, displayName, party, platform)
+function Nyx.Parliament.RegisterCandidate(src, sessionId, displayName, party, platform, slogan)
     local player = exports['nyx_core']:GetPlayer(src)
     if not player then return { success = false, error = "UNAUTHORIZED" } end
 
-    if type(sessionId) ~= "string" or not displayName or #displayName < 2 then
-        return { success = false, error = "INVALID_CANDIDATE_DATA" }
+    if type(sessionId) ~= "string" then
+        return { success = false, error = "INVALID_SESSION_ID" }
     end
+
+    local okVal, sanitized, valErr = Nyx.ParliamentUI.ValidateCandidatePayload({
+        displayName = displayName,
+        party = party,
+        platform = platform,
+        slogan = slogan
+    })
+
+    if not okVal then
+        return { success = false, error = valErr or "INVALID_CANDIDATE_DATA" }
+    end
+
+    displayName = sanitized.displayName
+    party = sanitized.party
+    platform = sanitized.platform
+    slogan = sanitized.slogan
 
     -- Verify session exists and is accepting candidates
     local session = MySQL.single.await([[
@@ -89,14 +105,15 @@ function Nyx.Parliament.RegisterCandidate(src, sessionId, displayName, party, pl
 
     local inserted = MySQL.insert.await([[
         INSERT INTO `nyx_parliament_candidates`
-            (`candidate_id`, `session_id`, `citizen_id`, `display_name`, `party_affiliation`, `platform_summary`, `collateral_deposited`, `status`)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (`candidate_id`, `session_id`, `citizen_id`, `display_name`, `party_affiliation`, `campaign_slogan`, `platform_summary`, `collateral_deposited`, `status`)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ]], {
         candidateId,
         sessionId,
         citId,
         displayName,
         partyAffiliation,
+        slogan or "",
         platformSummary,
         collateral,
         initialStatus
@@ -384,7 +401,7 @@ end
 
 Nyx.RPC.Register("parliament:registerCandidate", function(src, payload)
     if type(payload) ~= "table" then return { success = false, error = "INVALID_PAYLOAD" } end
-    return Nyx.Parliament.RegisterCandidate(src, payload.sessionId, payload.displayName, payload.party, payload.platform)
+    return Nyx.Parliament.RegisterCandidate(src, payload.sessionId, payload.displayName, payload.party, payload.platform, payload.slogan)
 end)
 
 Nyx.RPC.Register("parliament:endorseCandidate", function(src, candidateId)
@@ -395,7 +412,7 @@ Nyx.RPC.Register("parliament:getCandidates", function(src, sessionId)
     if not sessionId then return {} end
     local rows = MySQL.query.await([[
         SELECT `candidate_id`, `session_id`, `citizen_id`, `display_name`, `party_affiliation`,
-               `platform_summary`, `collateral_deposited`, `endorsements_count`, `status`, `created_at`
+               `campaign_slogan`, `platform_summary`, `collateral_deposited`, `endorsements_count`, `status`, `created_at`
         FROM `nyx_parliament_candidates`
         WHERE `session_id` = ?
         ORDER BY `endorsements_count` DESC, `created_at` ASC
