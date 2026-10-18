@@ -23,7 +23,8 @@ shared_scripts {
     'shared/pallets.lua',
     'shared/assembly.lua',
     'shared/contracts.lua',
-    'shared/warehouses.lua'
+    'shared/warehouses.lua',
+    'shared/market_monitor.lua'
 }
 
 server_scripts {
@@ -36,6 +37,7 @@ server_scripts {
     'server/shelves.lua',
     'server/contracts.lua',
     'server/warehouses.lua',
+    'server/market_monitor.lua',
     'server/exports.lua'
 }
 
@@ -45,6 +47,7 @@ client_scripts {
     'client/pallets.lua',
     'client/contracts.lua',
     'client/warehouses.lua',
+    'client/market_monitor.lua',
     'client/main.lua',
     'client/exports.lua'
 }

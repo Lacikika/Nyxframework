@@ -97,3 +97,21 @@ end)
 exports("GetFacility", function(facilityId)
     return Nyx.Logistics.Facilities and Nyx.Logistics.Facilities[facilityId]
 end)
+
+-- 3D Warehouse Matrix & Elastic Market Monitor
+exports("GetWarehouseMatrixOverview", function(warehouseId)
+    return Nyx.Logistics.GetWarehouseMatrixOverview and Nyx.Logistics.GetWarehouseMatrixOverview(warehouseId)
+end)
+
+exports("GetMarketMonitorOverview", function(zoneId)
+    return Nyx.Logistics.GetMarketMonitorOverview and Nyx.Logistics.GetMarketMonitorOverview(zoneId)
+end)
+
+exports("GetHaulerArbitrageRoutes", function(src)
+    return Nyx.Logistics.GetHaulerArbitrageRoutes and Nyx.Logistics.GetHaulerArbitrageRoutes(src)
+end)
+
+exports("BookHaulerDispatch", function(src, payload)
+    return Nyx.Logistics.BookHaulerDispatch and Nyx.Logistics.BookHaulerDispatch(src, payload)
+end)
+

@@ -35,5 +35,6 @@
   "034_factions_corporate_ui_and_rbac_audit.sql",
   "035_judiciary_courtroom_terminal_and_evidence_audit.sql",
   "036_parliament_voting_ui_and_legislation_audit.sql",
-  "037_property_blind_auction_and_stewardship_portal.sql"
+  "037_property_blind_auction_and_stewardship_portal.sql",
+  "038_warehouse_matrix_and_elastic_market_monitor.sql"
 ]

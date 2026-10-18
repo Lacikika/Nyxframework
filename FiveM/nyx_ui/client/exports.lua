@@ -60,6 +60,16 @@ exports('ClosePropertyPortal', function()
     Nyx.UI.Send("property", "PROPERTY_PORTAL_CLOSE", {})
 end)
 
+exports('OpenMarketMonitorUI', function(data)
+    Nyx.UI.SetFocus(true, true)
+    Nyx.UI.Send("logistics", "LOGISTICS_MATRIX_OPEN", data or {})
+end)
+
+exports('CloseMarketMonitorUI', function()
+    Nyx.UI.SetFocus(false, false)
+    Nyx.UI.Send("logistics", "LOGISTICS_MATRIX_CLOSE", {})
+end)
+
 exports('OpenView', function(viewName, data)
     if viewName == "faction_commerce_terminal" or viewName == "corporate" or viewName == "factions" or viewName == "union" then
         Nyx.UI.SetFocus(true, true)
@@ -76,6 +86,10 @@ exports('OpenView', function(viewName, data)
     elseif viewName == "property" or viewName == "properties" or viewName == "realestate" or viewName == "auction" or viewName == "auctions" or viewName == "stewardship" then
         Nyx.UI.SetFocus(true, true)
         Nyx.UI.Send("property", "PROPERTY_PORTAL_OPEN", data or {})
+        return true
+    elseif viewName == "market" or viewName == "market_monitor" or viewName == "warehouse_matrix" or viewName == "matrix" or viewName == "logistics_monitor" then
+        Nyx.UI.SetFocus(true, true)
+        Nyx.UI.Send("logistics", "LOGISTICS_MATRIX_OPEN", data or {})
         return true
     elseif viewName == "freight_board" then
         Nyx.UI.SetFocus(true, true)

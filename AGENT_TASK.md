@@ -54,7 +54,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Property Blind-Auction & Stewardship Portal (`nyx_ui` & `nyx_properties`)**
   - **Implementation:** Real estate web application supporting blind-auction foreclosure bidding, tax delinquency settlements, and proxy stewardship assignments.
 
-- [ ] **Feature: 3D Warehouse Matrix & Elastic Market Monitor (`nyx_ui` & `nyx_logistics`)**
+- [x] **Feature: 3D Warehouse Matrix & Elastic Market Monitor (`nyx_ui` & `nyx_logistics`)**
   - **Implementation:** Interactive 3D shelf visualizer for warehouse container matrices and real-time regional supply/demand pricing charts for logistics haulers.
 
 - [ ] **Feature: Mechanical Diagnostics & Civic Impound Terminal (`nyx_ui` & `nyx_vehicles`)**
@@ -107,6 +107,42 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: 3D Warehouse Matrix & Elastic Market Monitor (`nyx_ui` & `nyx_logistics`)**
+  - **Database Migration (`038_warehouse_matrix_and_elastic_market_monitor.sql`, `index.json`)**:
+    - Extended `nyx_logistics_shelf_nodes` table with `slot_status` (ENUM 'empty', 'occupied', 'reserved', 'damaged' DEFAULT 'empty'), `temperature_zone` (ENUM 'ambient', 'refrigerated', 'cryo', 'hazardous' DEFAULT 'ambient'), `reserved_until` (INT UNSIGNED NULL), and `reserved_by_citizen_id` (VARCHAR(64) NULL).
+    - Created `nyx_logistics_hauler_dispatches` table (`dispatch_id`, `route_id`, `citizen_id`, `commodity`, `units`, `origin_warehouse_id`, `destination_zone_id`, `origin_unit_cost`, `destination_unit_price`, `transport_fee`, `expected_payout`, `status`, `booked_at`, `completed_at`, `cancelled_at`).
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 38) and mirrored to `FiveM/nyx_logistics/sql/migrations/`.
+  - **Shared Pure Lua 5.4 Logic Engine (`nyx_logistics/shared/market_monitor.lua`, `fxmanifest.lua`)**:
+    - Implemented `Nyx.LogisticsMarket.ProjectIsometricSlot` providing pure 3D-to-2D isometric coordinate mapping (`screenX`, `screenY`, `depth`, `zIndex`) for warehouse racks.
+    - Implemented `Nyx.LogisticsMarket.ComputeElasticPrice` calculating dynamic pricing with exponential scarcity multipliers clamped to `[0.25x, 4.0x]`.
+    - Implemented `Nyx.LogisticsMarket.CalculateHaulerArbitrage` calculating origin-destination spreads, fuel/toll distance penalties, net profit, and ROI%.
+    - Implemented `Nyx.LogisticsMarket.FormatHealthBadge` providing 4-tier inventory taxonomy (`KRITIKUS HIÁNY`, `CSÖKKENŐ KÉSZLET`, `KIEGYENSÚLYOZOTT`, `TÚLKÍNÁLAT / TÖBBLET`).
+    - Implemented `Nyx.LogisticsMarket.ValidateDispatchPayload` enforcing zero-trust payload structure, positive units, and route bounds.
+    - Implemented `Nyx.LogisticsMarket.FilterCommodityCatalog` for multi-criteria search and category/zone filtering.
+    - Implemented `Nyx.LogisticsMarket.FormatCurrency` for standard US dollar representations.
+    - Registered `shared/market_monitor.lua` in `FiveM/nyx_logistics/fxmanifest.lua`.
+  - **Server-Side Subsystem & RPCs (`nyx_logistics/server/market_monitor.lua`, `exports.lua`)**:
+    - Implemented `GetWarehouseMatrixOverview` querying warehouse shelves and isometric slot states with real-time temperature zone indicators.
+    - Implemented `GetMarketMonitorOverview` aggregating all trade commodities, baseline targets, current stocks, dynamic unit prices, and health badges.
+    - Implemented `GetHaulerArbitrageRoutes` analyzing cross-zone price differentials to generate profitable hauler contracts.
+    - Implemented `BookHaulerDispatch` reserving cargo and logging active courier dispatches.
+    - Implemented `CancelHaulerDispatch` canceling dispatches and returning stock.
+    - Implemented `ReserveShelfNode` allowing warehouse stewards to lease/reserve specific shelf coordinates.
+    - Registered RPC endpoints: `logistics:getWarehouseMatrixOverview`, `logistics:getMarketMonitorOverview`, `logistics:getHaulerArbitrageRoutes`, `logistics:bookHaulerDispatch`, `logistics:cancelHaulerDispatch`, `logistics:reserveShelfNode`.
+    - Exported server APIs in `FiveM/nyx_logistics/server/exports.lua`.
+  - **Client-Side Dispatch & UI Bridge (`nyx_logistics/client/`, `nyx_ui/client/`)**:
+    - Created `nyx_logistics/client/market_monitor.lua` with `OpenMarketMonitor(options)`, `CloseMarketMonitor()`, chat commands `/marketmonitor`, `/warehousematrix`, `/market`, `/logistics`, net event `nyx:logistics:client:openMarketMonitor`, Third-Eye interactions, and exports. Registered in `fxmanifest.lua`.
+    - Updated `nyx_ui/client/bridge.lua` whitelisting parameters in `SanitizePayload` (`warehouseId`, `shelfId`, `nodeId`, `originWarehouseId`, `destinationZoneId`, `zoneId`, `filterZoneId`, `units`, `durationMinutes`, `dispatchId`, `temperatureZone`), and registering safe NUI callbacks (`closeMarketMonitor`, `logistics:getMatrixOverview`, `logistics:getMarketOverview`, `logistics:getArbitrageRoutes`, `logistics:bookDispatch`, `logistics:cancelDispatch`, `logistics:reserveNode`).
+    - Updated `nyx_ui/client/exports.lua` exporting `OpenMarketMonitorUI`, `CloseMarketMonitorUI`, and mapping aliases in `OpenView`.
+  - **Web Single-Frame CEF SPA (`nyx_ui/web/`)**:
+    - *HTML (`index.html`)*: Section 8F `#logistics-matrix-overlay` modal featuring 3 tabs (Raktár Rács & 3D Mátrix, Rugalmas Piaci Monitor, Fuvarozói Arbitrázs & Járatok), submodal (`#logistics-submodal-reserve`), and `#dev-btn-logistics` in toolbar.
+    - *CSS (`css/app.css`)*: Section 20 CEF-compliant styling strictly adhering to render budget (high-opacity dark surfaces `rgba(12, 16, 24, 0.96)`, isometric slot grid, temperature zone badge colors, touch targets $\ge 40$px, zero `backdrop-filter`, zero `blur()`, WCAG AA+ contrast).
+    - *JavaScript (`js/app.js`)*: Added `NyxState.logistics` reactive state, message listeners (`LOGISTICS_MATRIX_OPEN`/`CLOSE`), tab switching, interactive 3D shelf isometric slot matrix rendering with coordinate inspect popover, slot reservation modal with duration selection, elastic commodity table with real-time price trend indicators and search/zone/category filtering, hauler arbitrage route booking cards with ROI tags, active courier dispatches list with cancellation, button locking (`lockButtonAction`), hierarchical submodal escape handling, and browser dev mode mock telemetry.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestWarehouseMatrixAndElasticMarketMonitorUI()` (Test 33) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_warehouse_matrix_elastic_market_ui.py` covering isometric projections, elastic price formulas, arbitrage profit calculations, dispatch payload validation, health badges, commodity filters, migration 038 schema, web HTML structure, CEF CSS budget, JS state handlers, bridge registration, and tests.lua registration (13/13 passing).
+    - Full pytest suite: 290/290 tests passing (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 215 Lua files, 38 migrations, 100% clean verification.
 - **[2026-10-18] Feature: Property Blind-Auction & Stewardship Portal (`nyx_ui` & `nyx_properties`)**
   - **Database Migration (`037_property_blind_auction_and_stewardship_portal.sql`, `index.json`)**:
     - Created `nyx_property_auction_bids` immutable sealed bid ledger (`bid_id`, `auction_id`, `bidder_citizen_id`, `bid_amount`, `is_refunded`, `is_sealed`, `placed_at`, `refunded_at`, `treasury_tx_uuid`).

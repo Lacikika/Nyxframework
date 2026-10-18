@@ -865,6 +865,109 @@ function handleDevMockNui(action, data) {
         showNotification({ type: 'success', title: 'GONDNOK KIJELÖLVE', message: 'Ingatlan gondnoki kijelölése sikeresen frissítve.' });
         return { success: true };
     }
+    // Logistics Matrix & Elastic Market Monitor Dev Mocks
+    if (action === 'closeMarketMonitor') {
+        return { success: true };
+    }
+    if (action === 'logistics:getMatrixOverview') {
+        const mockWarehouses = [
+            { id: 'wh_dock_ls_01', name: 'Port of Los Santos Terminal Warehouse 4', zoneId: 'zone_port_industrial', routingBucket: 3001, shelfCount: 2, totalSlots: 18, occupiedSlots: 7, availableSlots: 11 },
+            { id: 'wh_sandy_dist_01', name: 'Sandy Shores Industrial Freight Depot', zoneId: 'zone_sandy_shores', routingBucket: 3002, shelfCount: 2, totalSlots: 18, occupiedSlots: 4, availableSlots: 14 }
+        ];
+        const targetWhId = data.warehouseId || 'wh_dock_ls_01';
+        const mockShelves = [
+            { id: 'wh_dock_shelf_01', warehouseId: targetWhId, label: 'Bay A - Heavy Pallet Rack', tiers: 3, slotsPerTier: 3 },
+            { id: 'wh_dock_shelf_02', warehouseId: targetWhId, label: 'Bay B - Parts & Tools Rack', tiers: 3, slotsPerTier: 3 }
+        ];
+        const mockNodes = [];
+        for (let t = 1; t <= 3; t++) {
+            for (let s = 1; s <= 3; s++) {
+                const isOccupied = (t === 1 || (t === 2 && s <= 2));
+                const nodeId = `wh_dock_shelf_01:t${t}_s${s}`;
+                const isoX = (s - 2) * 50;
+                const isoY = (3 - t) * 65 - ((s - 2) * 6);
+                mockNodes.push({
+                    id: nodeId,
+                    shelfId: 'wh_dock_shelf_01',
+                    warehouseId: targetWhId,
+                    shelfLabel: 'Bay A - Heavy Pallet Rack',
+                    tier: t,
+                    slot: s,
+                    isoX: isoX,
+                    isoY: isoY,
+                    layer: (3 - t) * 10 + s,
+                    status: isOccupied ? 'occupied' : 'available',
+                    temperatureZone: (t === 3) ? 'cold_storage' : 'ambient',
+                    occupiedDropId: isOccupied ? `drop_${nodeId}` : null,
+                    item: isOccupied ? {
+                        itemId: (t === 1) ? 'steel_ingot' : 'repairkit',
+                        label: (t === 1) ? 'Industrial Steel Ingot' : 'Vehicle Repair Kit',
+                        count: (t === 1) ? 25 : 5,
+                        weight: (t === 1) ? 50.0 : 15.0,
+                        durability: 100
+                    } : null,
+                    worldCoords: { x: 1052.0 + (s * 0.5), y: -3096.0, z: -39.0 + (t * 0.5) },
+                    localOffset: { x: (s - 2) * 0.55, y: 0.05, z: (t - 1) * 0.50 }
+                });
+            }
+        }
+        return {
+            success: true,
+            selectedWarehouseId: targetWhId,
+            warehouses: mockWarehouses,
+            shelves: mockShelves,
+            nodes: mockNodes
+        };
+    }
+    if (action === 'logistics:getMarketOverview') {
+        const mockZones = [
+            { zoneId: 'zone_ls_metro', zoneName: 'Los Santos Metro', cpi: 1.18, stockToDemandRatio: 0.55, healthStatus: 'MODERATE_SHORTAGE', shelfCount: 12, totalStock: 340, effectiveDemand: 620, baseDemandMultiplier: 1.35, taxSurcharge: 0.015, badge: { status: 'MODERATE_SHORTAGE', label: 'MÉRSÉKELT HIÁNY', badgeClass: 'badge-warning', color: '#F59E0B' } },
+            { zoneId: 'zone_sandy_shores', zoneName: 'Blaine County Central', cpi: 0.95, stockToDemandRatio: 1.10, healthStatus: 'EQUILIBRIUM', shelfCount: 6, totalStock: 220, effectiveDemand: 200, baseDemandMultiplier: 0.85, taxSurcharge: 0.0, badge: { status: 'EQUILIBRIUM', label: 'PIACI EGYENSÚLY', badgeClass: 'badge-success', color: '#10B981' } },
+            { zoneId: 'zone_paleto_bay', zoneName: 'Paleto Bay Enclave', cpi: 1.35, stockToDemandRatio: 0.22, healthStatus: 'CRITICAL_DEFICIT', shelfCount: 4, totalStock: 45, effectiveDemand: 205, baseDemandMultiplier: 0.75, taxSurcharge: 0.0, badge: { status: 'CRITICAL_DEFICIT', label: 'KRITIKUS HIÁNY', badgeClass: 'badge-danger', color: '#EF4444' } },
+            { zoneId: 'zone_port_industrial', zoneName: 'Port Logistics Basin', cpi: 0.82, stockToDemandRatio: 1.65, healthStatus: 'SURPLUS', shelfCount: 8, totalStock: 580, effectiveDemand: 350, baseDemandMultiplier: 1.15, taxSurcharge: 0.005, badge: { status: 'SURPLUS', label: 'TÚLKÍNÁLAT / TÖBBLET', badgeClass: 'badge-info', color: '#06B6D4' } }
+        ];
+        const mockCommodities = [
+            { shelfId: 'shelf_vinewood_tools', zoneId: 'zone_ls_metro', zoneName: 'Los Santos Metro', itemId: 'repairkit', name: 'Standard Repair Kit', category: 'tools', basePrice: 65.0, currentPrice: 88.0, priceMultiplier: 1.3538, currentStock: 18, targetCapacity: 60, effectiveDemand: 81, stockToDemandRatio: 0.2222, deficitUnits: 63, healthBadge: { status: 'CRITICAL_DEFICIT', label: 'KRITIKUS HIÁNY', badgeClass: 'badge-danger', color: '#EF4444' } },
+            { shelfId: 'shelf_pillbox_meds', zoneId: 'zone_ls_metro', zoneName: 'Los Santos Metro', itemId: 'bandage_sterile', name: 'Sterile Field Bandage', category: 'medical', basePrice: 15.0, currentPrice: 22.5, priceMultiplier: 1.5, currentStock: 35, targetCapacity: 120, effectiveDemand: 162, stockToDemandRatio: 0.216, deficitUnits: 127, healthBadge: { status: 'CRITICAL_DEFICIT', label: 'KRITIKUS HIÁNY', badgeClass: 'badge-danger', color: '#EF4444' } },
+            { shelfId: 'shelf_sandy_parts', zoneId: 'zone_sandy_shores', zoneName: 'Blaine County Central', itemId: 'refined_copper', name: 'Refined Copper Wire Spool', category: 'refining', basePrice: 45.0, currentPrice: 42.5, priceMultiplier: 0.9444, currentStock: 95, targetCapacity: 100, effectiveDemand: 85, stockToDemandRatio: 1.1176, deficitUnits: 0, healthBadge: { status: 'EQUILIBRIUM', label: 'PIACI EGYENSÚLY', badgeClass: 'badge-success', color: '#10B981' } },
+            { shelfId: 'shelf_paleto_food', zoneId: 'zone_paleto_bay', zoneName: 'Paleto Bay Enclave', itemId: 'canned_food', name: 'Preserved Rations Box', category: 'food', basePrice: 20.0, currentPrice: 34.0, priceMultiplier: 1.7, currentStock: 12, targetCapacity: 80, effectiveDemand: 60, stockToDemandRatio: 0.20, deficitUnits: 48, healthBadge: { status: 'CRITICAL_DEFICIT', label: 'KRITIKUS HIÁNY', badgeClass: 'badge-danger', color: '#EF4444' } },
+            { shelfId: 'shelf_port_bulk_ore', zoneId: 'zone_port_industrial', zoneName: 'Port Logistics Basin', itemId: 'iron_ore_bulk', name: 'Bulk Iron Ore Pallet', category: 'refining', basePrice: 35.0, currentPrice: 26.0, priceMultiplier: 0.7428, currentStock: 240, targetCapacity: 150, effectiveDemand: 172.5, stockToDemandRatio: 1.3913, deficitUnits: 0, healthBadge: { status: 'SURPLUS', label: 'TÚLKÍNÁLAT / TÖBBLET', badgeClass: 'badge-info', color: '#06B6D4' } }
+        ];
+        return {
+            success: true,
+            zones: mockZones,
+            commodities: mockCommodities,
+            citywideCpi: 1.08,
+            totalShelves: 30,
+            activeDeficitZones: 2,
+            activeSurplusZones: 1
+        };
+    }
+    if (action === 'logistics:getArbitrageRoutes') {
+        return {
+            success: true,
+            routes: [
+                { routeId: 'route_port_metro_tools', originWarehouseId: 'wh_dock_ls_01', originName: 'Port Terminal 4 Depot', destinationZoneId: 'zone_ls_metro', destinationName: 'Los Santos Metro', itemId: 'repairkit', itemName: 'Standard Repair Kit', recommendedUnits: 25, unitCost: 45.0, targetPrice: 88.0, unitSpread: 43.0, grossProfit: 1075.0, fuelCost: 22.75, projectedProfit: 1052.25, roiPct: 93.53, rating: 'EXCELLENT', distanceKm: 6.5 },
+                { routeId: 'route_dock_paleto_meds', originWarehouseId: 'wh_dock_ls_01', originName: 'Port Terminal 4 Depot', destinationZoneId: 'zone_paleto_bay', destinationName: 'Paleto Bay Enclave', itemId: 'bandage_sterile', itemName: 'Sterile Field Bandage', recommendedUnits: 50, unitCost: 10.0, targetPrice: 22.5, unitSpread: 12.5, grossProfit: 625.0, fuelCost: 77.0, projectedProfit: 548.0, roiPct: 109.6, rating: 'PROFITABLE', distanceKm: 22.0 },
+                { routeId: 'route_sandy_port_copper', originWarehouseId: 'wh_sandy_dist_01', originName: 'Sandy Shores Freight Depot', destinationZoneId: 'zone_port_industrial', destinationName: 'Port Logistics Basin', itemId: 'refined_copper', itemName: 'Refined Copper Wire Spool', recommendedUnits: 30, unitCost: 35.0, targetPrice: 52.0, unitSpread: 17.0, grossProfit: 510.0, fuelCost: 56.0, projectedProfit: 454.0, roiPct: 43.24, rating: 'PROFITABLE', distanceKm: 16.0 }
+            ],
+            myDispatches: [
+                { dispatchId: 104, originWarehouseId: 'wh_dock_ls_01', destinationZoneId: 'zone_ls_metro', itemId: 'repairkit', units: 25, unitCost: 45.0, targetPrice: 88.0, projectedProfit: 1052.25, status: 'claimed', claimedAt: '2026-10-18 10:15' }
+            ]
+        };
+    }
+    if (action === 'logistics:bookDispatch') {
+        showNotification({ type: 'success', title: 'FUVAR RÖGZÍTVE', message: `${data.units || 1} db ${data.itemId || 'áru'} fuvarmegbízás sikeresen lefoglalva!` });
+        return { success: true, dispatchId: 105 };
+    }
+    if (action === 'logistics:cancelDispatch') {
+        showNotification({ type: 'warning', title: 'FUVAR LEMONDVA', message: `Fuvarmegbízás (#${data.dispatchId}) feladva.` });
+        return { success: true };
+    }
+    if (action === 'logistics:reserveNode') {
+        showNotification({ type: 'success', title: 'REKESZ FENNTARTVA', message: `Rekesz (#${data.nodeId}) lezárva a következő ${data.durationMinutes || 60} percre.` });
+        return { success: true };
+    }
     return { success: true, devMode: true };
 }
 
@@ -977,6 +1080,26 @@ const NyxState = {
         searchQuery: '',
         typeFilter: 'all',
         statusFilter: 'all'
+    },
+    logistics: {
+        isOpen: false,
+        activeTab: 'matrix',
+        selectedWarehouseId: 'wh_dock_ls_01',
+        selectedShelfId: null,
+        selectedNodeId: null,
+        selectedNode: null,
+        warehouses: [],
+        shelves: [],
+        nodes: [],
+        zones: [],
+        commodities: [],
+        arbitrageRoutes: [],
+        myDispatches: [],
+        searchQuery: '',
+        marketSearchQuery: '',
+        zoneFilter: 'all',
+        categoryFilter: 'all',
+        citywideCpi: 1.00
     },
     activeDialog: null
 };
@@ -4267,6 +4390,547 @@ async function handleRevokeDelegate(delegateCitizenId) {
     });
 }
 
+// ================================================================
+// 12E. 3D WAREHOUSE MATRIX & ELASTIC MARKET MONITOR (`nyx_logistics`)
+// ================================================================
+
+function openMarketMonitor(payload = {}) {
+    NyxState.logistics.isOpen = true;
+    const overlay = document.getElementById('logistics-matrix-overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+    }
+
+    if (payload.warehouseId) {
+        NyxState.logistics.selectedWarehouseId = payload.warehouseId;
+    }
+    const targetTab = payload.activeTab || 'matrix';
+    setLogisticsTab(targetTab);
+
+    refreshLogisticsMatrixOverview(NyxState.logistics.selectedWarehouseId);
+    refreshLogisticsMarketOverview();
+    refreshLogisticsArbitrageRoutes();
+}
+
+function closeMarketMonitor() {
+    NyxState.logistics.isOpen = false;
+    const overlay = document.getElementById('logistics-matrix-overlay');
+    if (overlay) {
+        overlay.classList.add('hidden');
+    }
+    closeReserveSlotModal();
+    postNui('closeMarketMonitor', {});
+}
+
+function setLogisticsTab(tabName) {
+    NyxState.logistics.activeTab = tabName;
+
+    document.querySelectorAll('#logistics-matrix-overlay .modal-tabs .tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+    });
+
+    const panes = {
+        matrix: document.getElementById('logistics-tab-matrix'),
+        market: document.getElementById('logistics-tab-market'),
+        arbitrage: document.getElementById('logistics-tab-arbitrage')
+    };
+
+    Object.entries(panes).forEach(([name, pane]) => {
+        if (pane) pane.classList.toggle('hidden', name !== tabName);
+    });
+
+    if (tabName === 'matrix') {
+        renderLogistics3DShelfMatrix();
+    } else if (tabName === 'market') {
+        renderLogisticsMarketOverview();
+    } else if (tabName === 'arbitrage') {
+        renderLogisticsArbitrageRoutes();
+        renderLogisticsMyDispatches();
+    }
+}
+
+async function refreshLogisticsMatrixOverview(warehouseId) {
+    const res = await postNui('logistics:getMatrixOverview', { warehouseId: warehouseId || NyxState.logistics.selectedWarehouseId });
+    if (res && res.success) {
+        NyxState.logistics.warehouses = res.warehouses || [];
+        NyxState.logistics.shelves = res.shelves || [];
+        NyxState.logistics.nodes = res.nodes || [];
+        NyxState.logistics.selectedWarehouseId = res.selectedWarehouseId || warehouseId;
+
+        // Populate Warehouse Select
+        const whSelect = document.getElementById('logistics-wh-select');
+        if (whSelect) {
+            whSelect.innerHTML = '';
+            NyxState.logistics.warehouses.forEach(wh => {
+                const opt = document.createElement('option');
+                opt.value = wh.id;
+                opt.textContent = `${wh.name} (${wh.occupiedSlots}/${wh.totalSlots} rekesz)`;
+                if (wh.id === NyxState.logistics.selectedWarehouseId) opt.selected = true;
+                whSelect.appendChild(opt);
+            });
+        }
+
+        // Header Warehouse Badge
+        const currentWhObj = NyxState.logistics.warehouses.find(w => w.id === NyxState.logistics.selectedWarehouseId);
+        const whNameEl = document.getElementById('logistics-header-wh-name');
+        if (whNameEl && currentWhObj) {
+            whNameEl.textContent = currentWhObj.name;
+        }
+
+        // Populate Shelf Select
+        const shelfSelect = document.getElementById('logistics-shelf-select');
+        if (shelfSelect) {
+            shelfSelect.innerHTML = '';
+            NyxState.logistics.shelves.forEach(sh => {
+                const opt = document.createElement('option');
+                opt.value = sh.id;
+                opt.textContent = sh.label || sh.id;
+                shelfSelect.appendChild(opt);
+            });
+            if (NyxState.logistics.shelves.length > 0 && !NyxState.logistics.selectedShelfId) {
+                NyxState.logistics.selectedShelfId = NyxState.logistics.shelves[0].id;
+            }
+        }
+
+        renderLogistics3DShelfMatrix();
+    }
+}
+
+function renderLogistics3DShelfMatrix() {
+    const stage = document.getElementById('logistics-3d-viewport');
+    if (!stage) return;
+    stage.innerHTML = '';
+
+    const currentShelfId = NyxState.logistics.selectedShelfId || (NyxState.logistics.shelves[0] && NyxState.logistics.shelves[0].id);
+    const shelfNodes = NyxState.logistics.nodes.filter(n => !currentShelfId || n.shelfId === currentShelfId);
+
+    const container = document.createElement('div');
+    container.className = 'shelf-isometric-container';
+
+    // Rack metal upright frames
+    const uprightL = document.createElement('div');
+    uprightL.className = 'rack-frame-upright left';
+    const uprightR = document.createElement('div');
+    uprightR.className = 'rack-frame-upright right';
+    container.appendChild(uprightL);
+    container.appendChild(uprightR);
+
+    // Beams for tiers (3 tiers default)
+    [1, 2, 3].forEach(t => {
+        const beam = document.createElement('div');
+        beam.className = 'rack-tier-beam';
+        beam.style.top = `${(3 - t) * 65 + 60}px`;
+        container.appendChild(beam);
+    });
+
+    // Render Slots
+    const centerX = 180;
+    const centerY = 140;
+
+    shelfNodes.forEach(node => {
+        const slotEl = document.createElement('div');
+        const isSelected = NyxState.logistics.selectedNodeId === node.id;
+        const statusClass = node.status || 'available';
+        const tempClass = node.temperatureZone === 'cold_storage' ? 'cold' : '';
+
+        slotEl.className = `matrix-slot-box ${statusClass} ${tempClass} ${isSelected ? 'selected' : ''}`;
+        slotEl.dataset.nodeId = node.id;
+
+        // Positioning from isoX, isoY
+        const posX = centerX + (node.isoX || 0);
+        const posY = centerY + (node.isoY || 0);
+        slotEl.style.left = `${posX}px`;
+        slotEl.style.top = `${posY}px`;
+        slotEl.style.zIndex = node.layer || 10;
+
+        let iconClass = 'fa-solid fa-box-open';
+        if (node.status === 'occupied') iconClass = 'fa-solid fa-box-archive';
+        else if (node.status === 'reserved') iconClass = 'fa-solid fa-lock';
+        else if (node.temperatureZone === 'cold_storage') iconClass = 'fa-solid fa-snowflake';
+
+        slotEl.innerHTML = `
+            <i class="${iconClass} slot-icon"></i>
+            <span class="slot-code">T${node.tier}-S${node.slot}</span>
+        `;
+
+        slotEl.addEventListener('click', () => {
+            selectLogisticsShelfSlot(node.id);
+        });
+
+        container.appendChild(slotEl);
+    });
+
+    stage.appendChild(container);
+
+    // Auto-select first or previously selected node
+    if (!NyxState.logistics.selectedNodeId && shelfNodes.length > 0) {
+        selectLogisticsShelfSlot(shelfNodes[0].id);
+    } else if (NyxState.logistics.selectedNodeId) {
+        selectLogisticsShelfSlot(NyxState.logistics.selectedNodeId);
+    }
+}
+
+function selectLogisticsShelfSlot(nodeId) {
+    NyxState.logistics.selectedNodeId = nodeId;
+    const node = NyxState.logistics.nodes.find(n => n.id === nodeId);
+    NyxState.logistics.selectedNode = node;
+
+    // Visual selection highlighting
+    document.querySelectorAll('.matrix-slot-box').forEach(el => {
+        el.classList.toggle('selected', el.dataset.nodeId === nodeId);
+    });
+
+    if (!node) return;
+
+    // Update Telemetry Panel
+    const statusBadge = document.getElementById('logistics-slot-status-badge');
+    if (statusBadge) {
+        let badgeClass = 'badge-success';
+        let label = 'SZABAD';
+        if (node.status === 'occupied') {
+            badgeClass = 'badge-warning';
+            label = 'FOGLALT';
+        } else if (node.status === 'reserved') {
+            badgeClass = 'badge-primary';
+            label = 'FENNTARTVA';
+        }
+        statusBadge.className = `badge ${badgeClass}`;
+        statusBadge.textContent = label;
+    }
+
+    const nodeEl = document.getElementById('logistics-tel-node-id');
+    if (nodeEl) nodeEl.textContent = node.id || '--';
+
+    const shelfEl = document.getElementById('logistics-tel-shelf-label');
+    if (shelfEl) shelfEl.textContent = node.shelfLabel || 'Shelf Unit';
+
+    const tierSlotEl = document.getElementById('logistics-tel-tier-slot');
+    if (tierSlotEl) tierSlotEl.textContent = `T${node.tier} / S${node.slot}`;
+
+    const tempEl = document.getElementById('logistics-tel-temp-zone');
+    if (tempEl) tempEl.textContent = node.temperatureZone || 'ambient';
+
+    const coordsEl = document.getElementById('logistics-tel-world-coords');
+    if (coordsEl && node.worldCoords) {
+        coordsEl.textContent = `X: ${node.worldCoords.x.toFixed(2)} | Y: ${node.worldCoords.y.toFixed(2)} | Z: ${node.worldCoords.z.toFixed(2)}`;
+    }
+
+    // Stored item display
+    const emptyState = document.getElementById('logistics-slot-empty-state');
+    const itemDetails = document.getElementById('logistics-slot-item-details');
+
+    if (node.item && node.status === 'occupied') {
+        if (emptyState) emptyState.classList.add('hidden');
+        if (itemDetails) {
+            itemDetails.classList.remove('hidden');
+            const lbl = document.getElementById('logistics-item-label');
+            if (lbl) lbl.textContent = node.item.label || node.item.itemId || 'Csomag';
+            const idEl = document.getElementById('logistics-item-id');
+            if (idEl) idEl.textContent = node.item.itemId || 'item_id';
+            const countEl = document.getElementById('logistics-item-count');
+            if (countEl) countEl.textContent = `${node.item.count || 1} db`;
+            const weightEl = document.getElementById('logistics-item-weight');
+            if (weightEl) weightEl.textContent = `${(node.item.weight || 10.0).toFixed(1)} kg`;
+            const durEl = document.getElementById('logistics-item-durability');
+            if (durEl) durEl.textContent = `${node.item.durability || 100}%`;
+        }
+    } else {
+        if (emptyState) emptyState.classList.remove('hidden');
+        if (itemDetails) itemDetails.classList.add('hidden');
+    }
+}
+
+async function refreshLogisticsMarketOverview() {
+    const res = await postNui('logistics:getMarketOverview', {
+        zoneId: NyxState.logistics.zoneFilter
+    });
+    if (res && res.success) {
+        NyxState.logistics.zones = res.zones || [];
+        NyxState.logistics.commodities = res.commodities || [];
+        NyxState.logistics.citywideCpi = res.citywideCpi || 1.00;
+
+        const cpiBadge = document.getElementById('logistics-header-cpi');
+        if (cpiBadge) {
+            cpiBadge.innerHTML = `<i class="fa-solid fa-chart-line"></i> CPI: ${NyxState.logistics.citywideCpi.toFixed(2)}`;
+        }
+
+        renderLogisticsMarketOverview();
+    }
+}
+
+function renderLogisticsMarketOverview() {
+    // Zones KPI Grid
+    const zonesGrid = document.getElementById('logistics-zones-kpi-grid');
+    if (zonesGrid) {
+        zonesGrid.innerHTML = '';
+        NyxState.logistics.zones.forEach(z => {
+            const card = document.createElement('div');
+            card.className = 'zone-kpi-card';
+            const badgeClass = z.badge ? z.badge.badgeClass : 'badge-success';
+            const badgeLabel = z.badge ? z.badge.label : (z.healthStatus || 'EQUILIBRIUM');
+
+            card.innerHTML = `
+                <div class="zone-kpi-title">${escapeHtml(z.zoneName || z.zoneId)}</div>
+                <div class="zone-kpi-metrics">
+                    <span>CPI: <strong>${(z.cpi || 1.0).toFixed(2)}</strong></span>
+                    <span>S/D: <strong>${(z.stockToDemandRatio || 1.0).toFixed(2)}</strong></span>
+                </div>
+                <div style="margin-top: 4px;">
+                    <span class="badge ${badgeClass}" style="font-size: 10px;">${badgeLabel}</span>
+                </div>
+            `;
+            zonesGrid.appendChild(card);
+        });
+    }
+
+    renderLogisticsCommodityTable();
+}
+
+function renderLogisticsCommodityTable() {
+    const tbody = document.getElementById('logistics-pricing-rows');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const query = (NyxState.logistics.marketSearchQuery || '').toLowerCase();
+    const zoneFilter = NyxState.logistics.zoneFilter || 'all';
+    const catFilter = NyxState.logistics.categoryFilter || 'all';
+
+    const filtered = (NyxState.logistics.commodities || []).filter(item => {
+        const matchQ = !query || (item.name || '').toLowerCase().includes(query) || (item.itemId || '').toLowerCase().includes(query);
+        const matchZ = zoneFilter === 'all' || item.zoneId === zoneFilter;
+        const matchC = catFilter === 'all' || item.category === catFilter;
+        return matchQ && matchZ && matchC;
+    });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="table-empty-notice"><i class="fa-solid fa-circle-exclamation"></i> Nincs a megadott szűrésnek megfelelő kereskedelmi árucikk.</td></tr>`;
+        return;
+    }
+
+    filtered.forEach(c => {
+        const tr = document.createElement('tr');
+        const mult = c.priceMultiplier || 1.0;
+        let multColor = 'var(--accent-emerald)';
+        if (mult > 1.2) multColor = 'var(--accent-amber)';
+        if (mult > 1.5) multColor = 'var(--accent-rose)';
+        if (mult < 0.9) multColor = 'var(--accent-cyan)';
+
+        const badgeClass = c.healthBadge ? c.healthBadge.badgeClass : 'badge-success';
+        const badgeLabel = c.healthBadge ? c.healthBadge.label : 'EGYENSÚLY';
+
+        tr.innerHTML = `
+            <td><strong>${escapeHtml(c.name || c.itemId)}</strong><br><small class="text-muted"><code>${escapeHtml(c.itemId)}</code></small></td>
+            <td>${escapeHtml(c.zoneName || c.zoneId)}</td>
+            <td><span class="badge badge-outline">${escapeHtml(c.category || 'goods')}</span></td>
+            <td>$${(c.basePrice || 0).toFixed(2)}</td>
+            <td><strong style="color: ${multColor};">$${(c.currentPrice || 0).toFixed(2)}</strong></td>
+            <td><span style="color: ${multColor}; font-weight: 700;">${mult.toFixed(2)}x</span></td>
+            <td>${c.currentStock || 0} / ${Math.floor(c.effectiveDemand || 100)} db (${(c.stockToDemandRatio || 1.0).toFixed(2)})</td>
+            <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+async function refreshLogisticsArbitrageRoutes() {
+    const res = await postNui('logistics:getArbitrageRoutes', {});
+    if (res && res.success) {
+        NyxState.logistics.arbitrageRoutes = res.routes || [];
+        NyxState.logistics.myDispatches = res.myDispatches || [];
+        renderLogisticsArbitrageRoutes();
+        renderLogisticsMyDispatches();
+    }
+}
+
+function renderLogisticsArbitrageRoutes() {
+    const container = document.getElementById('logistics-arbitrage-cards');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const routes = NyxState.logistics.arbitrageRoutes || [];
+    if (routes.length === 0) {
+        container.innerHTML = `<div class="table-empty-notice"><i class="fa-solid fa-truck"></i> Jelenleg nincs aktív regionális arbitrázs lehetőség a piacon.</div>`;
+        return;
+    }
+
+    routes.forEach(r => {
+        const card = document.createElement('div');
+        card.className = 'arbitrage-card';
+
+        let ratingClass = 'badge-success';
+        if (r.rating === 'EXCELLENT') ratingClass = 'badge-primary';
+        else if (r.rating === 'MARGINAL') ratingClass = 'badge-warning';
+        else if (r.rating === 'UNPROFITABLE') ratingClass = 'badge-danger';
+
+        card.innerHTML = `
+            <div class="arb-route-header">
+                <div>
+                    <div class="arb-route-path">
+                        <span>${escapeHtml(r.originName || r.originWarehouseId)}</span>
+                        <i class="fa-solid fa-arrow-right text-cyan"></i>
+                        <span>${escapeHtml(r.destinationName || r.destinationZoneId)}</span>
+                    </div>
+                    <div class="arb-item-name">${escapeHtml(r.itemName || r.itemId)} (${r.recommendedUnits} db)</div>
+                </div>
+                <span class="badge ${ratingClass}">${escapeHtml(r.rating || 'PROFITABLE')}</span>
+            </div>
+
+            <div class="arb-numbers-grid">
+                <div class="arb-num-col">
+                    <span class="tel-label">Árrés / db:</span>
+                    <span class="val text-cyan">+$${(r.unitSpread || 0).toFixed(2)}</span>
+                </div>
+                <div class="arb-num-col">
+                    <span class="tel-label">Üzemanyag költség:</span>
+                    <span class="val text-danger">-$${(r.fuelCost || 0).toFixed(2)}</span>
+                </div>
+                <div class="arb-num-col">
+                    <span class="tel-label">Várható Tiszta Haszon:</span>
+                    <span class="val text-success">+$${(r.projectedProfit || 0).toFixed(2)}</span>
+                </div>
+            </div>
+
+            <button class="btn btn-primary btn-block btn-sm arb-claim-btn" data-route-id="${r.routeId}">
+                <i class="fa-solid fa-truck-ramp-box"></i> Fuvarmegbízás Lefoglalása
+            </button>
+        `;
+
+        const claimBtn = card.querySelector('.arb-claim-btn');
+        if (claimBtn) {
+            claimBtn.addEventListener('click', () => {
+                lockButtonAction(claimBtn, async () => {
+                    const res = await postNui('logistics:bookDispatch', {
+                        originWarehouseId: r.originWarehouseId,
+                        destinationZoneId: r.destinationZoneId,
+                        itemId: r.itemId,
+                        units: r.recommendedUnits,
+                        unitCost: r.unitCost,
+                        targetPrice: r.targetPrice,
+                        projectedProfit: r.projectedProfit,
+                        fuelSurcharge: r.fuelCost
+                    });
+                    if (res && res.success) {
+                        playWebBeep(980, 'sine', 0.1);
+                        showNotification({
+                            type: 'success',
+                            title: 'FUVAR LEFOGLALVA',
+                            message: `${r.recommendedUnits} db ${r.itemName} fuvarmegbízás rögzítve!`
+                        });
+                        refreshLogisticsArbitrageRoutes();
+                    } else {
+                        showNotification({
+                            type: 'error',
+                            title: 'LEFOGLALÁS SIKERTELEN',
+                            message: res?.error || 'Nem sikerült lefoglalni a fuvart.'
+                        });
+                    }
+                });
+            });
+        }
+
+        container.appendChild(card);
+    });
+}
+
+function renderLogisticsMyDispatches() {
+    const list = document.getElementById('logistics-my-dispatches-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    const dispatches = NyxState.logistics.myDispatches || [];
+    if (dispatches.length === 0) {
+        list.innerHTML = `<div class="table-empty-notice" style="padding: 10px;"><i class="fa-solid fa-clipboard-list"></i> Nincs folyamatban lévő saját fuvarmegbízásod.</div>`;
+        return;
+    }
+
+    dispatches.forEach(d => {
+        const item = document.createElement('div');
+        item.className = 'dispatch-row-item';
+        item.innerHTML = `
+            <div>
+                <strong>Fuvar #${d.dispatchId} &bull; ${d.units} db <code>${escapeHtml(d.itemId)}</code></strong>
+                <div style="font-size: 11px; color: var(--color-text-secondary);">
+                    Honnan: ${escapeHtml(d.originWarehouseId)} &bull; Hová: ${escapeHtml(d.destinationZoneId)} &bull; Várható haszon: <span class="text-success">+$${(d.projectedProfit || 0).toFixed(2)}</span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <span class="badge badge-success">${escapeHtml((d.status || 'claimed').toUpperCase())}</span>
+                <button class="btn btn-danger btn-sm cancel-dispatch-btn" data-dispatch-id="${d.dispatchId}"><i class="fa-solid fa-ban"></i> Lemondás</button>
+            </div>
+        `;
+
+        const cancelBtn = item.querySelector('.cancel-dispatch-btn');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                openDialog({
+                    title: 'Fuvarmegbízás Lemondása',
+                    message: `Biztosan feladod a #${d.dispatchId} fuvarozási megbízást?`,
+                    onConfirm: async () => {
+                        const res = await postNui('logistics:cancelDispatch', { dispatchId: d.dispatchId });
+                        if (res && res.success) {
+                            showNotification({ type: 'warning', title: 'FUVAR LEMONDVA', message: 'A fuvarmegbízás törölve.' });
+                            refreshLogisticsArbitrageRoutes();
+                        }
+                    }
+                });
+            });
+        }
+
+        list.appendChild(item);
+    });
+}
+
+function openReserveSlotModal(nodeId) {
+    const node = NyxState.logistics.nodes.find(n => n.id === nodeId) || NyxState.logistics.selectedNode;
+    if (!node) return;
+
+    const labelInput = document.getElementById('logistics-reserve-node-label');
+    if (labelInput) {
+        labelInput.value = `${node.shelfLabel || 'Polc'} [T${node.tier}-S${node.slot}] (${node.id})`;
+    }
+
+    const submodal = document.getElementById('logistics-submodal-reserve');
+    if (submodal) submodal.classList.remove('hidden');
+}
+
+function closeReserveSlotModal() {
+    const submodal = document.getElementById('logistics-submodal-reserve');
+    if (submodal) submodal.classList.add('hidden');
+}
+
+async function submitReserveSlot() {
+    const node = NyxState.logistics.selectedNode;
+    if (!node) return;
+
+    const durSelect = document.getElementById('logistics-reserve-duration-select');
+    const durationMinutes = parseInt(durSelect ? durSelect.value : '60', 10);
+
+    const btn = document.getElementById('logistics-reserve-confirm-btn');
+    lockButtonAction(btn, async () => {
+        const res = await postNui('logistics:reserveNode', {
+            nodeId: node.id,
+            durationMinutes: durationMinutes
+        });
+        if (res && res.success) {
+            playWebBeep(980, 'sine', 0.1);
+            showNotification({
+                type: 'success',
+                title: 'REKESZ ZÁROLVA',
+                message: `A(z) ${node.id} rekesz sikeresen fenntartva ${durationMinutes} percre!`
+            });
+            closeReserveSlotModal();
+            refreshLogisticsMatrixOverview(NyxState.logistics.selectedWarehouseId);
+        } else {
+            showNotification({
+                type: 'error',
+                title: 'ZÁROLÁS SIKERTELEN',
+                message: res?.error || 'A rekesz nem zárolható.'
+            });
+        }
+    });
+}
+
+
 
 // 13. Global NUI Envelope Dispatcher
 window.addEventListener('message', (event) => {
@@ -4362,6 +5026,13 @@ window.addEventListener('message', (event) => {
         openPropertyPortal(packet.payload);
     } else if (action === 'PROPERTY_PORTAL_CLOSE') {
         closePropertyPortal();
+    }
+
+    // 3D Warehouse Matrix & Elastic Market Monitor
+    else if (action === 'LOGISTICS_MATRIX_OPEN') {
+        openMarketMonitor(packet.payload);
+    } else if (action === 'LOGISTICS_MATRIX_CLOSE') {
+        closeMarketMonitor();
     }
 });
 
@@ -4829,6 +5500,63 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('property-assign-submit-btn')?.addEventListener('click', submitAssignSteward);
     document.getElementById('prop-btn-appoint-delegate')?.addEventListener('click', () => openAssignStewardModal(null));
 
+    // 3D Warehouse Matrix & Elastic Market Monitor Listeners
+    document.getElementById('logistics-matrix-close-btn')?.addEventListener('click', closeMarketMonitor);
+
+    document.querySelectorAll('#logistics-matrix-overlay .tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.getAttribute('data-tab');
+            if (tab) setLogisticsTab(tab);
+        });
+    });
+
+    document.getElementById('logistics-wh-select')?.addEventListener('change', (e) => {
+        NyxState.logistics.selectedWarehouseId = e.target.value;
+        refreshLogisticsMatrixOverview();
+    });
+
+    document.getElementById('logistics-shelf-select')?.addEventListener('change', (e) => {
+        NyxState.logistics.selectedShelfId = e.target.value;
+        renderLogistics3DShelfMatrix();
+    });
+
+    document.getElementById('logistics-matrix-search')?.addEventListener('input', () => {
+        renderLogistics3DShelfMatrix();
+    });
+
+    document.getElementById('logistics-matrix-refresh-btn')?.addEventListener('click', refreshLogisticsMatrixOverview);
+
+    document.getElementById('logistics-market-search')?.addEventListener('input', (e) => {
+        NyxState.logistics.marketSearchQuery = e.target.value;
+        renderLogisticsCommodityTable();
+    });
+
+    document.getElementById('logistics-market-zone-filter')?.addEventListener('change', (e) => {
+        NyxState.logistics.zoneFilter = e.target.value;
+        renderLogisticsCommodityTable();
+    });
+
+    document.getElementById('logistics-market-cat-filter')?.addEventListener('change', (e) => {
+        NyxState.logistics.categoryFilter = e.target.value;
+        renderLogisticsCommodityTable();
+    });
+
+    document.getElementById('logistics-market-refresh-btn')?.addEventListener('click', refreshLogisticsMarketOverview);
+
+    document.getElementById('logistics-arbitrage-refresh-btn')?.addEventListener('click', refreshLogisticsArbitrageRoutes);
+
+    document.getElementById('logistics-btn-reserve-slot')?.addEventListener('click', () => {
+        if (NyxState.logistics.selectedNodeId) {
+            openReserveSlotModal(NyxState.logistics.selectedNodeId);
+        } else {
+            showNotification({ type: 'warning', title: 'NINCS KIVÁLASZTVA', message: 'Kérlek válassz ki egy polchelyet a rácsból a foglaláshoz!' });
+        }
+    });
+
+    document.getElementById('logistics-submodal-reserve-close')?.addEventListener('click', closeReserveSlotModal);
+    document.getElementById('logistics-reserve-cancel-btn')?.addEventListener('click', closeReserveSlotModal);
+    document.getElementById('logistics-reserve-confirm-btn')?.addEventListener('click', submitReserveSlot);
+
     // Dialog Confirm & Cancel
     document.getElementById('dialog-confirm-btn')?.addEventListener('click', () => closeDialog(true));
     document.getElementById('dialog-cancel-btn')?.addEventListener('click', () => closeDialog(false));
@@ -4890,6 +5618,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const logisticsReserveSubmodal = document.getElementById('logistics-submodal-reserve');
+            if (logisticsReserveSubmodal && !logisticsReserveSubmodal.classList.contains('hidden')) {
+                closeReserveSlotModal();
+                return;
+            }
+
             const dialogOverlay = document.getElementById('dialog-overlay');
             if (dialogOverlay && !dialogOverlay.classList.contains('hidden')) {
                 closeDialog(false);
@@ -4924,6 +5658,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (NyxState.property.isOpen) {
                 closePropertyPortal();
+                return;
+            }
+            if (NyxState.logistics.isOpen) {
+                closeMarketMonitor();
                 return;
             }
             if (NyxState.mdt.isOpen) {
@@ -5099,6 +5837,14 @@ function initBrowserDevMode() {
             closePropertyPortal();
         } else {
             openPropertyPortal({ activeTab: 'auctions' });
+        }
+    });
+
+    document.getElementById('dev-btn-logistics')?.addEventListener('click', () => {
+        if (NyxState.logistics.isOpen) {
+            closeMarketMonitor();
+        } else {
+            openMarketMonitor({ activeTab: 'matrix' });
         }
     });
 

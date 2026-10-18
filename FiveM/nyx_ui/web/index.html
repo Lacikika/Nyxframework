@@ -25,6 +25,7 @@
             <button id="dev-btn-parliament"><i class="fa-solid fa-landmark"></i> Parliament</button>
             <button id="dev-btn-property"><i class="fa-solid fa-building-columns"></i> Real Estate</button>
             <button id="dev-btn-freight"><i class="fa-solid fa-truck"></i> Freight</button>
+            <button id="dev-btn-logistics"><i class="fa-solid fa-boxes-stacked"></i> Warehouse/Market</button>
             <button id="dev-btn-interact"><i class="fa-solid fa-crosshairs"></i> Target</button>
             <button id="dev-btn-place"><i class="fa-solid fa-arrows-up-down-left-right"></i> Place</button>
             <button id="dev-btn-toast"><i class="fa-solid fa-bell"></i> Toast</button>
@@ -1653,6 +1654,249 @@
                 <div class="modal-footer">
                     <button id="property-assign-cancel-btn" class="btn btn-secondary">Mégse</button>
                     <button id="property-assign-submit-btn" class="btn btn-primary"><i class="fa-solid fa-check"></i> Kijelölés Mentése</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================
+             8F. 3D WAREHOUSE MATRIX & ELASTIC MARKET MONITOR (`nyx_logistics`)
+             ================================================================ -->
+        <div id="logistics-matrix-overlay" class="modal-backdrop hidden">
+            <div class="modal-dialog logistics-matrix-dialog">
+                <!-- Master Header -->
+                <div class="modal-header">
+                    <div class="header-titles">
+                        <h3><i class="fa-solid fa-boxes-stacked icon-accent emerald"></i> 3D Raktári Mátrix & Rugalmas Piaci Monitor</h3>
+                        <span class="header-subtitle">Interactive 3D Physical Shelf Matrix Visualizer, Regional Elastic Pricing & Hauler Arbitrage Hub</span>
+                    </div>
+                    <div class="header-meta">
+                        <span id="logistics-header-cpi" class="badge badge-primary"><i class="fa-solid fa-chart-line"></i> CPI: 1.00</span>
+                        <span id="logistics-header-wh-badge" class="badge badge-success"><i class="fa-solid fa-warehouse"></i> <span id="logistics-header-wh-name">Központi Raktár</span></span>
+                        <button id="logistics-matrix-close-btn" class="icon-btn" title="Bezárás (ESC)"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                </div>
+
+                <!-- Master Navigation Tabs -->
+                <div class="modal-tabs">
+                    <button class="tab-btn active" data-tab="matrix" id="logistics-tab-btn-matrix">
+                        <i class="fa-solid fa-cubes"></i> 3D Raktári Mátrix & Polcrendszer
+                    </button>
+                    <button class="tab-btn" data-tab="market" id="logistics-tab-btn-market">
+                        <i class="fa-solid fa-chart-pie"></i> Rugalmas Piaci Árindex & Kereslet
+                    </button>
+                    <button class="tab-btn" data-tab="arbitrage" id="logistics-tab-btn-arbitrage">
+                        <i class="fa-solid fa-truck-fast"></i> Fuvarozói Arbitrázs & Diszpécser
+                    </button>
+                </div>
+
+                <!-- Master Body Container -->
+                <div class="modal-body logistics-matrix-body">
+                    <!-- Tab 1: 3D Warehouse Shelf Matrix Visualizer -->
+                    <div id="logistics-tab-matrix" class="logistics-tab-pane">
+                        <div class="tab-action-bar">
+                            <div class="action-bar-filters">
+                                <label class="filter-label"><i class="fa-solid fa-warehouse"></i> Raktár:</label>
+                                <select id="logistics-wh-select" class="modal-select filter-select">
+                                    <!-- Dynamic warehouse options -->
+                                </select>
+                                <label class="filter-label"><i class="fa-solid fa-boxes-stacked"></i> Polcegység:</label>
+                                <select id="logistics-shelf-select" class="modal-select filter-select">
+                                    <!-- Dynamic shelf options -->
+                                </select>
+                            </div>
+                            <div class="action-bar-filters">
+                                <input type="text" id="logistics-matrix-search" placeholder="Keresés rekeszek / cikkek között..." class="modal-input search-input">
+                                <button id="logistics-matrix-refresh-btn" class="btn btn-secondary btn-sm" title="Frissítés"><i class="fa-solid fa-arrows-rotate"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- 3D Matrix Viewport & Inspector Layout -->
+                        <div class="matrix-visualizer-layout">
+                            <!-- Left: Interactive 3D / Isometric Shelf Canvas -->
+                            <div class="matrix-canvas-card card-surface">
+                                <div class="canvas-header-row">
+                                    <span class="sub-text"><i class="fa-solid fa-eye"></i> Izometrikus Polcrekesz Megjelenítő (Kattints a rekeszre a telemetriához)</span>
+                                    <div class="matrix-legend">
+                                        <span class="legend-item"><span class="legend-dot available"></span> Szabad</span>
+                                        <span class="legend-item"><span class="legend-dot occupied"></span> Foglalt</span>
+                                        <span class="legend-item"><span class="legend-dot reserved"></span> Fenntartva</span>
+                                        <span class="legend-item"><span class="legend-dot cold"></span> Hűtött</span>
+                                    </div>
+                                </div>
+                                <div id="logistics-3d-viewport" class="matrix-3d-stage">
+                                    <!-- Dynamic 3D isometric shelf rack rendered here -->
+                                </div>
+                            </div>
+
+                            <!-- Right: Slot Telemetry & Item Inspector -->
+                            <div class="matrix-inspector-card card-surface">
+                                <div class="inspector-header">
+                                    <h4 class="card-title"><i class="fa-solid fa-microchip"></i> Rekesz Telemetria & Részletek</h4>
+                                    <span id="logistics-slot-status-badge" class="badge badge-success">SZABAD</span>
+                                </div>
+                                <div id="logistics-slot-inspector" class="inspector-body">
+                                    <div class="telemetry-grid">
+                                        <div class="telemetry-item">
+                                            <span class="tel-label">Rekesz Azonosító:</span>
+                                            <strong id="logistics-tel-node-id">--</strong>
+                                        </div>
+                                        <div class="telemetry-item">
+                                            <span class="tel-label">Polcegység / Címke:</span>
+                                            <strong id="logistics-tel-shelf-label">--</strong>
+                                        </div>
+                                        <div class="telemetry-item">
+                                            <span class="tel-label">Szint (Tier) / Pozíció (Slot):</span>
+                                            <strong id="logistics-tel-tier-slot">T1 / S1</strong>
+                                        </div>
+                                        <div class="telemetry-item">
+                                            <span class="tel-label">Hőmérsékleti Zóna:</span>
+                                            <strong id="logistics-tel-temp-zone">ambient</strong>
+                                        </div>
+                                    </div>
+
+                                    <div class="slot-item-card" id="logistics-slot-item-view">
+                                        <div class="empty-state" id="logistics-slot-empty-state">
+                                            <i class="fa-solid fa-box-open empty-icon"></i>
+                                            <p>A kiválasztott rekesz jelenleg üres. Szabadon bepakolható konténer vagy láda.</p>
+                                        </div>
+                                        <div class="item-details hidden" id="logistics-slot-item-details">
+                                            <div class="item-header-row">
+                                                <i class="fa-solid fa-box-archive item-box-icon"></i>
+                                                <div>
+                                                    <h4 id="logistics-item-label">Cikk Megnevezése</h4>
+                                                    <span id="logistics-item-id" class="sub-text">item_id</span>
+                                                </div>
+                                            </div>
+                                            <div class="item-specs-grid">
+                                                <div class="spec-pill"><span>Mennyiség:</span> <strong id="logistics-item-count">0 db</strong></div>
+                                                <div class="spec-pill"><span>Tömeg:</span> <strong id="logistics-item-weight">0.0 kg</strong></div>
+                                                <div class="spec-pill"><span>Állapot:</span> <strong id="logistics-item-durability">100%</strong></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="spatial-coords-box">
+                                        <span class="coords-label"><i class="fa-solid fa-location-dot"></i> Térbeli Koordináták (World Coordinates)</span>
+                                        <code id="logistics-tel-world-coords">X: 0.00 | Y: 0.00 | Z: 0.00</code>
+                                    </div>
+
+                                    <div class="inspector-actions">
+                                        <button id="logistics-btn-reserve-slot" class="btn btn-primary btn-block"><i class="fa-solid fa-lock"></i> Rekesz Fenntartása / Letétbe Helyezés</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Elastic Market Monitor & Commodity Pricing -->
+                    <div id="logistics-tab-market" class="logistics-tab-pane hidden">
+                        <!-- Regional Delivery Zones KPI Grid -->
+                        <div class="zones-kpi-grid" id="logistics-zones-kpi-grid">
+                            <!-- Dynamic zone cards (Metro, Sandy, Paleto, Port) -->
+                        </div>
+
+                        <!-- Commodity Filter & Table -->
+                        <div class="tab-action-bar">
+                            <div class="action-bar-info">
+                                <h4 class="section-title">Valós Idejű Rugalmas Árindex (Dynamic Price Index)</h4>
+                                <span class="sub-text">Az árak a zónánkénti készlet/kereslet arány (R_sd) és a fogyási sebesség alapján automatikusan skálázódnak.</span>
+                            </div>
+                            <div class="action-bar-filters">
+                                <input type="text" id="logistics-market-search" placeholder="Keresés termék vagy zóna szerint..." class="modal-input search-input">
+                                <select id="logistics-market-zone-filter" class="modal-select filter-select">
+                                    <option value="all">Minden Zóna</option>
+                                    <option value="zone_ls_metro">Los Santos Metro</option>
+                                    <option value="zone_sandy_shores">Blaine County Central</option>
+                                    <option value="zone_paleto_bay">Paleto Bay Enclave</option>
+                                    <option value="zone_port_industrial">Port Logistics Basin</option>
+                                </select>
+                                <select id="logistics-market-cat-filter" class="modal-select filter-select">
+                                    <option value="all">Minden Kategória</option>
+                                    <option value="tools">Szerszámok (Tools)</option>
+                                    <option value="medical">Orvosi Cikkek (Medical)</option>
+                                    <option value="refining">Finomított Nyersanyagok</option>
+                                    <option value="food">Élelmiszer (Food)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Pricing Table Container -->
+                        <div class="table-container">
+                            <table class="nyx-table">
+                                <thead>
+                                    <tr>
+                                        <th>Termék / Áru</th>
+                                        <th>Gazdasági Zóna</th>
+                                        <th>Kategória</th>
+                                        <th>Alapár ($)</th>
+                                        <th>Rugalmas Ár ($)</th>
+                                        <th>Szorzó</th>
+                                        <th>Készlet / Kereslet (R_sd)</th>
+                                        <th>Piaci Állapot</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="logistics-pricing-rows">
+                                    <!-- Dynamic commodity rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Hauler Arbitrage & Dispatch Planner -->
+                    <div id="logistics-tab-arbitrage" class="logistics-tab-pane hidden">
+                        <div class="tab-action-bar">
+                            <div class="action-bar-info">
+                                <h4 class="section-title">Fuvarozói Árrés & Térségi Arbitrázs (Arbitrage Routes)</h4>
+                                <span class="sub-text">Hasonlítsd össze az olcsó raktári beszerzési pontokat a hiányos kiskereskedelmi zónákkal a maximális profitért.</span>
+                            </div>
+                        </div>
+
+                        <!-- Arbitrage Cards Grid -->
+                        <div class="arbitrage-cards-grid" id="logistics-arbitrage-cards">
+                            <!-- Dynamic route cards -->
+                        </div>
+
+                        <!-- Active Hauler Dispatches -->
+                        <div class="card-surface dispatches-card">
+                            <div class="card-header-row">
+                                <h4 class="card-title"><i class="fa-solid fa-clipboard-check"></i> Általam Elvállalt Fuvarmegbízások</h4>
+                                <span class="card-subtitle">Aktív fuvarok állapota, célállomási átvétel és lemondás.</span>
+                            </div>
+                            <div id="logistics-my-dispatches-list" class="dispatches-list">
+                                <!-- Dynamic claimed dispatches -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submodal: Slot Reservation Dialog -->
+        <div id="logistics-submodal-reserve" class="modal-backdrop hidden">
+            <div class="modal-dialog submodal-dialog">
+                <div class="modal-header">
+                    <h4><i class="fa-solid fa-lock icon-accent emerald"></i> Rekesz Fenntartása / Letét</h4>
+                    <button id="logistics-submodal-reserve-close" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <p class="submodal-instruction">A rekesz fenntartása kizárólagos tárolási jogot biztosít számodra a megadott időtartamra. Más játékosok nem helyezhetnek ide árut.</p>
+                    <div class="form-group">
+                        <label>Kijelölt Rekesz</label>
+                        <input type="text" id="logistics-reserve-node-label" class="modal-input" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Fenntartási Időtartam</label>
+                        <select id="logistics-reserve-duration-select" class="modal-select">
+                            <option value="60">1 óra (Alapértelmezett)</option>
+                            <option value="180">3 óra</option>
+                            <option value="720">12 óra</option>
+                            <option value="1440">24 óra (Teljes nap)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="logistics-reserve-cancel-btn" class="btn btn-secondary">Mégse</button>
+                    <button id="logistics-reserve-confirm-btn" class="btn btn-primary"><i class="fa-solid fa-check"></i> Rekesz Zárolása</button>
                 </div>
             </div>
         </div>

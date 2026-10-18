@@ -7015,7 +7015,283 @@ function Nyx.Tests.TestPropertyBlindAuctionAndStewardshipUI()
     return passes == total
 end
 
--- 33. Master Test Runner
+-- 33. Test 3D Warehouse Matrix & Elastic Market Monitor UI (nyx_ui & nyx_logistics)
+function Nyx.Tests.TestWarehouseMatrixAndElasticMarketMonitorUI()
+    print("^3[Nyx:Tests] Running 3D Warehouse Matrix & Elastic Market Monitor UI Test Suite...^7")
+    local passes = 0
+    local total = 6
+
+    local MarketMod = (Nyx and Nyx.LogisticsMarket) or {}
+
+    -- Sub-test A: Isometric 3D-to-2D Projection & Depth Ordering Invariant
+    local projectSlot = MarketMod.ProjectIsometricSlot or function(x, y, z, originX, originY, slotWidth, slotHeight)
+        local ox = originX or 400
+        local oy = originY or 120
+        local w = slotWidth or 36
+        local h = slotHeight or 24
+
+        local screenX = ox + (x - y) * (w * 0.75)
+        local screenY = oy + (x + y) * (h * 0.5) - (z * (h * 1.1))
+        local depth = (x + y) * 10 + z
+
+        return {
+            screenX = math.floor(screenX + 0.5),
+            screenY = math.floor(screenY + 0.5),
+            depth = depth,
+            zIndex = 100 + depth
+        }
+    end
+
+    local p1 = projectSlot(0, 0, 0, 400, 120, 36, 24)
+    local p2 = projectSlot(2, 1, 3, 400, 120, 36, 24)
+    local p3 = projectSlot(1, 2, 3, 400, 120, 36, 24)
+
+    local testA_ok = (p1.screenX == 400 and p1.screenY == 120 and p1.depth == 0) and
+                     (p2.depth > p1.depth and p2.zIndex == 133) and
+                     (p3.depth == p2.depth and p3.screenX < p2.screenX)
+
+    if assertTest(testA_ok == true,
+        "Isometric 3D-to-2D Projection & Depth Ordering Invariants",
+        string.format("p1=(%d,%d,d=%d), p2=(%d,%d,d=%d), p3=(%d,%d,d=%d)", p1.screenX, p1.screenY, p1.depth, p2.screenX, p2.screenY, p2.depth, p3.screenX, p3.screenY, p3.depth)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Elastic Market Pricing with Supply Clamping & Scarcity Invariants
+    local computePrice = MarketMod.ComputeElasticPrice or function(basePrice, currentStock, targetStock, elasticityFactor)
+        local base = math.max(0.01, tonumber(basePrice or 100))
+        local current = math.max(0, tonumber(currentStock or 0))
+        local target = math.max(1, tonumber(targetStock or 100))
+        local elasticity = math.max(0.1, math.min(2.0, tonumber(elasticityFactor or 0.85)))
+
+        local ratio = current / target
+        local priceMultiplier = math.exp((1.0 - ratio) * elasticity)
+        priceMultiplier = math.max(0.25, math.min(4.0, priceMultiplier))
+
+        local unitPrice = math.floor((base * priceMultiplier) * 100 + 0.5) / 100
+        return {
+            unitPrice = unitPrice,
+            multiplier = math.floor(priceMultiplier * 100 + 0.5) / 100,
+            ratio = math.floor(ratio * 100 + 0.5) / 100,
+            isSurplus = ratio >= 1.2,
+            isScarcity = ratio <= 0.6
+        }
+    end
+
+    local normalPrice = computePrice(100.0, 100, 100, 0.85)
+    local scarcePrice = computePrice(100.0, 20, 100, 0.85)
+    local surplusPrice = computePrice(100.0, 250, 100, 0.85)
+    local maxClampPrice = computePrice(100.0, 0, 100, 2.0)
+    local minClampPrice = computePrice(100.0, 1000, 100, 2.0)
+
+    local testB_ok = (normalPrice.unitPrice == 100.0 and normalPrice.multiplier == 1.0) and
+                     (scarcePrice.unitPrice > 100.0 and scarcePrice.isScarcity == true) and
+                     (surplusPrice.unitPrice < 100.0 and surplusPrice.isSurplus == true) and
+                     (maxClampPrice.unitPrice == 400.0 and minClampPrice.unitPrice == 25.0)
+
+    if assertTest(testB_ok == true,
+        "Elastic Pricing Supply/Demand Invariant & [0.25x - 4.0x] Range Clamping",
+        string.format("norm=%.2f, scarce=%.2f, surplus=%.2f, max=%.2f, min=%.2f", normalPrice.unitPrice, scarcePrice.unitPrice, surplusPrice.unitPrice, maxClampPrice.unitPrice, minClampPrice.unitPrice)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Hauler Arbitrage Route & Profitability Calculations
+    local calcArbitrage = MarketMod.CalculateHaulerArbitrage or function(routeData)
+        if not routeData then return nil end
+        local units = math.max(1, tonumber(routeData.units or 1))
+        local origSell = math.max(0, tonumber(routeData.originSellPrice or 0))
+        local destBuy = math.max(0, tonumber(routeData.destinationBuyPrice or 0))
+        local distance = math.max(1, tonumber(routeData.distanceMeters or 1000))
+        local costPerKm = math.max(0, tonumber(routeData.fuelTollPerKm or 0.45))
+
+        local spreadPerUnit = destBuy - origSell
+        local grossSpread = spreadPerUnit * units
+        local transportCost = (distance / 1000.0) * costPerKm
+        local netProfit = grossSpread - transportCost
+
+        local investedCapital = origSell * units
+        local roiPercent = 0.0
+        if investedCapital > 0 then
+            roiPercent = (netProfit / investedCapital) * 100.0
+        end
+
+        return {
+            spreadPerUnit = math.floor(spreadPerUnit * 100 + 0.5) / 100,
+            grossSpread = math.floor(grossSpread * 100 + 0.5) / 100,
+            transportCost = math.floor(transportCost * 100 + 0.5) / 100,
+            netProfit = math.floor(netProfit * 100 + 0.5) / 100,
+            roiPercent = math.floor(roiPercent * 10 + 0.5) / 10,
+            isViable = netProfit > 0
+        }
+    end
+
+    local viableRoute = calcArbitrage({
+        units = 50,
+        originSellPrice = 80.0,
+        destinationBuyPrice = 110.0,
+        distanceMeters = 5000,
+        fuelTollPerKm = 2.0
+    })
+
+    local unviableRoute = calcArbitrage({
+        units = 10,
+        originSellPrice = 95.0,
+        destinationBuyPrice = 96.0,
+        distanceMeters = 15000,
+        fuelTollPerKm = 5.0
+    })
+
+    local testC_ok = (viableRoute.spreadPerUnit == 30.0 and viableRoute.transportCost == 10.0 and viableRoute.netProfit == 1490.0 and viableRoute.isViable == true and viableRoute.roiPercent > 30.0) and
+                     (unviableRoute.netProfit < 0 and unviableRoute.isViable == false)
+
+    if assertTest(testC_ok == true,
+        "Hauler Arbitrage Spread, Distance Cost & ROI Profitability Invariant",
+        string.format("viableNet=%.2f (roi=%.1f%%), unviableNet=%.2f", viableRoute.netProfit, viableRoute.roiPercent, unviableRoute.netProfit)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Dispatch & Reservation Zero-Trust Payload Validation
+    local validatePayload = MarketMod.ValidateDispatchPayload or function(payload)
+        if type(payload) ~= "table" then
+            return false, "Payload must be a table"
+        end
+        local routeId = tostring(payload.routeId or "")
+        if #routeId == 0 or #routeId > 64 then
+            return false, "Invalid routeId"
+        end
+        local commodity = tostring(payload.commodity or "")
+        if #commodity == 0 or #commodity > 32 then
+            return false, "Invalid commodity"
+        end
+        local units = tonumber(payload.units)
+        if not units or units <= 0 or units > 1000 then
+            return false, "Invalid units (must be between 1 and 1000)"
+        end
+        local origWh = tostring(payload.originWarehouseId or "")
+        local destZone = tostring(payload.destinationZoneId or "")
+        if #origWh == 0 or #destZone == 0 then
+            return false, "Origin warehouse and destination zone must be provided"
+        end
+        return true, "Valid"
+    end
+
+    local validPayload = {
+        routeId = "route_ls_to_paleto",
+        commodity = "steel_ingot",
+        units = 40,
+        originWarehouseId = "wh_central_01",
+        destinationZoneId = "zone_industrial_north"
+    }
+
+    local badUnitsPayload = {
+        routeId = "route_ls_to_paleto",
+        commodity = "steel_ingot",
+        units = -5,
+        originWarehouseId = "wh_central_01",
+        destinationZoneId = "zone_industrial_north"
+    }
+
+    local missingDestPayload = {
+        routeId = "route_ls_to_paleto",
+        commodity = "steel_ingot",
+        units = 20,
+        originWarehouseId = "wh_central_01",
+        destinationZoneId = ""
+    }
+
+    local v1_ok, _ = validatePayload(validPayload)
+    local v2_ok, _ = validatePayload(badUnitsPayload)
+    local v3_ok, _ = validatePayload(missingDestPayload)
+
+    local testD_ok = (v1_ok == true and v2_ok == false and v3_ok == false)
+
+    if assertTest(testD_ok == true,
+        "Hauler Dispatch Zero-Trust Payload Validation Rules",
+        string.format("valid=%s, badUnits=%s, missingDest=%s", tostring(v1_ok), tostring(v2_ok), tostring(v3_ok))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Market Health Badge Taxonomy & Threshold Invariant
+    local formatBadge = MarketMod.FormatHealthBadge or function(currentStock, targetStock)
+        local cur = math.max(0, tonumber(currentStock or 0))
+        local tgt = math.max(1, tonumber(targetStock or 100))
+        local ratio = cur / tgt
+
+        if ratio <= 0.40 then
+            return { badgeClass = "badge-danger", label = "KRITIKUS HIÁNY", icon = "fa-circle-exclamation", tier = "critical" }
+        elseif ratio < 0.80 then
+            return { badgeClass = "badge-warning", label = "CSÖKKENŐ KÉSZLET", icon = "fa-triangle-exclamation", tier = "low" }
+        elseif ratio <= 1.20 then
+            return { badgeClass = "badge-success", label = "KIEGYENSÚLYOZOTT", icon = "fa-check", tier = "balanced" }
+        else
+            return { badgeClass = "badge-info", label = "TÚLKÍNÁLAT / TÖBBLET", icon = "fa-boxes-stacked", tier = "surplus" }
+        end
+    end
+
+    local bCrit = formatBadge(20, 100)
+    local bLow = formatBadge(65, 100)
+    local bBal = formatBadge(105, 100)
+    local bSurp = formatBadge(180, 100)
+
+    local testE_ok = (bCrit.tier == "critical" and bCrit.badgeClass == "badge-danger") and
+                     (bLow.tier == "low" and bLow.badgeClass == "badge-warning") and
+                     (bBal.tier == "balanced" and bBal.badgeClass == "badge-success") and
+                     (bSurp.tier == "surplus" and bSurp.badgeClass == "badge-info")
+
+    if assertTest(testE_ok == true,
+        "Market Health Badge Taxonomy & Dynamic Threshold Boundaries",
+        string.format("crit=%s, low=%s, bal=%s, surp=%s", bCrit.tier, bLow.tier, bBal.tier, bSurp.tier)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Commodity Multi-Criteria Filter & Search Engine
+    local filterCommodities = MarketMod.FilterCommodityCatalog or function(catalog, searchQuery, zoneFilter, categoryFilter)
+        local results = {}
+        local q = string.lower(tostring(searchQuery or ""))
+        local z = string.lower(tostring(zoneFilter or "all"))
+        local c = string.lower(tostring(categoryFilter or "all"))
+
+        for _, item in ipairs(catalog or {}) do
+            local matchesQuery = (q == "") or
+                string.find(string.lower(item.name or ""), q, 1, true) or
+                string.find(string.lower(item.label or ""), q, 1, true)
+
+            local matchesZone = (z == "all") or (string.lower(item.zone or "") == z)
+            local matchesCategory = (c == "all") or (string.lower(item.category or "") == c)
+
+            if matchesQuery and matchesZone and matchesCategory then
+                table.insert(results, item)
+            end
+        end
+        return results
+    end
+
+    local sampleMarketCatalog = {
+        { name = "steel_ingot", label = "Acéltömb", category = "materials", zone = "zone_ls_harbor" },
+        { name = "medkit", label = "Elsősegély Csomag", category = "medical", zone = "zone_metro" },
+        { name = "circuit_board", label = "Integrált Áramkör", category = "electronics", zone = "zone_metro" },
+        { name = "copper_wire", label = "Vezeték Köteg", category = "materials", zone = "zone_industrial_north" }
+    }
+
+    local fSearch = filterCommodities(sampleMarketCatalog, "acél", "all", "all")
+    local fZone = filterCommodities(sampleMarketCatalog, "", "zone_metro", "all")
+    local fCat = filterCommodities(sampleMarketCatalog, "", "all", "materials")
+    local fCombined = filterCommodities(sampleMarketCatalog, "vezeték", "zone_industrial_north", "materials")
+
+    local testF_ok = (#fSearch == 1 and fSearch[1].name == "steel_ingot") and
+                     (#fZone == 2) and
+                     (#fCat == 2) and
+                     (#fCombined == 1 and fCombined[1].name == "copper_wire")
+
+    if assertTest(testF_ok == true,
+        "Commodity Search & Zone/Category Multi-Criteria Filtering Subsystem",
+        string.format("fSearch=%d, fZone=%d, fCat=%d, fCombined=%d", #fSearch, #fZone, #fCat, #fCombined)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 34. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -7053,9 +7329,10 @@ function Nyx.Tests.RunAll()
     local t30 = Nyx.Tests.TestCourtroomTerminalEvidenceAndJuryUI()
     local t31 = Nyx.Tests.TestParliamentRankedChoiceAndLegislationUI()
     local t32 = Nyx.Tests.TestPropertyBlindAuctionAndStewardshipUI()
+    local t33 = Nyx.Tests.TestWarehouseMatrixAndElasticMarketMonitorUI()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

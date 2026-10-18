@@ -123,6 +123,18 @@ function Nyx.UI.SanitizePayload(data)
     if data.statusFilter and type(data.statusFilter) == "string" then sanitized.statusFilter = string.sub(data.statusFilter, 1, 32) end
     if data.typeFilter and type(data.typeFilter) == "string" then sanitized.typeFilter = string.sub(data.typeFilter, 1, 32) end
     if data.searchQuery and type(data.searchQuery) == "string" then sanitized.searchQuery = string.sub(data.searchQuery, 1, 128) end
+    -- 3D Warehouse Matrix & Elastic Market Monitor parameters
+    if data.warehouseId and type(data.warehouseId) == "string" then sanitized.warehouseId = string.sub(data.warehouseId, 1, 64) end
+    if data.shelfId and type(data.shelfId) == "string" then sanitized.shelfId = string.sub(data.shelfId, 1, 64) end
+    if data.nodeId and type(data.nodeId) == "string" then sanitized.nodeId = string.sub(data.nodeId, 1, 64) end
+    if data.originWarehouseId and type(data.originWarehouseId) == "string" then sanitized.originWarehouseId = string.sub(data.originWarehouseId, 1, 64) end
+    if data.destinationZoneId and type(data.destinationZoneId) == "string" then sanitized.destinationZoneId = string.sub(data.destinationZoneId, 1, 32) end
+    if data.zoneId and type(data.zoneId) == "string" then sanitized.zoneId = string.sub(data.zoneId, 1, 32) end
+    if data.filterZoneId and type(data.filterZoneId) == "string" then sanitized.filterZoneId = string.sub(data.filterZoneId, 1, 32) end
+    if data.units and type(data.units) == "number" then sanitized.units = math.max(1, math.min(1000, math.floor(data.units))) end
+    if data.durationMinutes and type(data.durationMinutes) == "number" then sanitized.durationMinutes = math.max(10, math.min(1440, math.floor(data.durationMinutes))) end
+    if data.dispatchId and (type(data.dispatchId) == "string" or type(data.dispatchId) == "number") then sanitized.dispatchId = tonumber(data.dispatchId) or tostring(data.dispatchId) end
+    if data.temperatureZone and type(data.temperatureZone) == "string" then sanitized.temperatureZone = string.sub(data.temperatureZone, 1, 20) end
     if data.payload and type(data.payload) == "table" then
         sanitized.payload = Nyx.UI.SanitizePayload(data.payload)
     end
@@ -735,6 +747,60 @@ Nyx.UI.SafeNUICallback("property:getInactivityAuditLogs", function(data, cb)
         return cb(res or {})
     end
     cb({})
+end)
+
+-- 3D Warehouse Matrix & Elastic Market Monitor NUI Callbacks
+Nyx.UI.SafeNUICallback("closeMarketMonitor", function(_, cb)
+    Nyx.UI.SetFocus(false, false)
+    cb({ success = true })
+end)
+
+Nyx.UI.SafeNUICallback("logistics:getMatrixOverview", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("logistics:getWarehouseMatrixOverview", data and data.warehouseId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("logistics:getMarketOverview", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("logistics:getMarketMonitorOverview", data and (data.zoneId or data.filterZoneId))
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("logistics:getArbitrageRoutes", function(_, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("logistics:getHaulerArbitrageRoutes")
+        return cb(res or { success = false, routes = {} })
+    end
+    cb({ success = false, routes = {} })
+end)
+
+Nyx.UI.SafeNUICallback("logistics:bookDispatch", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("logistics:bookHaulerDispatch", data)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("logistics:cancelDispatch", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("logistics:cancelHaulerDispatch", data and data.dispatchId)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
+end)
+
+Nyx.UI.SafeNUICallback("logistics:reserveNode", function(data, cb)
+    if exports['nyx_core'] and exports['nyx_core'].TriggerRPCAwait then
+        local res = exports['nyx_core']:TriggerRPCAwait("logistics:reserveShelfNode", data and data.nodeId, data and data.durationMinutes)
+        return cb(res or { success = false })
+    end
+    cb({ success = false, error = "RPC_UNAVAILABLE" })
 end)
 
 
