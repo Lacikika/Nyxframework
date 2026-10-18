@@ -63,7 +63,7 @@ while true; do
     if [ -n "$CUSTOM_AGENT_COMMAND" ]; then
         eval "$CUSTOM_AGENT_COMMAND" >> "$LOG_FILE" 2>&1 || AGENT_EXIT=$?
     elif [ "$AGENT_BIN" = "agy" ]; then
-        agy --print "$AGENT_PROMPT" --dangerously-skip-permissions --mode auto >> "$LOG_FILE" 2>&1 || AGENT_EXIT=$?
+        agy --print "$AGENT_PROMPT" --dangerously-skip-permissions >> "$LOG_FILE" 2>&1 || AGENT_EXIT=$?
     else
         "$AGENT_BIN" --headless --message "$AGENT_PROMPT" >> "$LOG_FILE" 2>&1 || AGENT_EXIT=$?
     fi

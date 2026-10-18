@@ -81,15 +81,15 @@ while ($true) {
     # 1. Run Agent Headless
     $AgentExitCode = 0
     if ($CustomAgentCommand) {
-        Invoke-Expression "$CustomAgentCommand" 2>&1 | Out-File -FilePath $LogFile -Append -Encoding utf8
+        Invoke-Expression "$CustomAgentCommand" 2>&1 | ForEach-Object { "$_" } | Out-File -FilePath $LogFile -Append -Encoding utf8
         $AgentExitCode = $LASTEXITCODE
     } elseif ($AgentExecutable -like "*agy*") {
-        # Run agy in headless print mode with auto-approvals
-        & $AgentExecutable --print $AgentPrompt --dangerously-skip-permissions --mode auto 2>&1 | Out-File -FilePath $LogFile -Append -Encoding utf8
+        # Run agy in headless print mode with auto-approvals (default mode)
+        & $AgentExecutable --print $AgentPrompt --dangerously-skip-permissions 2>&1 | ForEach-Object { "$_" } | Out-File -FilePath $LogFile -Append -Encoding utf8
         $AgentExitCode = $LASTEXITCODE
     } else {
         # Generic fallback
-        & $AgentExecutable --headless --message $AgentPrompt 2>&1 | Out-File -FilePath $LogFile -Append -Encoding utf8
+        & $AgentExecutable --headless --message $AgentPrompt 2>&1 | ForEach-Object { "$_" } | Out-File -FilePath $LogFile -Append -Encoding utf8
         $AgentExitCode = $LASTEXITCODE
     }
 
@@ -102,7 +102,7 @@ while ($true) {
 
     # 2. Run Local Verification Gatekeeper
     Write-Host "[$Timestamp] Running automated validation checks..." -ForegroundColor Cyan
-    $VerifyOutput = & powershell -ExecutionPolicy Bypass -File "$PSScriptRoot\verify.ps1" 2>&1
+    $VerifyOutput = & powershell -ExecutionPolicy Bypass -File "$PSScriptRoot\verify.ps1" 2>&1 | ForEach-Object { "$_" }
     $VerifyExit = $LASTEXITCODE
     $VerifyOutput | Out-File -FilePath $LogFile -Append -Encoding utf8
 
