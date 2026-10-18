@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Nyxframework Git Auto-Sync every 2 minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=2min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
