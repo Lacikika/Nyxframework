@@ -9,6 +9,29 @@ Nyx = Nyx or {}
 Nyx.Properties = Nyx.Properties or {}
 Nyx.Properties.Loaded = {} -- [property_id] = propertyData
 
+-- Standardized Bridge to nyx_core
+Nyx.GetPlayer = Nyx.GetPlayer or function(src)
+    if exports['nyx_core'] and exports['nyx_core'].GetPlayer then
+        return exports['nyx_core']:GetPlayer(src)
+    end
+    return nil
+end
+
+Nyx.GetPlayerByCitizenId = Nyx.GetPlayerByCitizenId or function(citizenId)
+    if exports['nyx_core'] and exports['nyx_core'].GetPlayerByCitizenId then
+        return exports['nyx_core']:GetPlayerByCitizenId(citizenId)
+    end
+    return nil
+end
+
+Nyx.RPC = Nyx.RPC or {
+    Register = function(route, handler)
+        if exports['nyx_core'] and exports['nyx_core'].RegisterRPC then
+            exports['nyx_core']:RegisterRPC(route, handler)
+        end
+    end
+}
+
 -- 1. Initialize Default Properties and Load Database State
 MySQL.ready(function()
     -- Seed default properties if table empty

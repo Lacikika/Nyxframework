@@ -10,6 +10,29 @@
 Nyx = Nyx or {}
 Nyx.Properties = Nyx.Properties or {}
 
+-- Standardized Bridge to nyx_core
+Nyx.GetPlayer = Nyx.GetPlayer or function(src)
+    if exports['nyx_core'] and exports['nyx_core'].GetPlayer then
+        return exports['nyx_core']:GetPlayer(src)
+    end
+    return nil
+end
+
+Nyx.GetPlayerByCitizenId = Nyx.GetPlayerByCitizenId or function(citizenId)
+    if exports['nyx_core'] and exports['nyx_core'].GetPlayerByCitizenId then
+        return exports['nyx_core']:GetPlayerByCitizenId(citizenId)
+    end
+    return nil
+end
+
+Nyx.RPC = Nyx.RPC or {
+    Register = function(route, handler)
+        if exports['nyx_core'] and exports['nyx_core'].RegisterRPC then
+            exports['nyx_core']:RegisterRPC(route, handler)
+        end
+    end
+}
+
 -- 1. Register a Stewardship Delegate Authorization
 function Nyx.Properties.RegisterStewardshipDelegate(ownerCitizenId, delegateCitizenId, scope, notes)
     local valid, err = Nyx.Inactivity.ValidateDelegation(ownerCitizenId, delegateCitizenId, scope)
@@ -237,7 +260,7 @@ function Nyx.Properties.SweepPropertyInactivity()
                 end
 
                 -- Notify online owner or delegate
-                local ownerPly = Nyx.GetPlayerByCitizenId(p.owner_citizen_id)
+                local ownerPly = exports['nyx_core']:GetPlayerByCitizenId(p.owner_citizen_id)
                 if ownerPly then
                     TriggerClientEvent("nyx:ui:notify", ownerPly.source, {
                         type = "error",
@@ -246,7 +269,7 @@ function Nyx.Properties.SweepPropertyInactivity()
                     })
                 end
                 if p.steward_delegate_citizen_id then
-                    local delPly = Nyx.GetPlayerByCitizenId(p.steward_delegate_citizen_id)
+                    local delPly = exports['nyx_core']:GetPlayerByCitizenId(p.steward_delegate_citizen_id)
                     if delPly then
                         TriggerClientEvent("nyx:ui:notify", delPly.source, {
                             type = "warning",
@@ -326,8 +349,8 @@ end)
 -- RPC Registration
 -- ============================================================================
 
-Nyx.RPC.Register("properties:registerStewardDelegate", function(src, payload)
-    local player = Nyx.GetPlayer(src)
+exports['nyx_core']:RegisterRPC("properties:registerStewardDelegate", function(src, payload)
+    local player = exports['nyx_core']:GetPlayer(src)
     if not player then return false, "UNAUTHENTICATED" end
 
     local delegateCitizenId = payload and payload.delegateCitizenId
@@ -337,8 +360,8 @@ Nyx.RPC.Register("properties:registerStewardDelegate", function(src, payload)
     return Nyx.Properties.RegisterStewardshipDelegate(player.citizenId, delegateCitizenId, scope, notes)
 end)
 
-Nyx.RPC.Register("properties:revokeStewardDelegate", function(src, payload)
-    local player = Nyx.GetPlayer(src)
+exports['nyx_core']:RegisterRPC("properties:revokeStewardDelegate", function(src, payload)
+    local player = exports['nyx_core']:GetPlayer(src)
     if not player then return false, "UNAUTHENTICATED" end
 
     local delegateCitizenId = payload and payload.delegateCitizenId
@@ -347,8 +370,8 @@ Nyx.RPC.Register("properties:revokeStewardDelegate", function(src, payload)
     return Nyx.Properties.RevokeStewardshipDelegate(player.citizenId, delegateCitizenId, scope)
 end)
 
-Nyx.RPC.Register("properties:assignPropertySteward", function(src, payload)
-    local player = Nyx.GetPlayer(src)
+exports['nyx_core']:RegisterRPC("properties:assignPropertySteward", function(src, payload)
+    local player = exports['nyx_core']:GetPlayer(src)
     if not player then return false, "UNAUTHENTICATED" end
 
     local propertyId = payload and payload.propertyId
@@ -357,14 +380,14 @@ Nyx.RPC.Register("properties:assignPropertySteward", function(src, payload)
     return Nyx.Properties.AssignPropertySteward(propertyId, player.citizenId, delegateCitizenId)
 end)
 
-Nyx.RPC.Register("properties:getMyStewardship", function(src)
-    local player = Nyx.GetPlayer(src)
+exports['nyx_core']:RegisterRPC("properties:getMyStewardship", function(src)
+    local player = exports['nyx_core']:GetPlayer(src)
     if not player then return nil, "UNAUTHENTICATED" end
 
     return Nyx.Properties.GetCitizenStewardshipOverview(player.citizenId)
 end)
 
-Nyx.RPC.Register("properties:getInactivityAuditLogs", function(src, limit)
+exports['nyx_core']:RegisterRPC("properties:getInactivityAuditLogs", function(src, limit)
     limit = math.min(100, math.max(1, tonumber(limit) or 20))
     local logs = MySQL.query.await([[
         SELECT `log_id`, `asset_type`, `asset_id`, `previous_owner_citizen_id`, `delegate_citizen_id`,

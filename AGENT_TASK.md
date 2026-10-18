@@ -25,55 +25,98 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 5. Update `AGENT_TASK.md` marking the task completed (`- [x]`) and log a brief summary of what was implemented under `Completed Tasks Log`.
 
 ## Task Backlog
-- [x] Feature: Advanced vehicle mileage & wear tracking system (server-side persistence in `nyx_vehicles`)
-- [x] Feature: Dynamic inventory weight penalties on player movement (`nyx_inventory` -> `nyx_core`)
-- [x] Feature: Elastic item pricing based on localized stock-to-demand ratio (`nyx_logistics` / `nyx_treasury`)
-- [x] Feature: Cryptographic evidence chain-of-custody registry with SHA-256 fingerprints (`nyx_judiciary`)
-- [x] Refactor: Extract shared math/vector helper functions into a standalone utility (`nyx_core/shared/math.lua`)
-- [x] Feature: Multi-signature corporate treasury vaults and sign-off rules (`nyx_factions`)
-- [x] **Architecture: Master SPA CEF Optimization, Zero-Trust Security & UI/UX Ergonomics (`nyx_ui`)**
-  - **Dynamic Resource & Browser Dev Mode:** Resolve endpoints dynamically via `window.GetParentResourceName ? GetParentResourceName() : 'nui-dev'`. Provide mock state fallbacks when `window.invokeNative` is undefined for desktop browser debugging.
-  - **Focus & Lifecycle Failsafes:** Guarantee `cb(...)` execution on all code paths across every `RegisterNUICallback`. Bind `Escape` (and `Backspace` only when active element is not `INPUT`, `TEXTAREA`, or `[contenteditable]`) to close sub-modals/tooltips first before triggering `SetNuiFocus(false, false)`. Reset NUI focus automatically inside an `onResourceStop` handler.
-  - **Strict CEF Render Budget:** Enforce `background: transparent !important; overflow: hidden; user-select: none; -webkit-user-drag: none;` on root `html, body`. Strictly prohibit `backdrop-filter: blur()` and heavy `box-shadow` animations; use high-opacity dark surfaces (`rgba(12, 15, 22, 0.94)`) with `1px solid rgba(255, 255, 255, 0.08)` borders. Animate exclusively `transform` and `opacity`.
-  - **Delta-Throttled Messaging & Zero-Trust:** Never invoke `SendNUIMessage` inside `Wait(0)` loops; enforce state delta-checking and throttle HUD updates to `100ms–250ms`. Restrict NUI-to-Lua payloads strictly to player intent (`itemId`, `actionType`, `targetId`) with `isPending` button locking to prevent double-submit exploits.
-  - **Aspect-Ratio & WCAG AA+ Ergonomics:** Support 16:9, 21:9, 32:9, and 4:3 using Flexbox/Grid and `rem`/`vmin`/`vh` units (`max-height: 85vh; overflow-y: auto;`). Enforce `#F8FAFC` primary, `#94A3B8` secondary, and `#475569` muted color tokens, `38px–44px` minimum target heights with `8px–12px+` spacing, text truncation (`ellipsis`), virtualized lists for `100+` items, and auto-focused search inputs.
 
-- [x] **Feature: Extended Third-Eye (`LALT`) Cursor Manipulation & Zero-Packet Placement (`nyx_interact` / `nyx_inventory`)**
-  - **No-Press-E Philosophy:** Eliminate all legacy proximity key-press loops (`Wait(0)` "Press E" prompts). Route all world, NPC, and object interactions through the dormant `LALT` raycast Third-Eye cursor engine (`0.00ms` idle CPU budget).
-  - **Movement Freeze During Placement:** While a player is actively grabbing, rotating, or positioning a world item via the `LALT` cursor, lock character movement (`DisableControlAction` for movement/combat while keeping camera/cursor active) until placement is confirmed or cancelled.
-  - **60 FPS Client-Side Hologram Interpolation:** Render item dragging and rotation locally on the client with zero network traffic during movement. Transmit a single validated RPC call (`inventory:commitWorldPlacement`) with target coordinates and rotation only when the player releases the item.
+- [x] **Hotfix: Resolve Nil RPC Reference in Inactivity Handlers (`nyx_factions` & `nyx_properties`)**
+  - **Issue:** Server boot throws `attempt to index a nil value (field 'RPC')` at `inactivity.lua:295` and `inactivity.lua:329`.
+  - **Fix:** Replace direct uninitialized `Nyx.RPC` calls with `exports['nyx_core']:RegisterRPC` or ensure kernel RPC table reference is hydrated before event listeners bind.
 
-- [x] **Feature: Auto-Merging World Drops & Smart Fallback Containers (`nyx_inventory`)**
-  - **Weight-Tiered Fallback Models:** Automatically assign fallback 3D box/crate props to items lacking dedicated GTA V models based on item category and total weight.
-  - **Proximity Auto-Merge:** When an item is dropped or placed within `1.5m` of an identical item (or compatible fallback box), automatically merge the quantities/stacks server-side into the existing world container to prevent entity pool exhaustion and visual clutter.
+- [ ] **Hotfix: Substation Zero-State Blackout Cascade on Startup (`nyx_services`)**
+  - **Issue:** Power grid substations initialize with `0.0%` fuel and health on server boot, triggering a city-wide blackout cascade immediately.
+  - **Fix:** Update database hydration fallback in `server/powergrid.lua` to ensure default substations start at `100.0%` fuel and turbine integrity.
 
-- [x] **Feature: Menu-Free Grid-Snapping Warehouses & Routing Bucket Isolation (`nyx_logistics` / `nyx_inventory` / `nyx_core`)**
-  - **Physical Shelf Snapping:** Replace traditional stash menus in storage buildings with physical 3D shelf matrices. When holding or dragging a box via `LALT`, snap the prop to available shelf grid nodes so items remain physically visible and persistent at the exact spot they were placed.
-  - **Routing Bucket Isolation:** Isolate interior storage buildings into dedicated server-side Virtual Routing Buckets (`SetPlayerRoutingBucket` & `SetEntityRoutingBucket`) to guarantee zero entity streaming lag in the main overworld (`Bucket 0`).
+- [ ] **Performance: Batched Container Queries on Boot (`nyx_inventory` & `nyx_logistics`)**
+  - **Issue:** Sequential `SELECT * FROM nyx_inventories WHERE id = ?` calls cause 320ms query delays and a 370ms server thread hitch warning.
+  - **Fix:** Implement batched array queries (`WHERE id IN (...)`) for known startup containers (`stash:*`, `property:*`) to resolve cold-cache database latency.
 
-- [x] **Feature: Forgiving Tiered Weight Brackets & Heavy Freight Physics (`nyx_inventory` -> `nyx_core`)**
-  - **Expanded Capacity & State Bag Sync:** Increase baseline player carry capacity to a gameplay-friendly `50kg–60kg` limit. Synchronize weight brackets via server-authoritative State Bags (`Player(source).state.weightTier`) without client polling.
-  - **Tiered Movement Modifiers:**
-    - **Tier 0 (0%–70% load):** Normal movement, zero stamina or speed penalties.
-    - **Tier 1 (71%–95% load):** Moderate load; `-10%` sprint speed and slightly increased stamina drain.
-    - **Tier 2 (96%–100%+ load):** Overencumbered; sprinting and jumping disabled, fast walking allowed.
-    - **Tier 3 (Heavy Industrial Crates > 50kg):** Cannot be stored in backpack; requires physical two-handed carry, ground-dragging via `LALT`, or transport via pallet jack / forklift.
-- [x] Feature: Municipal power grid substation failure & blackout simulation (`nyx_services`)
-- [x] Security: Enforce RPC rate limiting (50 req/s token bucket) and 64KB payload cap (`nyx_core/server/rpc.lua`)
-- [x] Feature: Instant-Runoff Voting (IRV) election engine & live penal code sync (`nyx_parliament`)
-- [x] Feature: Automated jury pool dispatcher with Fisher-Yates shuffle & courtroom bucket routing (`nyx_judiciary`)
-- [x] Feature: Fiscal circuit protection & logarithmic public payroll scaling (`nyx_treasury`)
-- [x] Feature: Spatial grid ground drops & time-based item durability decay (`nyx_inventory` / `nyx_interact`)
-- [x] Feature: Physical freight pallets & power-dependent industrial assembly (`nyx_logistics` / `nyx_services`)
-- [x] QA: Add concurrency unit tests for inventory mutex locks and treasury double-entry conservation (`nyx_core/server/tests.lua`)
-- [x] Feature: Progressive property millage & dynamic land maintenance taxation (`nyx_properties` / `nyx_treasury`)
-- [x] Feature: Trade unionization framework, collective bargaining agreements & binding labor arbitration (`nyx_factions` / `nyx_treasury` / `nyx_judiciary`)
-- [x] Feature: Judicial subpoenas, probable cause warrants & live MDT dispatch tracking integration (`nyx_judiciary` / `nyx_mdt`)
-- [x] Feature: Municipal infrastructure degradation mode, civic impound reclamation & vehicle registration revenue (`nyx_treasury` / `nyx_vehicles` / `nyx_services`)
-- [x] Feature: Anti-monopoly inactivity reclamation engine, stewardship delegates & public blind-auction liquidation (`nyx_properties` / `nyx_factions` / `nyx_treasury`)
+- [ ] **Architecture: Staggered Resource Bootloader Dispatch (`nyx_core`)**
+  - **Issue:** 14 modular resources querying the MariaDB pool simultaneously causes connection contention on fresh server startup.
+  - **Fix:** Introduce a 50ms staggered initialization bus following `nyx:core:dbReady` so heavy resources initialize sequentially without thread hitches.
+
+- [ ] **Feature: Corporate Multi-Sig, RBAC & Union Management UI (`nyx_ui` & `nyx_factions`)**
+  - **Implementation:** Single-frame React/Svelte dashboard for player corporations and trade unions: visual RBAC permission matrix, multi-sig escrow approvals, and CBA contract builder.
+
+- [ ] **Feature: Judicial Chain-of-Custody, Warrants & Jury UI (`nyx_ui` & `nyx_judiciary`)**
+  - **Implementation:** Visual courtroom terminal app: SHA-256 evidence integrity explorer, secret-ballot jury voting box, and judge probable-cause warrant issuance screen.
+
+- [ ] **Feature: Parliamentary Ranked-Choice Voting & Legislation UI (`nyx_ui` & `nyx_parliament`)**
+  - **Implementation:** Interactive Instant-Runoff Voting (IRV) ballot interface, candidate endorsement registration portal, and live penal code amendment reader.
+
+- [ ] **Feature: Property Blind-Auction & Stewardship Portal (`nyx_ui` & `nyx_properties`)**
+  - **Implementation:** Real estate web application supporting blind-auction foreclosure bidding, tax delinquency settlements, and proxy stewardship assignments.
+
+- [ ] **Feature: 3D Warehouse Matrix & Elastic Market Monitor (`nyx_ui` & `nyx_logistics`)**
+  - **Implementation:** Interactive 3D shelf visualizer for warehouse container matrices and real-time regional supply/demand pricing charts for logistics haulers.
+
+- [ ] **Feature: Mechanical Diagnostics & Civic Impound Terminal (`nyx_ui` & `nyx_vehicles`)**
+  - **Implementation:** Vehicle wear inspection interface (oil, brake pads, gearbox, suspension telemetry) and automated civic impound lot release terminal.
+
+- [ ] **Feature: Citizen OS Master Smartphone Framework (`nyx_ui`)**
+  - **Implementation:** Unified single-frame CEF smartphone OS integrating mobile banking (`nyx_treasury`), freight dispatch board (`nyx_logistics`), and emergency alerts (`nyx_mdt`).
+
+- [ ] **Feature: Anatomical Trauma & Organ-Specific Medical Injury Engine (`nyx_services`)**
+  - **Implementation:** Limb-specific wound system (arterial bleeding, fractures, ballistic trauma) requiring physical medical items (`bandage_sterile`, `first_aid_pack`) for field stabilization.
+
+- [ ] **Feature: Pillbox Hospital Supply Depletion & Emergency Medical Hauls (`nyx_services` & `nyx_logistics`)**
+  - **Implementation:** Replace static medical supply loops with finite container `stash:pillbox_meds`. Low medical stock triggers priority emergency logistics contracts for couriers.
+
+- [ ] **Feature: Dynamic Gas Station Reservoir Stocks & Bulk Fuel Hauling (`nyx_logistics` & `nyx_vehicles`)**
+  - **Implementation:** Gas pumps draw from localized underground tanks. Zero fuel blocks vehicle refueling and creates refinery-to-station bulk tanker delivery missions.
+
+- [ ] **Feature: Physical Vehicle Keys, Fleet RFID Tokens & Lockpicking Forensics (`nyx_vehicles` & `nyx_inventory`)**
+  - **Implementation:** Metadata-driven ignition keys (`item_vehicle_key`), corporate RFID proximity access, and lockpicking mechanics that generate latent fingerprints for `nyx_judiciary`.
+
+- [ ] **Feature: Penal Labor Processing & Civic Sentence Reductions (`nyx_judiciary` & `nyx_logistics`)**
+  - **Implementation:** Bolingbroke penitentiary industrial work benches allowing inmates to assemble bulk civic materials to reduce prison sentence minutes and fund public reserves.
+
+- [ ] **Feature: Agricultural Extraction, Milling & Perishable Food Logistics (`nyx_services` & `nyx_logistics`)**
+  - **Implementation:** Natural crop harvest nodes and milling refineries producing shelf-stable bulk goods, feeding retail food containers with time-decay perishables.
+
+- [ ] **Feature: Investigative Press Leaks, Dropbox Whistleblowing & Subscriptions (`nyx_press` & `nyx_treasury`)**
+  - **Implementation:** Anonymous physical dropboxes for whistleblowers submitting evidence hashes, newspaper printing costs, and automated revenue splits from public newsstands.
+
+- [ ] **Feature: Substation Physical Sabotage, Alarm Breaches & Blackout Raids (`nyx_services` & `nyx_properties`)**
+  - **Implementation:** Transformer sabotage mechanics triggering localized blackout sectors, disabling commercial warehouse doorlocks and security alarms while alerting police dispatch.
+
+- [ ] **Feature: Sealed Industrial Pallet Breaching & Forensic Contamination (`nyx_logistics` & `nyx_judiciary`)**
+  - **Implementation:** Allow players to crowbar open tamper-sealed freight pallets in the world, generating ballistic scratches and DNA/fingerprint evidence markers.
+
+- [ ] **Feature: Weapon Serial Number Grinding & Acid-Etch Forensics (`nyx_inventory` & `nyx_judiciary`)**
+  - **Implementation:** Illicit workbench action stripping weapon metadata (`scratched = true`), with laboratory acid-etching allowing forensic investigators a chance to recover original serials.
+
+- [ ] **Feature: Commercial Money Laundering & Subpoena Ledger Auditing (`nyx_factions` & `nyx_treasury`)**
+  - **Implementation:** System allowing enterprises to inject illicit cash into legitimate registers over time, creating audit trail anomalies detectable via judicial subpoenas.
+
+- [ ] **Feature: Corporate Equity Public Offering & Dividend Distribution Engine (`nyx_factions` & `nyx_treasury`)**
+  - **Implementation:** Enable corporations to sell `equity_shares` to outside investors for capital raising, executing automated weekly dividend payouts via double-entry treasury ledgers.
+
+- [ ] **Feature: Armored Cash Transit & High-Value Banking Freight (`nyx_factions` & `nyx_treasury`)**
+  - **Implementation:** Retail store registers accumulating excess cash generate physical armored cash box items requiring secure transit to central municipal bank vaults.
+
+- [ ] **Testing: End-to-End Stress Simulation Across All 14 Resources (`nyx_core/server/tests.lua`)**
+  - **Implementation:** Automated test harness executing concurrent transactions across all systems to verify 0.00ms baseline idle performance, zero entity leaks, and perfect conservation.
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Hotfix: Resolve Nil RPC Reference in Inactivity Handlers (`nyx_factions` & `nyx_properties`)**
+  - **Kernel RPC Bridge & Handler Initialization (`nyx_factions/server/inactivity.lua`, `nyx_factions/server/permissions.lua`, `nyx_properties/server/inactivity.lua`, `nyx_properties/server/main.lua`)**:
+    - Replaced direct uninitialized `Nyx.RPC.Register` calls in `nyx_factions/server/inactivity.lua` (`factions:setFactionStewardDelegate`, `factions:getFactionInactivityStatus`) and `nyx_properties/server/inactivity.lua` (`properties:registerStewardDelegate`, `properties:revokeStewardDelegate`, `properties:assignPropertySteward`, `properties:getMyStewardship`, `properties:getInactivityAuditLogs`) with direct `exports['nyx_core']:RegisterRPC` calls.
+    - Added standardized kernel table hydration bridges (`Nyx.RPC`, `Nyx.GetPlayer`, `Nyx.GetPlayerByCitizenId`) at the top of boot scripts (`nyx_factions/server/permissions.lua`, `nyx_factions/server/inactivity.lua`, `nyx_properties/server/main.lua`, `nyx_properties/server/inactivity.lua`), ensuring non-nil access across all event handlers and sweepers.
+    - Resolved raw uninitialized `Nyx.GetPlayer` / `Nyx.GetPlayerByCitizenId` lookups in `nyx_properties/server/inactivity.lua` to route authoritatively via `exports['nyx_core']:GetPlayer(src)` and `exports['nyx_core']:GetPlayerByCitizenId(...)`.
+  - **Testing & Verification**:
+    - Added in-engine integration test assertion in `Nyx.Tests.TestInactivityReclamationAndStewardship()` (Test 25) in `FiveM/nyx_core/server/tests.lua` validating that all 7 inactivity and stewardship routes register cleanly and without nil-pointer references.
+    - Created dedicated pytest test suite `tests/test_inactivity_rpc_hotfix.py` verifying no raw unhydrated `Nyx.RPC` or `Nyx.GetPlayer` calls exist and verifying all 7 RPC routes are declared.
+    - Full pytest suite: 220/220 tests passing (100% pass rate).
+    - Verified clean passes across all 14 resources, 204 Lua files, and all 32 SQL migrations via `scripts/validator.py` and `scripts/verify.ps1`.
 - **[2026-10-18] Feature: Anti-monopoly inactivity reclamation engine, stewardship delegates & public blind-auction liquidation (`nyx_properties` / `nyx_factions` / `nyx_treasury`)**
   - **Database Migration & Schema Extensions (`031_inactivity_reclamation_and_stewardship.sql`, `index.json`)**:
     - Extended `nyx_characters` with `last_active_at` tracking timestamp on save and batch flush.

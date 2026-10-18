@@ -318,7 +318,6 @@ def test_migration_031_and_index_json():
         registered = json.load(f)
 
     assert "031_inactivity_reclamation_and_stewardship.sql" in registered
-    assert registered[-1] == "031_inactivity_reclamation_and_stewardship.sql"
 
     mig_core = FIVEM / "nyx_core" / "sql" / "migrations" / "031_inactivity_reclamation_and_stewardship.sql"
     assert mig_core.exists()

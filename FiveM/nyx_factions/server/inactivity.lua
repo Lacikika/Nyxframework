@@ -9,6 +9,29 @@
 Nyx = Nyx or {}
 Nyx.Factions = Nyx.Factions or {}
 
+-- Standardized Bridge to nyx_core
+Nyx.GetPlayer = Nyx.GetPlayer or function(src)
+    if exports['nyx_core'] and exports['nyx_core'].GetPlayer then
+        return exports['nyx_core']:GetPlayer(src)
+    end
+    return nil
+end
+
+Nyx.GetPlayerByCitizenId = Nyx.GetPlayerByCitizenId or function(citizenId)
+    if exports['nyx_core'] and exports['nyx_core'].GetPlayerByCitizenId then
+        return exports['nyx_core']:GetPlayerByCitizenId(citizenId)
+    end
+    return nil
+end
+
+Nyx.RPC = Nyx.RPC or {
+    Register = function(route, handler)
+        if exports['nyx_core'] and exports['nyx_core'].RegisterRPC then
+            exports['nyx_core']:RegisterRPC(route, handler)
+        end
+    end
+}
+
 -- 1. Set Stewardship Delegate for a Faction
 function Nyx.Factions.SetFactionStewardDelegate(src, factionId, delegateCitizenId)
     local player = Nyx.GetPlayer(src)
@@ -292,13 +315,13 @@ end
 -- RPC Registration
 -- ============================================================================
 
-Nyx.RPC.Register("factions:setFactionStewardDelegate", function(src, payload)
+exports['nyx_core']:RegisterRPC("factions:setFactionStewardDelegate", function(src, payload)
     local factionId = payload and payload.factionId
     local delegateCitizenId = payload and payload.delegateCitizenId
     return Nyx.Factions.SetFactionStewardDelegate(src, factionId, delegateCitizenId)
 end)
 
-Nyx.RPC.Register("factions:getFactionInactivityStatus", function(src, factionId)
+exports['nyx_core']:RegisterRPC("factions:getFactionInactivityStatus", function(src, factionId)
     local faction = MySQL.single.await([[
         SELECT `faction_id`, `legal_name`, `founder_citizen_id`, `steward_delegate_citizen_id`,
                `inactivity_status`, `inactivity_warning_at`, `is_active`

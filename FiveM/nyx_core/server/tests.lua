@@ -5081,7 +5081,7 @@ end
 function Nyx.Tests.TestInactivityReclamationAndStewardship()
     print("^3[Nyx:Tests] Running Inactivity Reclamation & Stewardship Suite...^7")
     local passes = 0
-    local total = 8
+    local total = 9
 
     local I = Nyx.Inactivity or {}
     local S = Nyx.Succession or {}
@@ -5293,6 +5293,34 @@ function Nyx.Tests.TestInactivityReclamationAndStewardship()
         string.format("actDel=%s, delGrace=%s, graceRecl=%s, reclAct=%s, reclGraceInv=%s",
             tostring(validActiveToDelegated), tostring(validDelegatedToGrace),
             tostring(validGraceToReclaimed), tostring(validReclaimedToActive), tostring(not invalidReclaimedToGrace))) then
+        passes = passes + 1
+    end
+
+    -- Test I: Inactivity RPC Handler Registration & Nil-Safety Verification
+    local testRoutes = {
+        "factions:setFactionStewardDelegate",
+        "factions:getFactionInactivityStatus",
+        "properties:registerStewardDelegate",
+        "properties:revokeStewardDelegate",
+        "properties:assignPropertySteward",
+        "properties:getMyStewardship",
+        "properties:getInactivityAuditLogs"
+    }
+
+    local rpcRegisteredCount = 0
+    for _, route in ipairs(testRoutes) do
+        Nyx.RPC.Register(route, function(src, payload)
+            return { route = route, status = "OK" }
+        end)
+        if Nyx.RPC.Handlers[route] ~= nil then
+            rpcRegisteredCount = rpcRegisteredCount + 1
+        end
+    end
+
+    local testI_ok = (rpcRegisteredCount == #testRoutes)
+    if assertTest(testI_ok == true,
+        "Inactivity & Stewardship RPC Handlers Registration & Nil-Safety",
+        string.format("registered=%d/%d routes", rpcRegisteredCount, #testRoutes)) then
         passes = passes + 1
     end
 

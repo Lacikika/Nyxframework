@@ -9,6 +9,29 @@ Nyx = Nyx or {}
 Nyx.Factions = Nyx.Factions or {}
 Nyx.Factions.MembersCache = {} -- [factionId .. ":" .. citizenId] = memberData
 
+-- Standardized Bridge to nyx_core
+Nyx.GetPlayer = Nyx.GetPlayer or function(src)
+    if exports['nyx_core'] and exports['nyx_core'].GetPlayer then
+        return exports['nyx_core']:GetPlayer(src)
+    end
+    return nil
+end
+
+Nyx.GetPlayerByCitizenId = Nyx.GetPlayerByCitizenId or function(citizenId)
+    if exports['nyx_core'] and exports['nyx_core'].GetPlayerByCitizenId then
+        return exports['nyx_core']:GetPlayerByCitizenId(citizenId)
+    end
+    return nil
+end
+
+Nyx.RPC = Nyx.RPC or {
+    Register = function(route, handler)
+        if exports['nyx_core'] and exports['nyx_core'].RegisterRPC then
+            exports['nyx_core']:RegisterRPC(route, handler)
+        end
+    end
+}
+
 -- 1. Evaluate whether a set of member permission nodes satisfies a required node
 local function evaluateNodeMatch(nodesList, requiredNode)
     if not nodesList or type(nodesList) ~= "table" then return false end
