@@ -9738,7 +9738,188 @@ function Nyx.Tests.TestWeaponSerialGrindingAndAcidEtchForensics()
     return passes == total
 end
 
--- 45. Master Test Runner
+function Nyx.Tests.TestCommercialMoneyLaunderingAndSubpoenaAuditing()
+    print("^3[Nyx:Tests] Running Commercial Money Laundering & Subpoena Ledger Auditing Suite...^7")
+    local passes = 0
+    local total = 8
+
+    local Laundering = Nyx.Laundering or {}
+    local Subpoena = Nyx.SubpoenaAudit or {}
+
+    -- Sub-test A: Migration 051 Schema Definition & Table Contracts
+    local m51_tables = {
+        registers = "nyx_factions_commercial_registers",
+        injections = "nyx_factions_laundering_injections",
+        audits = "nyx_treasury_subpoena_audits",
+        evidence_type = "financial"
+    }
+    local testA_ok = (m51_tables.registers ~= nil and m51_tables.injections ~= nil and m51_tables.audits ~= nil and m51_tables.evidence_type == "financial")
+    if assertTest(testA_ok == true,
+        "Migration 051 Schema Definition (Registers, Injections, Subpoena Audits & Financial Evidence Type)",
+        string.format("registers=%s, injections=%s, audits=%s, evidenceType=%s", m51_tables.registers, m51_tables.injections, m51_tables.audits, m51_tables.evidence_type)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Declarative Commercial Business Profiles
+    local profiles = Laundering.BusinessProfiles or {}
+    local nc = profiles['nightclub']
+    local cw = profiles['carwash']
+    local cs = profiles['consulting']
+
+    local testB_ok = (nc ~= nil and cw ~= nil and cs ~= nil) and
+                     (nc.baselineCashRatio == 0.70 and nc.washFeePct == 12.0 and nc.maxDailyCap == 100000.0) and
+                     (cw.baselineCashRatio == 0.60 and cw.washFeePct == 15.0) and
+                     (cs.baselineCashRatio == 0.05 and cs.washFeePct == 25.0)
+
+    if assertTest(testB_ok == true,
+        "Declarative Commercial Business Profiles (Nightclub, Carwash & Consulting Cash Baselines)",
+        string.format("nc(cash=%.2f, fee=%.1f%%); cw(cash=%.2f); cs(cash=%.2f, fee=%.1f%%)",
+            nc and nc.baselineCashRatio or 0, nc and nc.washFeePct or 0,
+            cw and cw.baselineCashRatio or 0,
+            cs and cs.baselineCashRatio or 0, cs and cs.washFeePct or 0)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Mathematical Laundering Split & Strict Cent Conservation
+    local split1 = Laundering.CalculateLaunderingSplit(10000.00, "nightclub", 10.0)
+    local split2 = Laundering.CalculateLaunderingSplit(2543.77, "carwash", 8.5)
+    local split3 = Laundering.CalculateLaunderingSplit(500.01, "consulting", 12.0)
+
+    local testC_ok = (split1.isValid == true and split1.conservationDelta == 0.00 and split1.clean == 7800.00 and split1.tax == 1000.00 and split1.overhead == 1200.00) and
+                     (split2.isValid == true and split2.conservationDelta < 0.001 and (split2.clean + split2.tax + split2.overhead) == 2543.77) and
+                     (split3.isValid == true and split3.conservationDelta < 0.001 and (split3.clean + split3.tax + split3.overhead) == 500.01)
+
+    if assertTest(testC_ok == true,
+        "Mathematical Laundering Split, Point-of-Sale Taxes & Cent Conservation (Delta = 0.00)",
+        string.format("split1(gross=%.2f, clean=%.2f, tax=%.2f, fee=%.2f, delta=%.4f)",
+            split1.gross, split1.clean, split1.tax, split1.overhead, split1.conservationDelta)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Drip Amount Calculation & Daily Cap Respect
+    local drip1 = Laundering.CalculateDripAmount(15000.00, 2500.00, 50000.00)
+    local dripCapConstrained = Laundering.CalculateDripAmount(15000.00, 2500.00, 1200.00)
+    local dripPoolConstrained = Laundering.CalculateDripAmount(800.00, 2500.00, 50000.00)
+    local dripExhausted = Laundering.CalculateDripAmount(15000.00, 2500.00, 0.00)
+
+    local testD_ok = (drip1 == 2500.00 and dripCapConstrained == 1200.00 and dripPoolConstrained == 800.00 and dripExhausted == 0.00)
+
+    if assertTest(testD_ok == true,
+        "Drip Laundering Pace, Queue Depletion & Remaining Daily Cap Bounds",
+        string.format("std=%.2f, capBound=%.2f, poolBound=%.2f, exh=%.2f",
+            drip1, dripCapConstrained, dripPoolConstrained, dripExhausted)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Zero-Trust Injection Payload Validation
+    local valOk, cleanPayload = Laundering.ValidateInjectionPayload({
+        registerId = "reg_unicorn_main",
+        amount = 15000.00,
+        citizenId = "CIT-001"
+    })
+    local valBadAmount, _ = Laundering.ValidateInjectionPayload({
+        registerId = "reg_unicorn_main",
+        amount = -500.00,
+        citizenId = "CIT-001"
+    })
+    local valBadRegister, _ = Laundering.ValidateInjectionPayload({
+        registerId = "",
+        amount = 5000.00,
+        citizenId = "CIT-001"
+    })
+
+    local testE_ok = (valOk == true and cleanPayload.amount == 15000.00 and valBadAmount == false and valBadRegister == false)
+
+    if assertTest(testE_ok == true,
+        "Zero-Trust Cash Injection Payload Validation & Numerical Sanitization",
+        string.format("valOk=%s, cleanAmount=%.2f, badAmount=%s, badReg=%s",
+            tostring(valOk), cleanPayload and cleanPayload.amount or 0, tostring(valBadAmount), tostring(valBadRegister))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Register Eligibility & Judicial Freeze Restraint
+    local mockActiveReg = {
+        is_active = 1,
+        is_frozen = 0,
+        dirty_cash_pool = 5000.00,
+        daily_laundered_amount = 10000.00,
+        max_daily_laundering_cap = 50000.00
+    }
+    local mockFrozenReg = {
+        is_active = 1,
+        is_frozen = 1,
+        freeze_reason = "Subpoena Warrant #42 Asset Restraint",
+        dirty_cash_pool = 5000.00,
+        daily_laundered_amount = 0.00,
+        max_daily_laundering_cap = 50000.00
+    }
+
+    local eligActive, _ = Laundering.EvaluateRegisterEligibility(mockActiveReg, 5000.00)
+    local eligFrozen, frozenReason = Laundering.EvaluateRegisterEligibility(mockFrozenReg, 5000.00)
+
+    local testF_ok = (eligActive == true and eligFrozen == false and frozenReason:find("REGISTER_FROZEN") ~= nil)
+
+    if assertTest(testF_ok == true,
+        "Register Operational Eligibility & Judicial Freeze Restraining Order Enforcement",
+        string.format("activeOk=%s, frozenBlocked=%s",
+            tostring(eligActive), tostring(not eligFrozen))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Forensic Anomaly Detection & Suspicion Taxonomy
+    local mockTxList = {
+        { amount = 5000.00, category = "cash_deposit", created_at_unix = 1700000100 },
+        { amount = 5000.00, category = "cash_deposit", created_at_unix = 1700000200 },
+        { amount = 5000.00, category = "cash_deposit", created_at_unix = 1700000300 },
+        { amount = 1000.00, category = "cash_deposit", created_at_unix = 1700000400 }
+    }
+    local anomalyReport = Subpoena.AnalyzeLedgerAnomalies(mockTxList, mockActiveReg, "consulting")
+
+    local testG_ok = (anomalyReport.anomalyScore >= 50.00 and anomalyReport.cashRatioPct == 100.0 and #anomalyReport.anomalies >= 2) and
+                     (anomalyReport.suspicionLevel == "elevated" or anomalyReport.suspicionLevel == "high_suspicion" or anomalyReport.suspicionLevel == "blatant_anomalies")
+
+    if assertTest(testG_ok == true,
+        "Statistical Ledger Anomaly Detection (Cash Ratio, Velocity Spikes & Benford Round Numbers)",
+        string.format("score=%.2f/100, level=%s, cashRatio=%.1f%%, anomaliesCount=%d",
+            anomalyReport.anomalyScore, anomalyReport.suspicionLevel, anomalyReport.cashRatioPct, #anomalyReport.anomalies)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test H: Cryptographic SHA-256 Report Integrity & Subpoena Scope Validation
+    local shaReport = anomalyReport.reportHash
+    local shaValid = (type(shaReport) == "string" and #shaReport == 64 and shaReport:match("^%x+$") ~= nil)
+
+    local mockWarrant = {
+        warrant_id = 991,
+        type = "subpoena",
+        subpoena_scope = "financial",
+        target_entity_id = "corp_vanilla_unicorn",
+        status = "active",
+        judicial_signature = "JUDGE_SIG_HASH_99"
+    }
+    local scopeOk, _ = Subpoena.ValidateSubpoenaScope(mockWarrant, "faction", "corp_vanilla_unicorn")
+    local mockMismatchWarrant = {
+        warrant_id = 992,
+        type = "subpoena",
+        subpoena_scope = "financial",
+        target_entity_id = "syn_other_syndicate",
+        status = "active"
+    }
+    local scopeMismatch, _ = Subpoena.ValidateSubpoenaScope(mockMismatchWarrant, "faction", "corp_vanilla_unicorn")
+
+    local testH_ok = (shaValid == true and scopeOk == true and scopeMismatch == false)
+
+    if assertTest(testH_ok == true,
+        "Cryptographic SHA-256 Audit Hash & Judicial Subpoena Warrant Scope Authorization",
+        string.format("sha256=%s, scopeOk=%s, scopeMismatchBlocked=%s",
+            shaReport:sub(1, 16) .. "...", tostring(scopeOk), tostring(not scopeMismatch))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 45. Master Test Runner (Suite 1 - Suite 46)
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -9789,9 +9970,10 @@ function Nyx.Tests.RunAll()
     local t43 = Nyx.Tests.TestSubstationSabotageAndBlackoutRaids()
     local t44 = Nyx.Tests.TestSealedPalletBreachingAndForensicContamination()
     local t45 = Nyx.Tests.TestWeaponSerialGrindingAndAcidEtchForensics()
+    local t46 = Nyx.Tests.TestCommercialMoneyLaunderingAndSubpoenaAuditing()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 and t41 and t42 and t43 and t44 and t45 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 and t41 and t42 and t43 and t44 and t45 and t46 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

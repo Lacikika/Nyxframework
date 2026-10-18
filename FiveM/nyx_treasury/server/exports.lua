@@ -106,3 +106,16 @@ exports("CalculatePublicRepairCost", function(baseLabor, damageRatio, partsMulti
     local tier = Nyx.Treasury.GetMunicipalFiscalTier()
     return Nyx.Degradation.CalculatePublicRepairCost(baseLabor, damageRatio, partsMultiplier, tier, hasRepairKit)
 end)
+
+-- Judicial Subpoena Forensic Audit Exports
+exports("ExecuteSubpoenaAudit", function(src, warrantId, targetType, targetId)
+    return Nyx.Treasury.ExecuteSubpoenaAudit(src, warrantId, targetType, targetId)
+end)
+
+exports("GetSubpoenaAuditReport", function(auditUuid)
+    return Nyx.Treasury.GetSubpoenaAuditReport(auditUuid)
+end)
+
+exports("FreezeCommercialTarget", function(src, warrantId, targetType, targetId, reason)
+    return Nyx.Treasury.FreezeCommercialTarget(src, warrantId, targetType, targetId, reason)
+end)

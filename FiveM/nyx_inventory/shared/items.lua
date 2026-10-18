@@ -699,6 +699,34 @@ Nyx.Items.Registry = {
             attachOffset = { x = 0.0, y = 0.42, z = -0.15 },
             attachRot = { x = 0.0, y = 0.0, z = 0.0 }
         }
+    },
+
+    -- Illicit Financial & Laundering Currency
+    ['dirty_money'] = {
+        name = 'dirty_money',
+        label = 'Illicit Cash Stack',
+        weight = 100,
+        stackable = true,
+        maxStack = 100,
+        type = 'currency',
+        decayRate = 0.00,
+        description = 'Banded stacks of untaxed, unregistered cash from illicit commerce. Must be laundered through commercial fronts.',
+        client = {
+            model = `prop_cash_pile_02`
+        }
+    },
+    ['marked_bills'] = {
+        name = 'marked_bills',
+        label = 'Dye-Pack Marked Bills',
+        weight = 150,
+        stackable = true,
+        maxStack = 50,
+        type = 'contraband',
+        decayRate = 0.00,
+        description = 'Bundles of bank cash contaminated with forensic security dye. High forensic anomaly profile.',
+        client = {
+            model = `prop_anim_cash_pile_01`
+        }
     }
 }
 
@@ -783,6 +811,14 @@ function Nyx.Items.CreateDefaultMetadata(name, extra)
         elseif item.name == 'tamper_seal' then
             meta.sealSerial = (type(extra) == "table" and extra.sealSerial) or string.format("SEAL-%07d", math.random(1000000, 9999999))
             meta.sealedAt = os.time()
+        elseif item.name == 'dirty_money' then
+            meta.bundleValue = (type(extra) == "table" and extra.bundleValue) or 1000.00
+            meta.taintRatio = (type(extra) == "table" and extra.taintRatio) or 1.00
+            meta.origin = (type(extra) == "table" and extra.origin) or "unregistered"
+        elseif item.name == 'marked_bills' then
+            meta.bundleValue = (type(extra) == "table" and extra.bundleValue) or 5000.00
+            meta.dyeColor = (type(extra) == "table" and extra.dyeColor) or "chemical_red"
+            meta.forensicRisk = (type(extra) == "table" and extra.forensicRisk) or 0.85
         end
     end
 

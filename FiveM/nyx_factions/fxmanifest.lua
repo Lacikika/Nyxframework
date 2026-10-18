@@ -17,7 +17,8 @@ shared_scripts {
     'config.lua',
     'shared/corporate_rbac.lua',
     'shared/unions.lua',
-    'shared/succession.lua'
+    'shared/succession.lua',
+    'shared/laundering.lua'
 }
 
 server_scripts {
@@ -31,6 +32,7 @@ server_scripts {
     'server/cba.lua',
     'server/inactivity.lua',
     'server/fleet.lua',
+    'server/laundering.lua',
     'server/main.lua',
     'server/exports.lua'
 }
@@ -39,6 +41,7 @@ client_scripts {
     'client/terminals.lua',
     'client/fleet_depot.lua',
     'client/unions.lua',
+    'client/laundering.lua',
     'client/main.lua',
     'client/exports.lua'
 }

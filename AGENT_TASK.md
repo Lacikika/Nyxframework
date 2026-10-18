@@ -93,7 +93,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Weapon Serial Number Grinding & Acid-Etch Forensics (`nyx_inventory` & `nyx_judiciary`)**
   - **Implementation:** Illicit workbench action stripping weapon metadata (`scratched = true`), with laboratory acid-etching allowing forensic investigators a chance to recover original serials.
 
-- [ ] **Feature: Commercial Money Laundering & Subpoena Ledger Auditing (`nyx_factions` & `nyx_treasury`)**
+- [x] **Feature: Commercial Money Laundering & Subpoena Ledger Auditing (`nyx_factions` & `nyx_treasury`)**
   - **Implementation:** System allowing enterprises to inject illicit cash into legitimate registers over time, creating audit trail anomalies detectable via judicial subpoenas.
 
 - [ ] **Feature: Corporate Equity Public Offering & Dividend Distribution Engine (`nyx_factions` & `nyx_treasury`)**
@@ -107,6 +107,34 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Commercial Money Laundering & Subpoena Ledger Auditing (`nyx_factions` & `nyx_treasury`)**
+  - **Database Migrations (`051_commercial_money_laundering_and_subpoena_auditing.sql`)**:
+    - Registered Step 51 in `FiveM/nyx_core/sql/migrations/index.json` and mirrored to `nyx_factions`, `nyx_treasury`, and `nyx_judiciary`.
+    - Extended `nyx_judiciary_evidence.type` ENUM with `'financial'`.
+    - Created `nyx_factions_commercial_registers` table (`register_id` PK, `faction_id`, `label`, `business_type`, `clean_cash_balance`, `dirty_cash_pool`, `total_washed`, `total_tax_paid`, `max_daily_laundering_cap`, `daily_laundered_amount`, `last_cap_reset`, `wash_rate_pct`, `drip_amount_per_tick`, `coords`, `is_active`, `is_frozen`, `frozen_by`, `freeze_reason`, timestamps) with indexes on `faction_id`, `business_type`, and status flags.
+    - Created `nyx_factions_laundering_injections` immutable deposit audit table (`injection_id` PK, `injection_uuid` UNIQUE, `register_id`, `faction_id`, `citizen_id`, `amount`, `source_note`, `status`, `created_at`).
+    - Created `nyx_treasury_subpoena_audits` immutable forensic audit ledger (`audit_id` PK, `audit_uuid` UNIQUE, `subpoena_warrant_id`, `target_type`, `target_id`, `auditor_citizen_id`, `anomaly_score`, `suspicion_level`, `anomalies_detected`, `total_volume_audited`, `cash_ratio_pct`, `forensic_report_sha256`, `evidence_id`, `recommendation`, `created_at`).
+    - Seeded canonical enterprises and clearing accounts: `pool:laundering:clearing`, `corp_vanilla_unicorn` (VIP lounge register), `priv_carwash_strawberry` (checkout till), and `syn_pacific_consulting` (accounts desk).
+  - **Item Registry Integration (`FiveM/nyx_inventory/shared/items.lua`)**:
+    - Registered `dirty_money` (Illicit Cash Stack, 100g, currency type, stackable up to 100).
+    - Registered `marked_bills` (Dye-Pack Marked Bills, 150g, contraband type, stackable up to 50).
+    - Extended `CreateDefaultMetadata` to auto-populate `bundleValue`, `taintRatio`, `origin`, `dyeColor`, and `forensicRisk`.
+  - **Shared Pure Lua 5.4 Domain Engines**:
+    - `FiveM/nyx_factions/shared/laundering.lua`: Declarative commercial profiles (`nightclub`, `carwash`, `restaurant`, `pawnshop`, `retail`, `consulting`, `logistics`), pure split calculator (`CalculateLaunderingSplit`) guaranteeing exact cent conservation ($\Delta = 0.00$), drip wash pace calculator (`CalculateDripAmount`), zero-trust payload sanitizer (`ValidateInjectionPayload`), and register eligibility evaluator (`EvaluateRegisterEligibility`).
+    - `FiveM/nyx_treasury/shared/subpoena_audit.lua`: Statistical ledger anomaly detection engine (`AnalyzeLedgerAnomalies`) tracking 5 forensic anomaly vectors (disproportionate cash ratios against industry baselines, burst velocity spikes < 300s, artificial round numbers, cap saturation velocity, and off-hours activity), 5-tier suspicion rating taxonomy (`clean`, `low_risk`, `elevated`, `high_suspicion`, `blatant_anomalies`), native bitwise pure Lua 5.4 SHA-256 report hasher (`Sha256`), and subpoena scope validator (`ValidateSubpoenaScope`).
+  - **Authoritative Server Subsystems & RPCs**:
+    - `FiveM/nyx_factions/server/laundering.lua`: In-memory register hydration on startup, authoritative dirty cash deposit handler (`InjectDirtyCash`) validating permissions, deducting dirty cash items/wallets, logging injections, periodic drip sweeper thread executing double-entry transfers into faction treasury account (`laundering_clean_deposit`) and municipal tax pool (`sales_tax`), register judicial freeze/unfreeze endpoints, and RPCs (`factions:getCommercialRegisters`, `factions:injectDirtyCash`, `factions:getRegisterDetails`, `factions:processLaunderingTick`, `factions:freezeRegister`).
+    - `FiveM/nyx_treasury/server/subpoena_audit.lua`: Authoritative subpoena forensic audit engine (`ExecuteSubpoenaAudit`), querying double-entry ledger history, calculating statistical anomalies, filing certified evidence into `nyx_judiciary` (`financial` evidence type), judicial asset freezing (`FreezeCommercialTarget`), and RPCs (`treasury:executeSubpoenaAudit`, `treasury:getSubpoenaAuditReport`, `treasury:freezeCommercialTarget`).
+    - Exported public APIs in `FiveM/nyx_factions/server/exports.lua` (`GetCommercialRegister`, `GetFactionCommercialRegisters`, `InjectDirtyCash`, `ProcessRegisterLaunderingTick`, `FreezeRegister`, `UnfreezeRegister`) and `FiveM/nyx_treasury/server/exports.lua` (`ExecuteSubpoenaAudit`, `GetSubpoenaAuditReport`, `FreezeCommercialTarget`).
+  - **Client Implementations & Interactions**:
+    - `FiveM/nyx_factions/client/laundering.lua`: Proximity resolution for nearest commercial front register, deposit animation, interactive commands (`/injectcash`, `/launder`, `/registerinfo`), and sound FX.
+    - `FiveM/nyx_treasury/client/subpoena_audit.lua`: Forensic audit execution command (`/subpoenaaudit`) rendering multi-line audit findings in chat, and judicial freeze command (`/freezebusiness`).
+  - **Manifests & Verification**:
+    - Updated `fxmanifest.lua` in `nyx_factions` and `nyx_treasury` declaring all shared, server, and client scripts.
+    - Added in-engine integration test Test 46 (`Nyx.Tests.TestCommercialMoneyLaunderingAndSubpoenaAuditing`) to `FiveM/nyx_core/server/tests.lua` and wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_commercial_laundering_and_subpoena_auditing.py` (11/11 tests passing).
+    - Full pytest suite: 419/419 passed (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 254 Lua files, 51 migrations (100% clean verification).
 - **[2026-10-18] Feature: Weapon Serial Number Grinding & Acid-Etch Forensics (`nyx_inventory` & `nyx_judiciary`)**
   - **Database Migrations (`050_weapon_serial_grinding_and_acid_etch_forensics.sql`)**:
     - Created migration file and registered Step 50 in `FiveM/nyx_core/sql/migrations/index.json`.

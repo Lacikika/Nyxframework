@@ -15,7 +15,9 @@ dependencies {
 shared_scripts {
     'config.lua',
     'shared/circuit.lua',
-    'shared/degradation.lua'
+    'shared/degradation.lua',
+    '@nyx_factions/shared/laundering.lua',
+    'shared/subpoena_audit.lua'
 }
 
 server_scripts {
@@ -25,12 +27,14 @@ server_scripts {
     'server/ledger.lua',
     'server/taxes.lua',
     'server/payroll.lua',
+    'server/subpoena_audit.lua',
     'server/main.lua',
     'server/exports.lua'
 }
 
 client_scripts {
     'client/terminals.lua',
+    'client/subpoena_audit.lua',
     'client/main.lua',
     'client/exports.lua'
 }

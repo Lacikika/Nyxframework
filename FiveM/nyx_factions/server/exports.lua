@@ -243,3 +243,28 @@ end)
 exports("GetRBACAuditLog", function(factionId, limit)
     return Nyx.Factions.GetRBACAuditLog(factionId, limit)
 end)
+
+-- Commercial Front Registers & Laundering Exports
+exports("GetCommercialRegister", function(registerId)
+    return Nyx.Laundering.GetRegister(registerId)
+end)
+
+exports("GetFactionCommercialRegisters", function(factionId)
+    return Nyx.Laundering.GetFactionRegisters(factionId)
+end)
+
+exports("InjectDirtyCash", function(src, payload)
+    return Nyx.Laundering.InjectDirtyCash(src, payload)
+end)
+
+exports("ProcessRegisterLaunderingTick", function(registerId)
+    return Nyx.Laundering.ProcessRegisterLaunderingTick(registerId)
+end)
+
+exports("FreezeRegister", function(registerId, judgeCitId, reason)
+    return Nyx.Laundering.FreezeRegister(registerId, judgeCitId, reason)
+end)
+
+exports("UnfreezeRegister", function(registerId, judgeCitId)
+    return Nyx.Laundering.UnfreezeRegister(registerId, judgeCitId)
+end)
