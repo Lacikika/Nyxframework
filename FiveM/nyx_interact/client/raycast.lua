@@ -12,12 +12,14 @@ Nyx.Interact.IsActive = false
 Nyx.Interact.CurrentTarget = nil
 Nyx.Interact.HasAudibleTarget = false
 
--- 1. Math: Convert Gameplay Camera Euler Rotation to Direction Vector
-function Nyx.Math.RotationToDirection(rot)
-    local z = math.rad(rot.z)
-    local x = math.rad(rot.x)
-    local num = math.abs(math.cos(x))
-    return vector3(-math.sin(z) * num, math.cos(z) * num, math.sin(x))
+-- 1. Math: Ensure Camera Rotation to Direction Vector is available
+if not Nyx.Math.RotationToDirection then
+    function Nyx.Math.RotationToDirection(rot)
+        local z = math.rad(rot.z)
+        local x = math.rad(rot.x)
+        local num = math.abs(math.cos(x))
+        return vector3(-math.sin(z) * num, math.cos(z) * num, math.sin(x))
+    end
 end
 
 -- 2. Execute Hardware-Accelerated LosProbe Shape Test

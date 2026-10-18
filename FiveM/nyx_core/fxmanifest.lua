@@ -9,6 +9,7 @@ version '1.0.0'
 
 shared_scripts {
     'config.lua',
+    'shared/math.lua',
     'shared/rpc.lua'
 }
 

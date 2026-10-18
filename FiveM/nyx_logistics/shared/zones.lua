@@ -50,22 +50,15 @@ function Nyx.Logistics.ResolveZoneFromCoords(coords, customZones)
     if not coords then return "zone_ls_metro" end
     local zones = customZones or Nyx.Logistics.Zones or Nyx.Logistics.DefaultZones
 
-    local targetVec
-    if type(coords) == "vector3" then
-        targetVec = coords
-    elseif type(coords) == "table" and coords.x and coords.y then
-        targetVec = vector3(coords.x, coords.y, coords.z or 0.0)
-    else
-        return "zone_ls_metro"
-    end
+    local targetVec = (Nyx.Math and Nyx.Math.ToVector3) and Nyx.Math.ToVector3(coords) or (type(coords) == "vector3" and coords or (type(coords) == "table" and coords.x and coords.y and vector3(coords.x, coords.y, coords.z or 0.0) or nil))
+    if not targetVec then return "zone_ls_metro" end
 
     local bestZoneId = "zone_ls_metro"
     local bestDistance = math.huge
 
     for zoneId, z in pairs(zones) do
-        local zCoords = z.coords
-        local zVec = type(zCoords) == "vector3" and zCoords or vector3(zCoords.x, zCoords.y, zCoords.z or 0.0)
-        local dist = #(vector2(targetVec.x, targetVec.y) - vector2(zVec.x, zVec.y))
+        local zVec = (Nyx.Math and Nyx.Math.ToVector3) and Nyx.Math.ToVector3(z.coords) or (type(z.coords) == "vector3" and z.coords or vector3(z.coords.x, z.coords.y, z.coords.z or 0.0))
+        local dist = (Nyx.Math and Nyx.Math.Distance2D) and Nyx.Math.Distance2D(targetVec, zVec) or #(vector2(targetVec.x, targetVec.y) - vector2(zVec.x, zVec.y))
         
         -- If inside radius, prefer the closest match
         if dist <= (z.radius or 2000.0) and dist < bestDistance then

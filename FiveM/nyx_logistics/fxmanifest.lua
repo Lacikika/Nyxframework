@@ -15,6 +15,7 @@ dependencies {
 }
 
 shared_scripts {
+    '@nyx_core/shared/math.lua',
     'config.lua',
     'shared/zones.lua',
     'shared/nodes.lua',

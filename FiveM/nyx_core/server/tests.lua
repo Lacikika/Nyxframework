@@ -672,7 +672,138 @@ function Nyx.Tests.TestEvidenceChainOfCustody()
     return passes == total
 end
 
--- 9. Master Test Runner
+-- 9. Test Shared Math, Vector Algebra & Spatial Geometry Utility Suite
+function Nyx.Tests.TestSharedMathAndVectorUtils()
+    print("^3[Nyx:Tests] Running Shared Math & Vector Utility Suite...^7")
+    local passes = 0
+    local total = 6
+
+    local M = Nyx.Math
+
+    -- Test A: Scalar Math (Clamp, Round, Lerp, InvLerp, Remap, Sign, IsNear)
+    local clamped1 = M.Clamp(5, 10, 20)
+    local clamped2 = M.Clamp(25, 10, 20)
+    local clamped3 = M.Clamp(15, 10, 20)
+    local round1 = M.Round(3.14159, 2)
+    local round2 = M.Round(10.555, 2)
+    local round3 = M.Round(-2.5, 0)
+    local lerpVal = M.Lerp(10.0, 50.0, 0.25)
+    local invLerpVal = M.InvLerp(10.0, 50.0, 20.0)
+    local remapVal = M.Remap(50, 0, 100, 200, 400)
+    local signPos = M.Sign(42)
+    local signNeg = M.Sign(-99)
+    local isNear = M.IsNear(1.0000001, 1.0, 1e-5)
+
+    if assertTest(clamped1 == 10 and clamped2 == 20 and clamped3 == 15
+        and round1 == 3.14 and round2 == 10.56 and round3 == -3.0
+        and math.abs(lerpVal - 20.0) < 1e-6 and math.abs(invLerpVal - 0.25) < 1e-6
+        and math.abs(remapVal - 300.0) < 1e-6
+        and signPos == 1 and signNeg == -1 and isNear == true,
+        "Scalar Math Operations (Clamp, Round, Lerp, Remap, Sign, IsNear)",
+        "Scalar math evaluated to unexpected values") then
+        passes = passes + 1
+    end
+
+    -- Test B: Vector Type Parsing & Conversion (ToVector3, ToVector2, VectorToTable, Normalize)
+    local vFromTbl = M.ToVector3({ x = 12.5, y = -34.2, z = 5.0 })
+    local vFromArr = M.ToVector3({ 1.0, 2.0, 3.0 })
+    local vNil = M.ToVector3(nil, 42.0)
+    local v2 = M.ToVector2(vFromTbl)
+    local tbl = M.VectorToTable(vFromTbl)
+    local unitV = M.Normalize(vector3(0.0, 10.0, 0.0))
+    local zeroV = M.Normalize(vector3(0.0, 0.0, 0.0))
+
+    if assertTest(vFromTbl.x == 12.5 and vFromTbl.y == -34.2 and vFromTbl.z == 5.0
+        and vFromArr.x == 1.0 and vFromArr.y == 2.0 and vFromArr.z == 3.0
+        and vNil.z == 42.0
+        and v2.x == 12.5 and v2.y == -34.2
+        and tbl.x == 12.5 and tbl.y == -34.2 and tbl.z == 5.0
+        and math.abs(unitV.y - 1.0) < 1e-6 and unitV.x == 0.0
+        and zeroV.x == 0.0 and zeroV.y == 0.0 and zeroV.z == 0.0,
+        "Vector Parsing, Conversion & Normalization Invariant",
+        "Vector conversion or normalization failed") then
+        passes = passes + 1
+    end
+
+    -- Test C: Spatial Distance & Proximity Evaluation (Distance, Distance2D, DistanceSquared, IsWithinRange)
+    local p1 = vector3(0.0, 0.0, 0.0)
+    local p2 = vector3(1.0, 2.0, 2.0)
+    local d3d = M.Distance(p1, p2)
+    local d3dSq = M.DistanceSquared(p1, p2)
+    local d2d = M.Distance2D(p1, vector3(3.0, 4.0, 100.0))
+    local inRange = M.IsWithinRange(p1, p2, 3.0)
+    local outOfRange = M.IsWithinRange(p1, p2, 2.9)
+
+    if assertTest(math.abs(d3d - 3.0) < 1e-6 and math.abs(d3dSq - 9.0) < 1e-6
+        and math.abs(d2d - 5.0) < 1e-6 and inRange == true and outOfRange == false,
+        "Spatial Euclidean & Squared Distance Range Evaluation Invariant",
+        "Distance or squared proximity check evaluated incorrectly") then
+        passes = passes + 1
+    end
+
+    -- Test D: Vector Algebra & Angle Invariants (Dot, Cross, Magnitude, AngleBetween, VectorLerp)
+    local dotOrthogonal = M.Dot(vector3(1.0, 0.0, 0.0), vector3(0.0, 1.0, 0.0))
+    local dotParallel = M.Dot(vector3(2.0, 3.0, 4.0), vector3(1.0, 2.0, 3.0))
+    local crossZ = M.Cross(vector3(1.0, 0.0, 0.0), vector3(0.0, 1.0, 0.0))
+    local mag = M.Magnitude(vector3(0.0, 3.0, 4.0))
+    local angle90 = M.AngleBetween(vector3(1.0, 0.0, 0.0), vector3(0.0, 1.0, 0.0))
+    local vLerp = M.VectorLerp(vector3(0.0, 0.0, 0.0), vector3(10.0, 20.0, 30.0), 0.5)
+
+    if assertTest(math.abs(dotOrthogonal) < 1e-6 and math.abs(dotParallel - 20.0) < 1e-6
+        and math.abs(crossZ.x) < 1e-6 and math.abs(crossZ.y) < 1e-6 and math.abs(crossZ.z - 1.0) < 1e-6
+        and math.abs(mag - 5.0) < 1e-6 and math.abs(angle90 - 90.0) < 1e-4
+        and math.abs(vLerp.x - 5.0) < 1e-6 and math.abs(vLerp.y - 10.0) < 1e-6 and math.abs(vLerp.z - 15.0) < 1e-6,
+        "Vector Algebra, Cross Product & Angular Invariants",
+        "Vector algebraic operations failed") then
+        passes = passes + 1
+    end
+
+    -- Test E: Rotation, Heading & Directional Math (RotationToDirection, HeadingToDirection, DirectionToHeading, GetHeadingBetween, GetAngleDifference)
+    local hNorth = M.HeadingToDirection(0.0)
+    local hWest = M.HeadingToDirection(90.0)
+    local calcHeadingNorth = M.DirectionToHeading(hNorth)
+    local calcHeadingWest = M.DirectionToHeading(hWest)
+    local headingToTarget = M.GetHeadingBetween(vector3(0.0, 0.0, 0.0), vector3(0.0, 50.0, 0.0))
+    local angleDiff1 = M.GetAngleDifference(10.0, 350.0)
+    local angleDiff2 = M.GetAngleDifference(0.0, 180.0)
+    local camDir = M.RotationToDirection(vector3(0.0, 0.0, 0.0))
+
+    if assertTest(math.abs(hNorth.y - 1.0) < 1e-6 and math.abs(hNorth.x) < 1e-6
+        and math.abs(hWest.x - (-1.0)) < 1e-6 and math.abs(hWest.y) < 1e-6
+        and math.abs(calcHeadingNorth - 0.0) < 1e-4 and math.abs(calcHeadingWest - 90.0) < 1e-4
+        and math.abs(headingToTarget - 0.0) < 1e-4
+        and math.abs(angleDiff1 - 20.0) < 1e-4 and math.abs(angleDiff2 - 180.0) < 1e-4
+        and math.abs(camDir.y - 1.0) < 1e-6,
+        "Heading, Directional Transformation & Angular Delta Invariants",
+        "Heading or rotation transformation failed") then
+        passes = passes + 1
+    end
+
+    -- Test F: Geometric Containment Invariants (IsPointInSphere, IsPointInBox, IsPointInPolygon)
+    local inSphere = M.IsPointInSphere(vector3(1.0, 1.0, 1.0), vector3(0.0, 0.0, 0.0), 2.0)
+    local outSphere = M.IsPointInSphere(vector3(3.0, 0.0, 0.0), vector3(0.0, 0.0, 0.0), 2.0)
+
+    -- Box centered at (10, 10, 5) with dimensions (4, 4, 2)
+    local inBox = M.IsPointInBox(vector3(11.0, 11.0, 5.5), vector3(10.0, 10.0, 5.0), vector3(4.0, 4.0, 2.0), 0.0)
+    local outBox = M.IsPointInBox(vector3(15.0, 10.0, 5.0), vector3(10.0, 10.0, 5.0), vector3(4.0, 4.0, 2.0), 0.0)
+
+    -- 2D Polygon square: (0,0) -> (10,0) -> (10,10) -> (0,10)
+    local square = { { x = 0.0, y = 0.0 }, { x = 10.0, y = 0.0 }, { x = 10.0, y = 10.0 }, { x = 0.0, y = 10.0 } }
+    local inPoly = M.IsPointInPolygon(vector2(5.0, 5.0), square)
+    local outPoly = M.IsPointInPolygon(vector2(15.0, 5.0), square)
+
+    if assertTest(inSphere == true and outSphere == false
+        and inBox == true and outBox == false
+        and inPoly == true and outPoly == false,
+        "Geometric Spatial Containment Invariant (Sphere, OBB Box, Polygon)",
+        "Spatial containment check evaluated incorrectly") then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 10. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -686,9 +817,10 @@ function Nyx.Tests.RunAll()
     local t6 = Nyx.Tests.TestWeightPenalties()
     local t7 = Nyx.Tests.TestElasticItemPricingAndZoneDemand()
     local t8 = Nyx.Tests.TestEvidenceChainOfCustody()
+    local t9 = Nyx.Tests.TestSharedMathAndVectorUtils()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

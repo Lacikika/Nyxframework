@@ -14,6 +14,7 @@ description 'Persistent Vehicle Lifecycle, Damage Engine & Storage Bindings'
 version '1.0.0'
 
 shared_scripts {
+    '@nyx_core/shared/math.lua',
     'config.lua'
 }
 
