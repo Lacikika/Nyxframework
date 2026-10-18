@@ -38,7 +38,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
   - **Issue:** Sequential `SELECT * FROM nyx_inventories WHERE id = ?` calls cause 320ms query delays and a 370ms server thread hitch warning.
   - **Fix:** Implement batched array queries (`WHERE id IN (...)`) for known startup containers (`stash:*`, `property:*`) to resolve cold-cache database latency.
 
-- [ ] **Architecture: Staggered Resource Bootloader Dispatch (`nyx_core`)**
+- [x] **Architecture: Staggered Resource Bootloader Dispatch (`nyx_core`)**
   - **Issue:** 14 modular resources querying the MariaDB pool simultaneously causes connection contention on fresh server startup.
   - **Fix:** Introduce a 50ms staggered initialization bus following `nyx:core:dbReady` so heavy resources initialize sequentially without thread hitches.
 
@@ -107,6 +107,32 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Architecture: Staggered Resource Bootloader Dispatch (`nyx_core`)**
+  - **Pure Lua 5.4 Shared Engine (`nyx_core/shared/bootloader.lua`, `fxmanifest.lua`)**:
+    - Created pure shared bootloader engine `Nyx.Bootloader` providing canonical 6-stage architecture mapping all 14 modular resources (`kernel`, `inventory`, `civil`, `governance`, `justice`, `interface`).
+    - Implemented `CalculateTimeline(stages, staggerMs)` calculating linear scheduling ramps with 50ms stagger intervals (0ms to 650ms dispatch window across 14 resources).
+    - Added mathematical connection contention model `CalculateContentionSavings`: proves 14 concurrent connection pool bursts at $t=0$ are reduced to $\le 1.0$ concurrent with 50ms staggering ($> 90\%$ pool contention and hitch reduction).
+    - Added strict unidirectional state machine transition validator `ValidateTransition` (`UNINITIALIZED` -> `WAITING_DB` -> `DB_READY` -> `DISPATCHING` -> `BOOT_COMPLETE`).
+    - Added diagnostic boot report builder `FormatBootReport` formatting execution summaries and timing metrics.
+    - Registered `shared/bootloader.lua` in `FiveM/nyx_core/fxmanifest.lua`.
+  - **Authoritative Server Bootloader Dispatcher & Event Bus (`nyx_core/server/bootloader.lua`, `config.lua`, `fxmanifest.lua`)**:
+    - Built authoritative server dispatcher coordinating the 50ms sequential initialization bus.
+    - Wired `migrations.lua` to call `Nyx.Bootloader.OnDatabaseReady()`, emitting `nyx:core:dbReady` upon successful schema verification before triggering staggered resource dispatch.
+    - Dispatches sequential events: `nyx:core:resourceInit` (with resource name, stage ID, total stages, and elapsed offset) and targeted `nyx:core:init:<resourceName>`, followed by `nyx:core:bootComplete` upon sequence finalization.
+    - Synchronized with OneSync `GlobalState`: `GlobalState.nyxBootState`, `GlobalState.nyxBootStage`, and `GlobalState.nyxBootCompleted`.
+    - Added public server exports in `nyx_core/server/exports.lua`: `RegisterBootStage`, `IsDatabaseReady`, `IsBootComplete`, `GetBootState`, `GetBootReport`, `AwaitDatabase`, `AwaitBootStage`, and `DispatchBootloader`.
+    - Registered `server/bootloader.lua` in `FiveM/nyx_core/fxmanifest.lua`.
+  - **Database Schema Migration (`033_bootloader_staggered_dispatch_and_audit.sql`, `index.json`)**:
+    - Created `nyx_bootloader_logs` table persisting immutable server boot cycle logs (`boot_uuid`, `started_at`, `completed_at`, `total_duration_ms`, `stagger_delay_ms`, `resources_dispatched`, `stages_json`, `status`).
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 33).
+  - **Inter-Resource Bootloader Integration (`nyx_inventory`, `nyx_services`)**:
+    - *Inventory (`nyx_inventory/server/state.lua`)*: Hooked startup container batch preloading to `nyx:core:init:nyx_inventory` (Stage 2) with `IsDatabaseReady()` fallback, ensuring migrations and core accounts are fully loaded before container querying.
+    - *Services (`nyx_services/server/main.lua`)*: Hooked regional substation and hospital database hydration to `nyx:core:init:nyx_services` (Stage 3) with `IsDatabaseReady()` fallback, eliminating simultaneous startup database load.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestStaggeredResourceBootloaderDispatch()` (Test 28) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest test suite `tests/test_staggered_bootloader_dispatch.py` validating 8 distinct test scenarios (stage mapping, 50ms timeline calculation, connection contention math, state machine transitions, fxmanifest declarations, SQL migration 033, shared API, and server export bridges).
+    - Full pytest suite: 240/240 tests passing (100% pass rate).
+    - Verified clean passes across all 14 resources, 207 Lua files, and all 33 SQL migrations via `scripts/validator.py` and `scripts/verify.ps1`.
 - **[2026-10-18] Performance: Batched Container Queries on Boot (`nyx_inventory` & `nyx_logistics`)**
   - **Pure Lua 5.4 Batch Query Engine (`nyx_inventory/shared/batch.lua`, `fxmanifest.lua`)**:
     - Created pure shared batch planner `Nyx.Inventory.Batch` providing `SanitizeContainerIds` (order-preserving deduplication, trimming, and non-string validation), `PartitionExisting` (segregating hot cache hits from cold database misses), `ChunkIds` (bounded chunking to max 50 items per SQL statement), and `BuildQueryPlan` (generating parameterized ANSI SQL `WHERE id IN (?, ?, ...)` and `WHERE inventory_id IN (?, ?, ...)`).

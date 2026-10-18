@@ -123,3 +123,60 @@ exports("IsHeavyFreightWeight", function(grams)
     return (tonumber(grams) or 0) > 50000
 end)
 
+-- Staggered Resource Bootloader Exports
+exports("RegisterBootStage", function(resourceName, stage, priority, callback)
+    if Nyx.Bootloader and Nyx.Bootloader.RegisterBootStage then
+        return Nyx.Bootloader.RegisterBootStage(resourceName, stage, priority, callback)
+    end
+    return false
+end)
+
+exports("IsDatabaseReady", function()
+    if Nyx.Bootloader and Nyx.Bootloader.IsDatabaseReady then
+        return Nyx.Bootloader.IsDatabaseReady()
+    end
+    return false
+end)
+
+exports("IsBootComplete", function()
+    if Nyx.Bootloader and Nyx.Bootloader.IsBootComplete then
+        return Nyx.Bootloader.IsBootComplete()
+    end
+    return false
+end)
+
+exports("GetBootState", function()
+    if Nyx.Bootloader and Nyx.Bootloader.GetBootState then
+        return Nyx.Bootloader.GetBootState()
+    end
+    return "UNKNOWN"
+end)
+
+exports("GetBootReport", function()
+    if Nyx.Bootloader and Nyx.Bootloader.GetBootReport then
+        return Nyx.Bootloader.GetBootReport()
+    end
+    return nil
+end)
+
+exports("AwaitDatabase", function()
+    if Nyx.Bootloader and Nyx.Bootloader.AwaitDatabase then
+        return Nyx.Bootloader.AwaitDatabase()
+    end
+    return true
+end)
+
+exports("AwaitBootStage", function(stageOrResource)
+    if Nyx.Bootloader and Nyx.Bootloader.AwaitBootStage then
+        return Nyx.Bootloader.AwaitBootStage(stageOrResource)
+    end
+    return true
+end)
+
+exports("DispatchBootloader", function(customStaggerMs)
+    if Nyx.Bootloader and Nyx.Bootloader.Dispatch then
+        return Nyx.Bootloader.Dispatch(customStaggerMs)
+    end
+    return false, "BOOTLOADER_NOT_LOADED"
+end)
+

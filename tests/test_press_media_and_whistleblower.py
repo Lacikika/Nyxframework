@@ -388,7 +388,7 @@ def test_migration_032_and_manifest_integrity():
 
     assert "032_press_media_whistleblower_and_print_circulation.sql" in migrations
     assert (
-        migrations[-1] == "032_press_media_whistleblower_and_print_circulation.sql"
+        migrations.index("032_press_media_whistleblower_and_print_circulation.sql") >= 31
     )
 
     core_mig = (

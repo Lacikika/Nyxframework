@@ -268,6 +268,13 @@ CreateThread(function()
         local ok, err = pcall(runMigrations)
         if not ok then
             print(string.format("^1[Nyx:Migration] Fatal exception during migrations: %s^7", tostring(err)))
+        else
+            if Nyx.Bootloader and Nyx.Bootloader.OnDatabaseReady then
+                Nyx.Bootloader.OnDatabaseReady()
+            else
+                TriggerEvent("nyx:core:dbReady")
+                TriggerClientEvent("nyx:core:client:dbReady", -1)
+            end
         end
     end)
 end)

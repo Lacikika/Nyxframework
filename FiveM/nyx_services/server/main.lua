@@ -8,14 +8,24 @@
 Nyx = Nyx or {}
 Nyx.Services = Nyx.Services or {}
 
-CreateThread(function()
-    print("^4[Nyx:Services]^7 Initializing Civil Infrastructure & Public Utilities...^7")
-
+local servicesLoaded = false
+local function loadServicesData()
+    if servicesLoaded then return end
+    servicesLoaded = true
     -- 1. Load substations and hospitals from database
     Nyx.Services.LoadSubstations()
     Nyx.Services.LoadHospitals()
+end
 
-    -- 2. Register RPC routes
+-- Staggered initialization listener (Stage 3: Civil Infrastructure)
+AddEventHandler("nyx:core:init:nyx_services", function()
+    loadServicesData()
+end)
+
+CreateThread(function()
+    print("^4[Nyx:Services]^7 Initializing Civil Infrastructure & Public Utilities...^7")
+
+    -- Register RPC routes
     if exports['nyx_core'] and exports['nyx_core'].RegisterRPC then
         -- Query substations
         exports['nyx_core']:RegisterRPC("services:getSubstations", function(src)
@@ -101,6 +111,17 @@ CreateThread(function()
             return { success = true, substationId = substationId, isBlackout = s.isBlackout }
         end)
     end
+
+    -- Await nyx_core database ready signal with fallback
+    CreateThread(function()
+        while not (exports['nyx_core'] and exports['nyx_core']:IsDatabaseReady()) do
+            Wait(50)
+        end
+        Wait(350)
+        if not servicesLoaded then
+            loadServicesData()
+        end
+    end)
 
     -- 3. Power Grid Consumption Tick Loop (Every 60 seconds)
     CreateThread(function()

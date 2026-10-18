@@ -11,11 +11,13 @@ shared_scripts {
     'config.lua',
     'shared/math.lua',
     'shared/rpc.lua',
-    'shared/weights.lua'
+    'shared/weights.lua',
+    'shared/bootloader.lua'
 }
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
+    'server/bootloader.lua',
     'server/migrations.lua',
     'server/rpc.lua',
     'server/player.lua',

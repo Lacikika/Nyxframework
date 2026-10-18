@@ -163,3 +163,12 @@ Config.WeightPenalties = {
     }
 }
 
+-- Staggered Resource Bootloader Dispatch Configuration
+Config.Bootloader = {
+    enabled = true,
+    staggerDelayMs = 50,         -- 50ms interval between sequential resource initializations
+    autoDispatch = true,         -- Automatically begin staggered dispatch when migrations complete
+    logToDatabase = true,        -- Persist boot cycle telemetry to nyx_bootloader_logs
+    stages = nil                 -- nil uses Nyx.Bootloader.GetDefaultStages()
+}
+

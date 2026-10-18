@@ -5917,7 +5917,170 @@ function Nyx.Tests.TestBatchedContainerQueriesOnBoot()
     return passes == total
 end
 
--- 28. Master Test Runner
+-- 28. Test Staggered Resource Bootloader Dispatch & Contention Mitigation (nyx_core)
+function Nyx.Tests.TestStaggeredResourceBootloaderDispatch()
+    print("^3[Nyx:Tests] Running Staggered Resource Bootloader Dispatch Suite (50ms Stagger & Contention Modeling)...^7")
+    local passes = 0
+    local total = 8
+
+    -- Test A: Canonical Stage Architecture & Coverage of All 14 Resources
+    local defaultStages = Nyx.Bootloader.GetDefaultStages()
+    local resourceCount = 0
+    local resourceMap = {}
+    if defaultStages and #defaultStages == 6 then
+        for _, s in ipairs(defaultStages) do
+            if s.resources then
+                for _, r in ipairs(s.resources) do
+                    resourceCount = resourceCount + 1
+                    resourceMap[r.name] = s.stage
+                end
+            end
+        end
+    end
+
+    local all14Mapped = (resourceCount == 14) and
+        (resourceMap["nyx_core"] == 1) and
+        (resourceMap["nyx_treasury"] == 1) and
+        (resourceMap["nyx_inventory"] == 2) and
+        (resourceMap["nyx_logistics"] == 2) and
+        (resourceMap["nyx_services"] == 3) and
+        (resourceMap["nyx_properties"] == 3) and
+        (resourceMap["nyx_vehicles"] == 3) and
+        (resourceMap["nyx_factions"] == 4) and
+        (resourceMap["nyx_parliament"] == 4) and
+        (resourceMap["nyx_judiciary"] == 5) and
+        (resourceMap["nyx_mdt"] == 5) and
+        (resourceMap["nyx_press"] == 5) and
+        (resourceMap["nyx_interact"] == 6) and
+        (resourceMap["nyx_ui"] == 6)
+
+    if assertTest(all14Mapped == true,
+        "Canonical 6-Stage Boot Architecture Mapping All 14 Resources",
+        string.format("count=%d, core=%s, ui=%s", resourceCount, tostring(resourceMap["nyx_core"]), tostring(resourceMap["nyx_ui"]))) then
+        passes = passes + 1
+    end
+
+    -- Test B: 50ms Stagger Timeline Linear Ramp Calculation
+    local timeline, totalWindowMs = Nyx.Bootloader.CalculateTimeline(defaultStages, 50)
+    local testB_ok = (#timeline == 14) and
+        (timeline[1].resource == "nyx_core" and timeline[1].scheduledOffsetMs == 0) and
+        (timeline[2].resource == "nyx_treasury" and timeline[2].scheduledOffsetMs == 50) and
+        (timeline[3].resource == "nyx_inventory" and timeline[3].scheduledOffsetMs == 100) and
+        (timeline[14].resource == "nyx_ui" and timeline[14].scheduledOffsetMs == 650) and
+        (totalWindowMs == 650)
+
+    if assertTest(testB_ok == true,
+        "Linear 50ms Stagger Ramp (0ms to 650ms for 14 Resources)",
+        string.format("len=%d, t1Offset=%s, t14Offset=%s, total=%s",
+            #timeline,
+            timeline[1] and tostring(timeline[1].scheduledOffsetMs) or "nil",
+            timeline[14] and tostring(timeline[14].scheduledOffsetMs) or "nil",
+            tostring(totalWindowMs))) then
+        passes = passes + 1
+    end
+
+    -- Test C: Database Connection Pool Contention Reduction Math
+    local contention = Nyx.Bootloader.CalculateContentionSavings(14, 50, 30.0)
+    local testC_ok = contention and
+        (contention.unmitigatedBurst == 14) and
+        (contention.staggeredMaxConcurrent <= 1.0) and
+        (contention.reductionPercent >= 90.0)
+
+    if assertTest(testC_ok == true,
+        "Mathematical Contention Reduction (14 -> <=1.0 concurrent, >=90% reduction)",
+        string.format("burst=%s, maxConcurrent=%s, reduction=%s%%",
+            contention and tostring(contention.unmitigatedBurst) or "nil",
+            contention and tostring(contention.staggeredMaxConcurrent) or "nil",
+            contention and string.format("%.1f", contention.reductionPercent) or "nil")) then
+        passes = passes + 1
+    end
+
+    -- Test D: State Machine Transition Validity & Guard Clauses
+    local trans1 = Nyx.Bootloader.ValidateTransition("UNINITIALIZED", "WAITING_DB")
+    local trans2 = Nyx.Bootloader.ValidateTransition("WAITING_DB", "DB_READY")
+    local trans3 = Nyx.Bootloader.ValidateTransition("DB_READY", "DISPATCHING")
+    local trans4 = Nyx.Bootloader.ValidateTransition("DISPATCHING", "BOOT_COMPLETE")
+    local illegal1 = Nyx.Bootloader.ValidateTransition("UNINITIALIZED", "BOOT_COMPLETE")
+    local illegal2 = Nyx.Bootloader.ValidateTransition("BOOT_COMPLETE", "DISPATCHING")
+
+    local testD_ok = (trans1 == true) and (trans2 == true) and (trans3 == true) and (trans4 == true) and
+        (illegal1 == false) and (illegal2 == false)
+
+    if assertTest(testD_ok == true,
+        "Authoritative Boot Lifecycle State Machine Transitions & Guard Clauses",
+        string.format("t1=%s, t2=%s, t3=%s, t4=%s, ill1=%s, ill2=%s",
+            tostring(trans1), tostring(trans2), tostring(trans3), tostring(trans4), tostring(illegal1), tostring(illegal2))) then
+        passes = passes + 1
+    end
+
+    -- Test E: Dynamic Boot Stage Registration & Priority Sorting
+    local customStages = Nyx.Bootloader.GetDefaultStages()
+    Nyx.Bootloader.RegisterBootStage("nyx_custom_addon", 3, 15)
+    local customStageId, customStageName, customPrio = Nyx.Bootloader.DetermineResourceStage("nyx_custom_addon", Nyx.Bootloader.Stages)
+    local testE_ok = (customStageId == 3) and (customStageName == "civil") and (customPrio == 15)
+
+    if assertTest(testE_ok == true,
+        "Dynamic Custom Resource Boot Stage Registration & Mapping",
+        string.format("stageId=%s, stageName=%s, prio=%s",
+            tostring(customStageId), tostring(customStageName), tostring(customPrio))) then
+        passes = passes + 1
+    end
+
+    -- Test F: Formatted Diagnostic Report & Telemetry
+    local mockExecuted = {
+        { resource = "nyx_core", stage = 1, stageName = "kernel", priority = 10, scheduledOffsetMs = 0 },
+        { resource = "nyx_treasury", stage = 1, stageName = "kernel", priority = 20, scheduledOffsetMs = 50 }
+    }
+    local report = Nyx.Bootloader.FormatBootReport(mockExecuted, 650, "BOOT_COMPLETE")
+    local testF_ok = report and (report.status == "BOOT_COMPLETE") and
+        (report.totalResources == 2) and
+        (report.totalDurationMs == 650) and
+        (type(report.summary) == "string") and
+        (report.summary:find("nyx_core") ~= nil)
+
+    if assertTest(testF_ok == true,
+        "Diagnostic Boot Report Formatting & Timing Summary",
+        string.format("status=%s, resCount=%s, hasCore=%s",
+            report and report.status or "nil",
+            report and tostring(report.totalResources) or "nil",
+            tostring(report and report.summary and report.summary:find("nyx_core") ~= nil))) then
+        passes = passes + 1
+    end
+
+    -- Test G: Public Export Bridge Verification
+    local hasIsDbReady = (exports['nyx_core'] and exports['nyx_core'].IsDatabaseReady ~= nil)
+    local hasIsBootComplete = (exports['nyx_core'] and exports['nyx_core'].IsBootComplete ~= nil)
+    local hasGetBootState = (exports['nyx_core'] and exports['nyx_core'].GetBootState ~= nil)
+    local hasGetBootReport = (exports['nyx_core'] and exports['nyx_core'].GetBootReport ~= nil)
+    local hasRegisterBootStage = (exports['nyx_core'] and exports['nyx_core'].RegisterBootStage ~= nil)
+
+    local testG_ok = hasIsDbReady and hasIsBootComplete and hasGetBootState and hasGetBootReport and hasRegisterBootStage
+
+    if assertTest(testG_ok == true,
+        "Public Server Export Wrappers for Inter-Resource Staggered Bootloader",
+        string.format("isDbReady=%s, isComplete=%s, getState=%s, getReport=%s, regStage=%s",
+            tostring(hasIsDbReady), tostring(hasIsBootComplete), tostring(hasGetBootState), tostring(hasGetBootReport), tostring(hasRegisterBootStage))) then
+        passes = passes + 1
+    end
+
+    -- Test H: Safe Coroutine Await Guards with Zero Blocking on Ready State
+    local stateBackup = Nyx.Bootloader.State
+    Nyx.Bootloader.State = "BOOT_COMPLETE"
+    local dbReadyImmediate = Nyx.Bootloader.IsDatabaseReady()
+    local bootCompleteImmediate = Nyx.Bootloader.IsBootComplete()
+    Nyx.Bootloader.State = stateBackup
+
+    local testH_ok = (dbReadyImmediate == true) and (bootCompleteImmediate == true)
+    if assertTest(testH_ok == true,
+        "Authoritative Ready State Query Checks with 0ms Delay",
+        string.format("dbReady=%s, complete=%s", tostring(dbReadyImmediate), tostring(bootCompleteImmediate))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 29. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -5950,9 +6113,10 @@ function Nyx.Tests.RunAll()
     local t25 = Nyx.Tests.TestInactivityReclamationAndStewardship()
     local t26 = Nyx.Tests.TestPressMediaAndWhistleblower()
     local t27 = Nyx.Tests.TestBatchedContainerQueriesOnBoot()
+    local t28 = Nyx.Tests.TestStaggeredResourceBootloaderDispatch()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

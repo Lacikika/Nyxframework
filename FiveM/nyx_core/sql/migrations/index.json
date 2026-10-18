@@ -30,5 +30,6 @@
   "029_judiciary_subpoenas_and_warrant_tracking.sql",
   "030_treasury_infrastructure_degradation_and_vehicle_impounds.sql",
   "031_inactivity_reclamation_and_stewardship.sql",
-  "032_press_media_whistleblower_and_print_circulation.sql"
+  "032_press_media_whistleblower_and_print_circulation.sql",
+  "033_bootloader_staggered_dispatch_and_audit.sql"
 ]

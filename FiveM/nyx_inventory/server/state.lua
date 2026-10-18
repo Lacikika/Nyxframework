@@ -440,7 +440,11 @@ function Nyx.Inventory.BatchLoad(containerIds, options)
 end
 
 -- Batch Preload Known Startup Containers on Boot ('stash:*', 'property:*')
-CreateThread(function()
+local startupPreloaded = false
+local function preloadStartupContainers()
+    if startupPreloaded then return end
+    startupPreloaded = true
+
     while GetResourceState("oxmysql") ~= "started" do
         Wait(50)
     end
@@ -466,6 +470,22 @@ CreateThread(function()
         local loaded, hits, misses, queriesSaved = Nyx.Inventory.BatchLoad(startupIds)
         local elapsedMs = GetGameTimer() - startTimer
         print(string.format("^2[Nyx:Inventory] Batched startup preloaded %d container(s) ('stash:*', 'property:*') in %dms (Saved %d queries, Cold-Cache Latency Resolved).^7", #startupIds, elapsedMs, queriesSaved or 0))
+    end
+end
+
+-- Staggered initialization listener (Stage 2: Foundation)
+AddEventHandler("nyx:core:init:nyx_inventory", function()
+    preloadStartupContainers()
+end)
+
+CreateThread(function()
+    while not (exports['nyx_core'] and exports['nyx_core']:IsDatabaseReady()) do
+        Wait(50)
+    end
+    -- Fallback safety window in case staggered event bus was bypassed
+    Wait(300)
+    if not startupPreloaded then
+        preloadStartupContainers()
     end
 end)
 
