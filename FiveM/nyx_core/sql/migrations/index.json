@@ -57,5 +57,6 @@
   "056_democratic_parliamentary_elections_and_recall_referendums.sql",
   "057_auditable_public_treasury_ledger_and_department_monitor.sql",
   "058_commercial_real_estate_leasing_and_storefront_cycles.sql",
-  "059_dynamic_speed_limits_statutory_laws_and_mdt_overlays.sql"
+  "059_dynamic_speed_limits_statutory_laws_and_mdt_overlays.sql",
+  "060_organizational_warehousing_and_storage_networks.sql"
 ]

@@ -24,7 +24,8 @@ shared_scripts {
     'shared/assembly.lua',
     'shared/contracts.lua',
     'shared/warehouses.lua',
-    'shared/market_monitor.lua'
+    'shared/market_monitor.lua',
+    '@nyx_factions/shared/storage_networks.lua'
 }
 
 server_scripts {

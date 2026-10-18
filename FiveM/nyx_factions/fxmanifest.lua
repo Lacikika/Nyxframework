@@ -20,6 +20,7 @@ shared_scripts {
     'shared/succession.lua',
     'shared/laundering.lua',
     'shared/equity.lua',
+    'shared/storage_networks.lua',
     '@nyx_treasury/shared/cash_transit.lua',
     '@nyx_properties/shared/commercial_leases.lua'
 }
@@ -38,6 +39,7 @@ server_scripts {
     'server/fleet.lua',
     'server/laundering.lua',
     'server/cash_transit.lua',
+    'server/storage_networks.lua',
     'server/main.lua',
     'server/exports.lua'
 }
@@ -49,6 +51,7 @@ client_scripts {
     'client/laundering.lua',
     'client/equity.lua',
     'client/cash_transit.lua',
+    'client/storage_networks.lua',
     'client/main.lua',
     'client/exports.lua'
 }

@@ -112,11 +112,11 @@ created: 2026-09-20
 - [ ] **Granular Node-Based Permissions:**
   - `funds:withdraw`, `funds:deposit`, `fleet:spawn`, `property:manage`, `contract:sign`
 - [ ] **Multi-Signature Corporate Accounts:** High-tier financial withdrawals require confirmation from two or more designated signatories before execution.
-- [ ] **Shareholding & Automated Dividends:** Revenue automatically splits across member wallets based on defined equity ownership percentages.
+- [x] **Shareholding & Automated Dividends:** Revenue automatically splits across member wallets based on defined equity ownership percentages.
 
 ### 5.2 Dynamic Territory & Property Charters
 - [x] **Commercial Real Estate Leasing:** Physical storefronts enter public lease cycles if rental taxes lapse.
-- [ ] **Warehousing & Storage Networks:** Organizations deploy secured stashes, workbenches, and pallet drop zones bound to customized access levels.
+- [x] **Warehousing & Storage Networks:** Organizations deploy secured stashes, workbenches, and pallet drop zones bound to customized access levels.
 
 ---
 

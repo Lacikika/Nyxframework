@@ -11430,7 +11430,161 @@ function Nyx.Tests.TestDynamicSpeedLimitsStatutoryLawsAndMDTOverlays()
     return passes == total
 end
 
--- 45. Master Test Runner (Suite 1 - Suite 54)
+-- 44b. Suite 55: Organizational Warehousing & Storage Networks (nyx_factions, nyx_logistics & nyx_inventory)
+function Nyx.Tests.TestOrganizationalWarehousingAndStorageNetworks()
+    print("^3[Nyx:Tests] Running Suite 55: Organizational Warehousing & Storage Networks...^7")
+    local passes = 0
+    local total = 7
+
+    local StorageNetworks = Nyx.StorageNetworks
+    if not StorageNetworks then
+        assertTest(false, "Suite 55 Initialization", "Nyx.StorageNetworks module not loaded in server environment")
+        return false
+    end
+
+    -- Sub-test A: Taxonomy Profiles & Technical Specifications Invariant
+    local tax = StorageNetworks.Taxonomy
+    local testA_ok = (tax.secured_stash ~= nil) and
+                     (tax.secured_stash.tiers.standard.capacity_grams == 1000000) and
+                     (tax.secured_stash.tiers.reinforced.capacity_grams == 3000000) and
+                     (tax.secured_stash.tiers.vault.capacity_grams == 10000000) and
+                     (tax.industrial_workbench.subtypes.assembly ~= nil) and
+                     (tax.industrial_workbench.subtypes.refining ~= nil) and
+                     (tax.industrial_workbench.subtypes.weapons ~= nil) and
+                     (tax.industrial_workbench.subtypes.medical ~= nil) and
+                     (tax.pallet_drop_zone.maxPallets == 4) and
+                     (tax.pallet_drop_zone.radius == 4.5)
+
+    if assertTest(testA_ok == true,
+        "Storage Networks Taxonomy Specifications & Capacity Tiers Invariant",
+        string.format("stashTiers=%s, benchSubs=%s, palletMax=%d",
+            tostring(tax.secured_stash ~= nil), tostring(tax.industrial_workbench ~= nil), tax.pallet_drop_zone and tax.pallet_drop_zone.maxPallets or 0)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Facility Density Limits Evaluation
+    local limits = StorageNetworks.FacilityLimits
+    local testB_ok = (limits.warehouse.secured_stash == 10 and limits.warehouse.industrial_workbench == 4 and limits.warehouse.pallet_drop_zone == 4) and
+                     (limits.commercial_storefront.secured_stash == 4 and limits.commercial_storefront.industrial_workbench == 2 and limits.commercial_storefront.pallet_drop_zone == 1) and
+                     (limits.property.secured_stash == 2 and limits.property.industrial_workbench == 1 and limits.property.pallet_drop_zone == 0)
+
+    if assertTest(testB_ok == true,
+        "Facility Density Limits & Spatial Asset Quotas Invariant",
+        string.format("whStash=%d, storeStash=%d, propDrop=%d",
+            limits.warehouse.secured_stash, limits.commercial_storefront.secured_stash, limits.property.pallet_drop_zone)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Deployment Parameters Validation & Spatial Sanitization
+    local okWh, _, dataWh = StorageNetworks.ValidateDeploymentParameters("warehouse", "wh_elysian_04", "secured_stash", "reinforced", { x = 150.123, y = -3180.456, z = 6.0, h = 90.0 }, 2)
+    local okLimit, msgLimit = StorageNetworks.ValidateDeploymentParameters("commercial_storefront", "store_vinewood_24", "secured_stash", "standard", { x = 0, y = 0, z = 0, h = 0 }, 4)
+    local okBadFac, msgBadFac = StorageNetworks.ValidateDeploymentParameters("airport_hangar", "hangar_1", "secured_stash", "standard", { x = 0, y = 0, z = 0 }, 0)
+
+    local testC_ok = (okWh == true and dataWh.capacity_grams == 3000000 and dataWh.slots == 100 and dataWh.coords.x == 150.12) and
+                     (okLimit == false and string.find(msgLimit, "FACILITY_LIMIT_EXCEEDED") ~= nil) and
+                     (okBadFac == false and msgBadFac == "INVALID_FACILITY_TYPE")
+
+    if assertTest(testC_ok == true,
+        "Deployment Parameters Validation, Bounds Checking & Spatial Sanitization",
+        string.format("whValid=%s, cap=%d, limitExceeded=%s, badFac=%s",
+            tostring(okWh), dataWh and dataWh.capacity_grams or 0, tostring(okLimit == false), msgBadFac)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Multi-Tier RBAC Access Evaluation & Faction Isolation
+    local mockAsset = {
+        asset_id = 1,
+        faction_id = "corp:elysian_logistics",
+        access_permission_node = "inventory:withdraw",
+        min_rank_level = 2,
+        is_locked = 0
+    }
+    local alienMember = { faction_id = "corp:other", rank_level = 5, permissions = { "*" } }
+    local lowRankMember = { faction_id = "corp:elysian_logistics", rank_level = 1, permissions = { "inventory:withdraw" } }
+    local qualifiedMember = { faction_id = "corp:elysian_logistics", rank_level = 2, permissions = { "inventory:withdraw" } }
+
+    local okAlien, reasonAlien = StorageNetworks.EvaluateAssetAccess(mockAsset, alienMember)
+    local okLow, reasonLow = StorageNetworks.EvaluateAssetAccess(mockAsset, lowRankMember)
+    local okQual, _, tierQual = StorageNetworks.EvaluateAssetAccess(mockAsset, qualifiedMember)
+
+    local testD_ok = (okAlien == false and reasonAlien == "ACCESS_DENIED_FACTION_MISMATCH") and
+                     (okLow == false and reasonLow == "ACCESS_DENIED_INSUFFICIENT_RANK") and
+                     (okQual == true and tierQual == "full")
+
+    if assertTest(testD_ok == true,
+        "Multi-Tier RBAC Access Evaluation, Faction Boundary Isolation & Rank Gating",
+        string.format("alienRejected=%s, rankGated=%s, qualifiedTier=%s",
+            tostring(okAlien == false), tostring(okLow == false), tierQual)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Granular Access Tiers & Security Lock Enforcement
+    local depositMember = { faction_id = "corp:elysian_logistics", rank_level = 2, permissions = { "inventory:deposit" } }
+    local viewMember = { faction_id = "corp:elysian_logistics", rank_level = 2, permissions = { "inventory:view" } }
+    local lockedAsset = { asset_id = 2, faction_id = "corp:elysian_logistics", access_permission_node = "inventory:withdraw", min_rank_level = 1, is_locked = 1 }
+    local officerMember = { faction_id = "corp:elysian_logistics", rank_level = 3, permissions = { "inventory:manage_stashes" } }
+
+    local okDep, _, tierDep = StorageNetworks.EvaluateAssetAccess(mockAsset, depositMember)
+    local okView, _, tierView = StorageNetworks.EvaluateAssetAccess(mockAsset, viewMember)
+    local okLockBlocked, reasonLock = StorageNetworks.EvaluateAssetAccess(lockedAsset, qualifiedMember)
+    local okOfficerUnlock, _, tierOfficer = StorageNetworks.EvaluateAssetAccess(lockedAsset, officerMember)
+
+    local testE_ok = (okDep == true and tierDep == "deposit_only") and
+                     (okView == true and tierView == "read_only") and
+                     (okLockBlocked == false and reasonLock == "ACCESS_DENIED_ASSET_LOCKED") and
+                     (okOfficerUnlock == true and tierOfficer == "full")
+
+    if assertTest(testE_ok == true,
+        "Granular Access Tiers (Full / Deposit-Only / Read-Only) & Security Lock Enforcement",
+        string.format("depositTier=%s, viewTier=%s, lockBlocked=%s, officerTier=%s",
+            tierDep, tierView, tostring(okLockBlocked == false), tierOfficer)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Pallet Drop Zone Staging & Retrieval State Machine
+    local mockZone = { pallet_max_capacity = 3, staged_pallets = { "pallet:001", "pallet:002" } }
+    local okStage, _, staged3 = StorageNetworks.EvaluatePalletStaging(mockZone, "pallet:003", "stage")
+    mockZone.staged_pallets = staged3
+    local okOverflow, msgOverflow = StorageNetworks.EvaluatePalletStaging(mockZone, "pallet:004", "stage")
+    local okDuplicate, msgDuplicate = StorageNetworks.EvaluatePalletStaging(mockZone, "pallet:001", "stage")
+    local okRetrieve, _, stagedAfterRet = StorageNetworks.EvaluatePalletStaging(mockZone, "pallet:002", "retrieve")
+    local okRetNotFound, msgNotFound = StorageNetworks.EvaluatePalletStaging(mockZone, "pallet:999", "retrieve")
+
+    local testF_ok = (okStage == true and #staged3 == 3) and
+                     (okOverflow == false and msgOverflow == "DROP_ZONE_CAPACITY_FULL") and
+                     (okDuplicate == false and msgDuplicate == "PALLET_ALREADY_STAGED") and
+                     (okRetrieve == true and #stagedAfterRet == 2) and
+                     (okRetNotFound == false and msgNotFound == "PALLET_NOT_FOUND_IN_ZONE")
+
+    if assertTest(testF_ok == true,
+        "Pallet Drop Zone Staging, Capacity Gating & Deduplicated Retrieval State Machine",
+        string.format("stagedCount=%d, overflow=%s, duplicate=%s, retrieved=%s",
+            #staged3, msgOverflow, msgDuplicate, tostring(okRetrieve))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Asset Summary & Status Badges Formatting
+    local summaryUnlocked = StorageNetworks.FormatAssetSummary({ asset_type = "secured_stash", capacity_grams = 3000000, slots_count = 100, is_locked = 0 })
+    local summaryLocked = StorageNetworks.FormatAssetSummary({ asset_type = "secured_stash", capacity_grams = 1000000, slots_count = 60, is_locked = 1 })
+    local summaryPallet = StorageNetworks.FormatAssetSummary({ asset_type = "pallet_drop_zone", pallet_max_capacity = 4 })
+    local summaryBench = StorageNetworks.FormatAssetSummary({ asset_type = "industrial_workbench", workbench_subtype = "weapons" })
+
+    local testG_ok = (summaryUnlocked.badgeClass == "badge-success" and summaryUnlocked.statusText == "AKTÍV") and
+                     (summaryLocked.badgeClass == "badge-danger" and summaryLocked.statusText == "ZÁROLVA") and
+                     (summaryPallet.capacityDesc == "Max 4 raklap") and
+                     (summaryBench.capacityDesc == "Típus: weapons")
+
+    if assertTest(testG_ok == true,
+        "Asset Summary & Real-Time Status Badges Formatting",
+        string.format("unlockedBadge=%s, lockedBadge=%s, palletDesc=%s, benchDesc=%s",
+            summaryUnlocked.badgeClass, summaryLocked.badgeClass, summaryPallet.capacityDesc, summaryBench.capacityDesc)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 45. Master Test Runner (Suite 1 - Suite 55)
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -11490,6 +11644,7 @@ function Nyx.Tests.RunAll()
     local t52 = Nyx.Tests.TestAuditablePublicTreasuryLedgerAndDepartmentMonitor()
     local t53 = Nyx.Tests.TestCommercialRealEstateLeasingAndStorefrontCycles()
     local t54 = Nyx.Tests.TestDynamicSpeedLimitsStatutoryLawsAndMDTOverlays()
+    local t55 = Nyx.Tests.TestOrganizationalWarehousingAndStorageNetworks()
 
     print("^5--------------------------------------------------^7")
     local suites1to50Passed = false
@@ -11497,7 +11652,7 @@ function Nyx.Tests.RunAll()
         suites1to50Passed = true
     end
 
-    if suites1to50Passed and t51 and t52 and t53 and t54 then
+    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

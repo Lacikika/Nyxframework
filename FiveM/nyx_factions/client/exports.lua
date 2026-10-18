@@ -15,3 +15,13 @@ end)
 exports("GetVaultsConfig", function()
     return Config.Vaults or {}
 end)
+
+exports("GetNearbyFacilityAssets", function()
+    return Nyx.StorageNetworksClient and Nyx.StorageNetworksClient.FacilityAssets or {}
+end)
+
+exports("InteractDeployedAsset", function(assetId)
+    if Nyx.StorageNetworksClient and Nyx.StorageNetworksClient.InteractAsset then
+        return Nyx.StorageNetworksClient.InteractAsset(assetId)
+    end
+end)

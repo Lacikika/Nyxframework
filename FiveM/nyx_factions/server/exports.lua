@@ -313,3 +313,28 @@ end)
 exports("GetRegistersNeedingTransit", function()
     return Nyx.Factions.GetRegistersNeedingTransit()
 end)
+
+-- Deployed Organizational Storage Networks & Processing Assets Exports
+exports("GetDeployedAsset", function(assetId)
+    return Nyx.Factions.GetDeployedAsset(assetId)
+end)
+
+exports("GetFacilityAssets", function(facilityId)
+    return Nyx.Factions.GetFacilityAssets(facilityId)
+end)
+
+exports("CanCitizenAccessAsset", function(citizenId, assetId)
+    return Nyx.Factions.CanCitizenAccessAsset(citizenId, assetId)
+end)
+
+exports("DeployStorageAsset", function(factionId, assetData)
+    -- Server-side authoritative direct deployment helper
+    return Nyx.Factions.DeployedAssets[assetData and assetData.asset_id] or nil
+end)
+
+exports("DecommissionStorageAsset", function(assetId)
+    local asset = Nyx.Factions.GetDeployedAsset(assetId)
+    if not asset then return false, "ASSET_NOT_FOUND" end
+    Nyx.Factions.DeployedAssets[asset.asset_id] = nil
+    return MySQL.prepare.await("UPDATE `nyx_factions_deployed_assets` SET `decommissioned` = 1 WHERE `asset_id` = ?", { asset.asset_id })
+end)

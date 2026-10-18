@@ -120,8 +120,44 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Dynamic Speed Limits, Statutory Law Formulation & MDT Enforcement Overlays (`nyx_parliament`, `nyx_mdt` & `nyx_vehicles`)**
   - **Implementation:** Officials author structured legislation (penal code fine maximums, speed limits per zone, legal sales tax caps, zoning classifications). Passing a bill instantly updates MDT maximum citation values and jail times, in-game sales tax calculators across registered points of sale, and real-time dispatch warning overlays for law enforcement with ANPR camera telemetry.
 
+- [x] **Feature: Organizational Warehousing & Storage Networks (`nyx_factions`, `nyx_logistics` & `nyx_inventory`)**
+  - **Implementation:** Decentralized warehousing infrastructure allowing player organizations to deploy, configure, and secure physical stashes, industrial workbenches, and pallet drop zones bound to customized role-based access control (RBAC) permissions within owned/leased facilities.
+
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Organizational Warehousing & Storage Networks (`nyx_factions`, `nyx_logistics` & `nyx_inventory`)**
+  - **Database Migration (`060_organizational_warehousing_and_storage_networks.sql`)**:
+    - Created migration file and registered Step 60 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Mirrored migration to `FiveM/nyx_factions/sql/migrations/060_organizational_warehousing_and_storage_networks.sql`.
+    - Created `nyx_factions_deployed_assets` table (`asset_id` PK, `asset_uuid` UNIQUE, `faction_id`, `facility_type`, `facility_id`, `asset_type` ENUM('secured_stash', 'industrial_workbench', 'pallet_drop_zone'), `asset_label`, `model_name`, `coords`, `routing_bucket`, `access_permission_node`, `min_rank_level`, `inventory_id`, `capacity_grams`, `slots_count`, `workbench_subtype`, `pallet_max_capacity`, `staged_pallets_json`, `is_locked`, `decommissioned`, `deployed_by_citizen_id`, timestamps) with B-tree lookup indexes.
+    - Created `nyx_factions_storage_access_audit` immutable audit ledger (`audit_id` PK, `audit_uuid` UNIQUE, `asset_id`, `faction_id`, `citizen_id`, `action` ENUM('DEPLOYED', 'ACCESSED', 'STASH_OPENED', 'WORKBENCH_USED', 'PALLET_STAGED', 'PALLET_RETRIEVED', 'ACCESS_RULE_CHANGED', 'LOCK_TOGGLED', 'DECOMMISSIONED'), `permission_evaluated`, `notes`, `created_at`) with performance lookup indexes.
+    - Seeded canonical organizational assets (`asset-elysian-stash-01`, `asset-elysian-bench-01`, `asset-elysian-pallet-01`, `asset-vinewood-stash-01`).
+  - **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_factions/shared/storage_networks.lua`)**:
+    - Created asset taxonomy: `secured_stash` (standard 1,000kg/60 slots, reinforced 3,000kg/100 slots, vault 10,000kg/150 slots), `industrial_workbench` (`assembly`, `refining`, `weapons`, `medical`), and `pallet_drop_zone` (4-16 pallets, 4.5m radius).
+    - Configured facility density limits: warehouse (10 stashes, 4 benches, 4 drop zones), commercial storefront (4 stashes, 2 benches, 1 drop zone), property (2 stashes, 1 bench, 0 drop zones).
+    - Implemented `EvaluateAssetAccess`: multi-tier authorization evaluating faction membership, minimum rank tier, security lock override (`inventory:manage_stashes`), and granular RBAC permissions (`full`, `deposit_only`, `read_only`, `denied`).
+    - Implemented `ValidateDeploymentParameters`: spatial bounds verification, density limits checking, and technical parameter sanitization.
+    - Implemented `EvaluatePalletStaging`: state machine managing pallet staging, capacity saturation rejection, duplicate prevention, and clean retrieval.
+    - Implemented `FormatAssetSummary`: dynamic status badges (`AKTÍV` / `ZÁROLVA`) and human-readable capacity descriptions.
+  - **Authoritative Server Subsystems & RPCs (`FiveM/nyx_factions/server/storage_networks.lua`)**:
+    - Bootloader cache hydration (`Nyx.Factions.DeployedAssets`) from database and automatic registration of dynamic stash containers in `nyx_inventory` (`faction:stash:deployed:{asset_uuid}`).
+    - Registered RPC endpoints: `factions:getFacilityAssets`, `factions:deployStorageAsset` (with statutory fee transfers from corporate treasury to `gov:city:master`), `factions:accessStorageAsset`, `factions:updateAssetAccessRule`, `factions:toggleAssetLock`, `factions:decommissionStorageAsset`, `factions:stagePalletInDropZone`, `factions:retrievePalletFromDropZone`.
+    - Integrated audit logging with `nyx_factions_storage_access_audit`.
+    - Exported public helpers in `server/exports.lua`: `GetDeployedAsset`, `GetFacilityAssets`, `CanCitizenAccessAsset`, `DeployStorageAsset`, `DecommissionStorageAsset`.
+  - **Client Subsystems & Spatial Interaction (`FiveM/nyx_factions/client/storage_networks.lua`)**:
+    - Dynamic prop entity spawning and freezing based on active facility routing buckets.
+    - Integrated Third-Eye spatial interaction targets (`nyx_interact`): "Biztonsági Raktárláda Megnyitása", "Zár Átkapcsolása", "Ipari Munkapad Használata", and "Raklap Lerakása Zónába".
+    - Network listeners for real-time asset syncing across players.
+    - Registered player commands: `/deployasset` and `/facilityassets`.
+    - Exported client helpers in `client/exports.lua`: `GetNearbyFacilityAssets`, `InteractDeployedAsset`.
+  - **Manifest Declarations**:
+    - Declared `shared/storage_networks.lua`, `server/storage_networks.lua`, and `client/storage_networks.lua` in `FiveM/nyx_factions/fxmanifest.lua`.
+    - Declared `@nyx_factions/shared/storage_networks.lua` in `FiveM/nyx_logistics/fxmanifest.lua`.
+  - **Verification & Test Coverage**:
+    - Added in-engine integration test Test 55 (`Nyx.Tests.TestOrganizationalWarehousingAndStorageNetworks`) in `FiveM/nyx_core/server/tests.lua` (7 sub-tests) and wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_organizational_warehousing_and_storage_networks.py` (8/8 tests passing).
+    - Full test suite: 516/516 tests passing; `scripts/validator.py` and `scripts/verify.ps1` clean across all 14 resources, 277 Lua files, and 60 migrations.
+
 - **[2026-10-18] Feature: Dynamic Speed Limits, Statutory Law Formulation & MDT Enforcement Overlays (`nyx_parliament`, `nyx_mdt` & `nyx_vehicles`)**
   - **Database Migration (`059_dynamic_speed_limits_statutory_laws_and_mdt_overlays.sql`)**:
     - Created migration file and registered Step 59 in `FiveM/nyx_core/sql/migrations/index.json`.
