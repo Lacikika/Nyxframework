@@ -231,7 +231,7 @@ class TestGasStationReservoirsAndBulkFuelHauling(unittest.TestCase):
 
         self.assertIn("function Nyx.Tests.TestGasStationReservoirsAndBulkFuelHauling()", code)
         self.assertIn("local t38 = Nyx.Tests.TestGasStationReservoirsAndBulkFuelHauling()", code)
-        self.assertIn("t38 then", code)
+        self.assertIn("and t38", code)
 
 
 if __name__ == "__main__":

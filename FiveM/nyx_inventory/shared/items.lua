@@ -413,6 +413,24 @@ Nyx.Items.Registry = {
         type = 'tool',
         description = 'Electronic proximity key fob encoding encrypted vehicle VIN & plate data.'
     },
+    ['item_vehicle_key'] = {
+        name = 'item_vehicle_key',
+        label = 'Physical Vehicle Key',
+        weight = 30,
+        stackable = false,
+        maxSlots = 1,
+        type = 'tool',
+        description = 'Physical laser-cut ignition key and transponder chip bound to vehicle VIN and license plate.'
+    },
+    ['rfid_fleet_card'] = {
+        name = 'rfid_fleet_card',
+        label = 'Corporate Fleet RFID Pass',
+        weight = 15,
+        stackable = false,
+        maxSlots = 1,
+        type = 'valuable',
+        description = 'Encrypted high-frequency NFC/RFID transponder card granting proximity access to corporate fleet vehicles.'
+    },
 
     -- Heavy Freight & Industrial Crates (> 50kg, cannot be stored in player backpack)
     ['crate_industrial_heavy'] = {
@@ -513,6 +531,17 @@ function Nyx.Items.CreateDefaultMetadata(name, extra)
         elseif item.type == 'food' or item.type == 'drink' then
             meta.isSpoiled = false
             meta.nutrition = item.nutrition or item.hydration or 0
+        elseif item.name == 'item_vehicle_key' or item.name == 'car_keys' then
+            meta.vin = (type(extra) == "table" and extra.vin) or "NYX-UNKNOWN"
+            meta.plate = (type(extra) == "table" and extra.plate) or "NYX-000"
+            meta.keyType = (type(extra) == "table" and extra.keyType) or "master"
+            meta.issuedAt = os.time()
+        elseif item.name == 'rfid_fleet_card' then
+            meta.tokenUuid = (type(extra) == "table" and extra.tokenUuid) or ("rfid-" .. tostring(os.time()))
+            meta.factionId = (type(extra) == "table" and extra.factionId) or "corp_logistics"
+            meta.accessLevel = (type(extra) == "table" and extra.accessLevel) or "driver"
+            meta.isRevoked = false
+            meta.issuedAt = os.time()
         end
     end
 

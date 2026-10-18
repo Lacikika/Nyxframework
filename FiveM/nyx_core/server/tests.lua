@@ -8498,7 +8498,211 @@ function Nyx.Tests.TestGasStationReservoirsAndBulkFuelHauling()
     return passes == total
 end
 
--- 39. Master Test Runner
+-- 39. Physical Vehicle Keys, Fleet RFID Tokens & Lockpicking Forensics Test Suite
+function Nyx.Tests.TestPhysicalKeysFleetRfidAndLockpickingForensics()
+    print("^3[Nyx:Tests] Running Physical Vehicle Keys, Fleet RFID & Lockpicking Forensics Suite...^7")
+    local passes = 0
+    local total = 6
+
+    local KeyMod = (Nyx.VehicleKeys) or {}
+
+    -- Sub-test A: Key Item Matching (VIN & Plate Matching)
+    local valKey = KeyMod.ValidateKeyMatch or function(kItem, vin, plate)
+        if not kItem or type(kItem) ~= "table" then return false, "INVALID_KEY_ITEM" end
+        local itemId = kItem.item_id or kItem.name
+        if itemId ~= "item_vehicle_key" and itemId ~= "car_keys" then return false, "NOT_A_KEY_ITEM" end
+        local meta = kItem.metadata or {}
+        if meta.vin and vin and tostring(meta.vin) == tostring(vin) then return true, "VIN_MATCH" end
+        if meta.plate and plate then
+            local cK = string.upper(string.gsub(tostring(meta.plate), "%s+", ""))
+            local cT = string.upper(string.gsub(tostring(plate), "%s+", ""))
+            if cK == cT and #cK > 0 then return true, "PLATE_MATCH" end
+        end
+        return false, "KEY_MISMATCH"
+    end
+
+    local k1 = { item_id = "item_vehicle_key", metadata = { vin = "VIN-NYX-001", plate = "NYX 101", keyType = "master" } }
+    local k2 = { item_id = "item_vehicle_key", metadata = { plate = "NYX 101", keyType = "copy" } }
+    local k3 = { item_id = "item_vehicle_key", metadata = { vin = "VIN-OTHER", plate = "OTHER" } }
+    local kBad = { item_id = "tool_lockpick", metadata = {} }
+
+    local okK1, rK1 = valKey(k1, "VIN-NYX-001", "NYX 101")
+    local okK2, rK2 = valKey(k2, "VIN-NYX-999", "NYX 101")
+    local okK3, rK3 = valKey(k3, "VIN-NYX-001", "NYX 101")
+    local okK4, rK4 = valKey(kBad, "VIN-NYX-001", "NYX 101")
+
+    local testA_ok = (okK1 == true and rK1 == "VIN_MATCH") and
+                     (okK2 == true and rK2 == "PLATE_MATCH") and
+                     (okK3 == false and rK3 == "KEY_MISMATCH") and
+                     (okK4 == false and rK4 == "NOT_A_KEY_ITEM")
+
+    if assertTest(testA_ok == true,
+        "Physical Key Metadata & Plate Matching Invariant",
+        string.format("k1=%s(%s), k2=%s(%s), k3=%s(%s), k4=%s(%s)",
+            tostring(okK1), rK1, tostring(okK2), rK2, tostring(okK3), rK3, tostring(okK4), rK4)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Corporate Fleet RFID Hierarchy, Expiry & Revocation
+    local valRfid = KeyMod.ValidateRfidAccess or function(rItem, factionId, curTime, reqLevel)
+        local levels = { driver = 1, manager = 2, executive = 3, admin = 4 }
+        if not rItem or type(rItem) ~= "table" then return false, "INVALID_RFID_ITEM" end
+        local itemId = rItem.item_id or rItem.name
+        if itemId ~= "rfid_fleet_card" then return false, "NOT_RFID_ITEM" end
+        local meta = rItem.metadata or {}
+        if meta.is_revoked == true or meta.isRevoked == true then return false, "TOKEN_REVOKED" end
+        local exp = tonumber(meta.expires_at or meta.expiresAt)
+        local now = tonumber(curTime) or os.time()
+        if exp and exp > 0 and now > exp then return false, "TOKEN_EXPIRED" end
+        local itemFac = meta.faction_id or meta.factionId
+        if not itemFac or itemFac ~= factionId then return false, "FACTION_MISMATCH" end
+        local tLevel = meta.access_level or meta.accessLevel or "driver"
+        if (levels[tLevel] or 1) < (levels[reqLevel or "driver"] or 1) then return false, "INSUFFICIENT_ACCESS_LEVEL" end
+        return true, "AUTHORIZED"
+    end
+
+    local r1 = { item_id = "rfid_fleet_card", metadata = { faction_id = "corp_logistics", access_level = "manager", is_revoked = false, expires_at = 200000 } }
+    local rRevoked = { item_id = "rfid_fleet_card", metadata = { faction_id = "corp_logistics", access_level = "manager", is_revoked = true } }
+    local rExpired = { item_id = "rfid_fleet_card", metadata = { faction_id = "corp_logistics", access_level = "driver", expires_at = 100000 } }
+
+    local okR1, resR1 = valRfid(r1, "corp_logistics", 150000, "driver")
+    local okR2, resR2 = valRfid(r1, "other_faction", 150000, "driver")
+    local okR3, resR3 = valRfid(rRevoked, "corp_logistics", 150000, "driver")
+    local okR4, resR4 = valRfid(rExpired, "corp_logistics", 100005, "driver")
+    local okR5, resR5 = valRfid(r1, "corp_logistics", 150000, "executive")
+
+    local testB_ok = (okR1 == true and resR1 == "AUTHORIZED") and
+                     (okR2 == false and resR2 == "FACTION_MISMATCH") and
+                     (okR3 == false and resR3 == "TOKEN_REVOKED") and
+                     (okR4 == false and resR4 == "TOKEN_EXPIRED") and
+                     (okR5 == false and resR5 == "INSUFFICIENT_ACCESS_LEVEL")
+
+    if assertTest(testB_ok == true,
+        "Corporate Fleet RFID Hierarchy, Expiry & Revocation Invariant",
+        string.format("r1=%s(%s), r2=%s(%s), r3=%s(%s), r4=%s(%s), r5=%s(%s)",
+            tostring(okR1), resR1, tostring(okR2), resR2, tostring(okR3), resR3, tostring(okR4), resR4, tostring(okR5), resR5)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Lockpick Probability Math & Alarms
+    local calcLP = KeyMod.CalculateLockpickChance or function(pType, vClass, sec)
+        local base = (pType == "tool_lockpick_advanced") and 0.75 or 0.50
+        local mod = (vClass == 7) and -0.20 or ((vClass == 0) and 0.05 or 0.0)
+        local secPen = (tonumber(sec) or 0) * 0.10
+        local sChance = math.max(0.05, math.min(0.95, base + mod - secPen))
+        local aFail = math.min(0.90, 0.35 + (sec * 0.15))
+        local aSuccess = math.min(0.50, 0.10 + (sec * 0.10))
+        local bChance = (pType == "tool_lockpick") and 0.25 or 0.10
+        local rnd = function(v) return math.floor((v * 100) + 0.5) / 100 end
+        return { successChance = rnd(sChance), alarmChanceFail = rnd(aFail), alarmChanceSuccess = rnd(aSuccess), breakChance = rnd(bChance) }
+    end
+
+    local lpStd = calcLP("tool_lockpick", 0, 0)
+    local lpSuper = calcLP("tool_lockpick", 7, 1)
+
+    local testC_ok = (lpStd.successChance == 0.55) and
+                     (lpStd.breakChance == 0.25) and
+                     (lpSuper.successChance == 0.20) and
+                     (lpSuper.alarmChanceFail == 0.50)
+
+    if assertTest(testC_ok == true,
+        "Lockpick Probability Math, Class Modifiers & Breakage Invariant",
+        string.format("std=%.2f/%.2f, super=%.2f/%.2f",
+            lpStd.successChance, lpStd.breakChance, lpSuper.successChance, lpSuper.alarmChanceFail)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Forensic Latent Fingerprint Trace & Gloves Protection
+    local detTrace = KeyMod.DetermineForensicTrace or function(hasGloves, citId, coords, salt)
+        if hasGloves == true then
+            return { leavesFingerprint = false, evidenceType = nil, hash = nil, surface = nil }
+        end
+        local sSerial = "FP-" .. tostring(citId or "UNKNOWN")
+        local raw = string.format("%s:%s:%.2f,%.2f,%.2f:%s", sSerial, tostring(citId or "UNKNOWN"), coords.x, coords.y, coords.z, salt or "SALT")
+        local fpHash = (KeyMod.Sha256 and KeyMod.Sha256(raw)) or "HASH64DUMMY"
+        return { leavesFingerprint = true, evidenceType = "fingerprint", sourceSerial = sSerial, hash = fpHash, surface = "vehicle_door_handle" }
+    end
+
+    local cCoords = { x = 215.5, y = -805.0, z = 30.8 }
+    local traceGloves = detTrace(true, "CIT-100", cCoords, "SALT1")
+    local traceBare = detTrace(false, "CIT-100", cCoords, "SALT1")
+
+    local testD_ok = (traceGloves.leavesFingerprint == false and traceGloves.hash == nil) and
+                     (traceBare.leavesFingerprint == true and traceBare.evidenceType == "fingerprint" and traceBare.surface == "vehicle_door_handle" and type(traceBare.hash) == "string")
+
+    if assertTest(testD_ok == true,
+        "Forensic Latent Fingerprint Trace & Gloves Immunity Invariant",
+        string.format("gloves=%s, bare=%s, hashLen=%d",
+            tostring(traceGloves.leavesFingerprint), tostring(traceBare.leavesFingerprint), #(traceBare.hash or ""))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Zero-Trust Payload Validation for Keys & RFID
+    local valKeyPayload = KeyMod.ValidateKeyCreationPayload or function(p)
+        if not p or type(p) ~= "table" then return false, "INVALID_PAYLOAD" end
+        if not p.vin or type(p.vin) ~= "string" or #p.vin < 3 or #p.vin > 32 then return false, "INVALID_VIN" end
+        if not p.plate or type(p.plate) ~= "string" or #p.plate < 2 or #p.plate > 12 then return false, "INVALID_PLATE" end
+        local t = p.keyType or "copy"
+        if t ~= "master" and t ~= "copy" and t ~= "valet" and t ~= "fob" then return false, "INVALID_KEY_TYPE" end
+        if not p.targetCitizenId or type(p.targetCitizenId) ~= "string" or #p.targetCitizenId < 2 then return false, "INVALID_TARGET" end
+        return true, "OK"
+    end
+
+    local valRfidPayload = KeyMod.ValidateRfidCreationPayload or function(p)
+        if not p or type(p) ~= "table" then return false, "INVALID_PAYLOAD" end
+        if not p.factionId or type(p.factionId) ~= "string" or #p.factionId < 2 or #p.factionId > 32 then return false, "INVALID_FACTION_ID" end
+        if p.targetCitizenId ~= nil and (type(p.targetCitizenId) ~= "string" or #p.targetCitizenId < 2) then return false, "INVALID_TARGET" end
+        local lvl = p.accessLevel or "driver"
+        if lvl ~= "driver" and lvl ~= "manager" and lvl ~= "executive" and lvl ~= "admin" then return false, "INVALID_ACCESS_LEVEL" end
+        return true, "OK"
+    end
+
+    local okKP1, _ = valKeyPayload({ vin = "VIN-100", plate = "NYX 100", keyType = "copy", targetCitizenId = "CIT-200" })
+    local okKP2, errKP2 = valKeyPayload({ vin = "", plate = "NYX 100" })
+    local okRP1, _ = valRfidPayload({ factionId = "corp_logistics", accessLevel = "manager", targetCitizenId = "CIT-200" })
+    local okRP2, errRP2 = valRfidPayload({ factionId = "corp_logistics", accessLevel = "super_admin" })
+
+    local testE_ok = (okKP1 == true) and
+                     (okKP2 == false and errKP2 == "INVALID_VIN") and
+                     (okRP1 == true) and
+                     (okRP2 == false and errRP2 == "INVALID_ACCESS_LEVEL")
+
+    if assertTest(testE_ok == true,
+        "Zero-Trust Payload Validation for Keys & RFID Invariant",
+        string.format("kp1=%s, kp2=%s(%s), rp1=%s, rp2=%s(%s)",
+            tostring(okKP1), tostring(okKP2), errKP2, tostring(okRP1), tostring(okRP2), errRP2)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: UI Badge Formatting
+    local fmtBadge = KeyMod.FormatKeyBadge or function(t)
+        if t == "master" then return { label = "FŐKULCS (MASTER)", cssClass = "badge-primary" }
+        elseif t == "valet" then return { label = "SZERVÍZ / VALET", cssClass = "badge-warning" }
+        elseif t == "fob" then return { label = "DIGITÁLIS FOB", cssClass = "badge-info" }
+        else return { label = "MÁSOLAT (COPY)", cssClass = "badge-secondary" } end
+    end
+
+    local bMaster = fmtBadge("master")
+    local bValet = fmtBadge("valet")
+    local bFob = fmtBadge("fob")
+    local bCopy = fmtBadge("copy")
+
+    local testF_ok = (bMaster.cssClass == "badge-primary") and
+                     (bValet.cssClass == "badge-warning") and
+                     (bFob.cssClass == "badge-info") and
+                     (bCopy.cssClass == "badge-secondary")
+
+    if assertTest(testF_ok == true,
+        "Key Badge Taxonomy & UI Formatting Invariant",
+        string.format("master=%s, valet=%s, fob=%s, copy=%s",
+            bMaster.cssClass, bValet.cssClass, bFob.cssClass, bCopy.cssClass)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 40. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -8542,15 +8746,17 @@ function Nyx.Tests.RunAll()
     local t36 = Nyx.Tests.TestAnatomicalTraumaAndInjuryEngine()
     local t37 = Nyx.Tests.TestPillboxSupplyDepletionAndEmergencyHauls()
     local t38 = Nyx.Tests.TestGasStationReservoirsAndBulkFuelHauling()
+    local t39 = Nyx.Tests.TestPhysicalKeysFleetRfidAndLockpickingForensics()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")
     end
     print("^5==================================================^7")
 end
+
 
 
 

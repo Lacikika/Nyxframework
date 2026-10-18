@@ -11,3 +11,16 @@ end)
 exports("GetStorageCapacity", function(vehicleClass)
     return Config.StorageByClass[vehicleClass] or Config.DefaultStorage
 end)
+
+exports("ToggleVehicleLock", function()
+    ExecuteCommand("nyx_toggle_vehicle_lock")
+end)
+
+exports("LockpickVehicle", function(useGloves)
+    ExecuteCommand("lockpickvehicle " .. (useGloves and "gloves" or ""))
+end)
+
+exports("HotwireVehicle", function(useGloves)
+    ExecuteCommand("hotwire " .. (useGloves and "gloves" or ""))
+end)
+

@@ -111,3 +111,33 @@ exports("ReplenishReservoir", function(stationId, liters)
     return Nyx.VehicleFuel.ReplenishReservoir(stationId, liters)
 end)
 
+-- Keys, Fleet RFID Tokens & Lockpicking Forensics
+exports("CheckIgnition", function(src, vinOrNetId)
+    return Nyx.Vehicles.CheckIgnition(src, vinOrNetId)
+end)
+
+exports("AttemptLockpick", function(src, netId, useGloves)
+    return Nyx.Vehicles.AttemptLockpick(src, netId, useGloves)
+end)
+
+exports("AttemptHotwire", function(src, netId, useGloves)
+    return Nyx.Vehicles.AttemptHotwire(src, netId, useGloves)
+end)
+
+exports("IssuePhysicalKey", function(src, vin, targetCitId, keyType)
+    return Nyx.Vehicles.IssuePhysicalKey(src, vin, targetCitId, keyType)
+end)
+
+exports("IssueRfidToken", function(src, factionId, targetCitId, accessLevel, label)
+    return Nyx.Vehicles.IssueRfidToken(src, factionId, targetCitId, accessLevel, label)
+end)
+
+exports("RevokeRfidToken", function(src, tokenUuid, reason)
+    return Nyx.Vehicles.RevokeRfidToken(src, tokenUuid, reason)
+end)
+
+exports("GetVehicleLockpickHistory", function(vin)
+    return Nyx.Vehicles.GetLockpickHistory(vin)
+end)
+
+

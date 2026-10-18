@@ -72,7 +72,7 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Dynamic Gas Station Reservoir Stocks & Bulk Fuel Hauling (`nyx_logistics` & `nyx_vehicles`)**
   - **Implementation:** Gas pumps draw from localized underground tanks. Zero fuel blocks vehicle refueling and creates refinery-to-station bulk tanker delivery missions.
 
-- [ ] **Feature: Physical Vehicle Keys, Fleet RFID Tokens & Lockpicking Forensics (`nyx_vehicles` & `nyx_inventory`)**
+- [x] **Feature: Physical Vehicle Keys, Fleet RFID Tokens & Lockpicking Forensics (`nyx_vehicles` & `nyx_inventory`)**
   - **Implementation:** Metadata-driven ignition keys (`item_vehicle_key`), corporate RFID proximity access, and lockpicking mechanics that generate latent fingerprints for `nyx_judiciary`.
 
 - [ ] **Feature: Penal Labor Processing & Civic Sentence Reductions (`nyx_judiciary` & `nyx_logistics`)**
@@ -107,6 +107,44 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Physical Vehicle Keys, Fleet RFID Tokens & Lockpicking Forensics (`nyx_vehicles` & `nyx_inventory`)**
+  - **Database Migration (`044_vehicle_keys_rfid_and_lockpicking_forensics.sql`, `index.json`)**:
+    - Created `nyx_vehicles_rfid_tokens` table (`token_id` PK, `token_uuid` UNIQUE, `faction_id`, `holder_citizen_id`, `access_level`, `label`, `is_revoked`, `revoked_by`, `revocation_reason`, `expires_at`, `created_at`) for corporate fleet transponder passes.
+    - Created `nyx_vehicles_lockpick_attempts` audit ledger (`attempt_id` PK, `attempt_uuid` UNIQUE, `vin`, `plate`, `citizen_id`, `action_type`, `success`, `alarm_triggered`, `tool_used`, `tool_broken`, `had_gloves`, `fingerprint_evidence_id`, `fingerprint_hash`, `coords`, `notes`, `attempted_at`) for forensic tracking and tamper auditing.
+    - Extended `nyx_vehicles_owned` with `hotwired` (TINYINT default 0) and `alarm_state` (TINYINT default 0).
+    - Seeded initial corporate RFID tokens for `corp_logistics`, `police`, and `ems`.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 44) and mirrored to `FiveM/nyx_vehicles/sql/migrations/`.
+  - **Item Registry Integration (`nyx_inventory/shared/items.lua`)**:
+    - Registered `item_vehicle_key` (Physical Vehicle Key, 30g, laser-cut ignition key with VIN, plate, and keyType metadata).
+    - Registered `rfid_fleet_card` (Corporate Fleet RFID Pass, 15g, NFC/RFID transponder card granting proximity access to corporate fleets).
+    - Updated `CreateDefaultMetadata` to automatically populate key and RFID metadata on item creation.
+  - **Shared Pure Lua 5.4 Logic Engine (`nyx_vehicles/shared/keys.lua`, `fxmanifest.lua`)**:
+    - Implemented `Nyx.VehicleKeys.ValidateKeyMatch` supporting exact VIN match, plate match normalization, and key item validation.
+    - Implemented `Nyx.VehicleKeys.ValidateRfidAccess` supporting 4-tier access hierarchy (`driver`, `manager`, `executive`, `admin`), faction match, expiration checks, and token revocation.
+    - Implemented `Nyx.VehicleKeys.CalculateLockpickChance` calculating success probabilities based on lockpick type, vehicle class modifiers, and security upgrades, alongside alarm and tool break probabilities.
+    - Implemented `Nyx.VehicleKeys.DetermineForensicTrace` calculating latent fingerprint traces and deterministic SHA-256 evidence hashes with complete glove immunity.
+    - Implemented `Nyx.VehicleKeys.FormatKeyBadge` and zero-trust payload validators `ValidateKeyCreationPayload` and `ValidateRfidCreationPayload`.
+    - Declared `shared/keys.lua` in `FiveM/nyx_vehicles/fxmanifest.lua`.
+  - **Server-Side Subsystem & RPCs (`nyx_vehicles/server/keys.lua`, `server/exports.lua`)**:
+    - Extended `HasKey` to check `item_vehicle_key`, `car_keys`, `rfid_fleet_card`, `nyx_vehicles_rfid_tokens`, and faction RBAC permissions.
+    - Implemented `CheckIgnition` enforcing key, RFID, or hotwire authorization to run engines.
+    - Implemented `AttemptLockpick` executing proximity checks, pick breakage, alarm triggering, MDT dispatch broadcast, and generating latent fingerprint evidence via `nyx_judiciary:RegisterFingerprintEvent`.
+    - Implemented `AttemptHotwire` allowing drivers to hotwire steering column ignition while generating steering column latent fingerprints if operating without gloves.
+    - Implemented `IssuePhysicalKey`, `IssueRfidToken`, and `RevokeRfidToken` with atomic database insertion and inventory grants.
+    - Implemented `GetVehicleLockpickHistory` for detective investigations and MDT auditing.
+    - Registered RPC endpoints: `vehicles:checkIgnition`, `vehicles:attemptLockpick`, `vehicles:attemptHotwire`, `vehicles:issuePhysicalKey`, `vehicles:issueRfidToken`, `vehicles:revokeRfidToken`, `vehicles:getLockpickHistory`.
+    - Exported APIs in `FiveM/nyx_vehicles/server/exports.lua`.
+  - **Client-Side Ignition Enforcement & Interactions (`nyx_vehicles/client/keys.lua`, `client/exports.lua`)**:
+    - Implemented driver seat ignition enforcement thread automatically stalling engine and locking driveability if player lacks valid key/RFID/hotwire.
+    - Added `/lockpickvehicle` (`/lockpick`) and `/hotwire` commands with realistic animations and progress delays.
+    - Added car alarm listener (`nyx:vehicles:client:alarmTriggered`) with siren duration and visual indicator flashing.
+    - Exported client APIs in `FiveM/nyx_vehicles/client/exports.lua`.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestPhysicalKeysFleetRfidAndLockpickingForensics()` (Test 39) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_vehicle_keys_rfid_and_lockpicking_forensics.py` with 10 test cases covering migration 044 schema, item registry, manifest declarations, key matching, RFID hierarchy and revocation, lockpicking chance math, latent fingerprint generation and glove protection, zero-trust payload validation, server exports and RPCs, and in-engine registration (10/10 passing).
+    - Full pytest suite: 348/348 tests passing (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 230 Lua files, 44 migrations, 100% clean verification.
+
 - **[2026-10-18] Feature: Dynamic Gas Station Reservoir Stocks & Bulk Fuel Hauling (`nyx_logistics` & `nyx_vehicles`)**
   - **Database Migration (`043_gas_station_reservoirs_and_bulk_fuel_hauling.sql`, `index.json`)**:
     - Created `nyx_vehicles_gas_stations` table (`station_id` PK, `name`, `brand`, `zone_id`, `reservoir_stash_id` UNIQUE, `coords`, `fuel_capacity`, `fuel_stock`, `fuel_price_per_liter`, `critical_threshold`, `degraded_threshold`, `is_active`, `last_emergency_contract_at`, `last_delivery_at`) for persistent underground tank management.

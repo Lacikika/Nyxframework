@@ -19,7 +19,8 @@ shared_scripts {
     'config.lua',
     'shared/registration.lua',
     'shared/diagnostics.lua',
-    'shared/fuel.lua'
+    'shared/fuel.lua',
+    'shared/keys.lua'
 }
 
 server_scripts {
