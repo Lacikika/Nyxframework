@@ -284,46 +284,121 @@ function Nyx.Treasury.ProcessP2PTransfer(senderCitizenId, receiverCitizenId, gro
 end
 
 -- Periodic Municipal Revenue Redistribution Sweep
--- Traverses nyx_treasury_allocations and transfers collected taxes to department budgets
-function Nyx.Treasury.SweepTaxes()
+-- Traverses nyx_treasury_allocations, executes statutory percentage splits with cap overflow protection,
+-- records immutable audit log in nyx_treasury_revenue_sweeps, and broadcasts telemetry to clients.
+function Nyx.Treasury.SweepTaxes(executedBy)
+    executedBy = executedBy or "REVENUE_SWEEP_DAEMON"
     local taxAcc = Config.Accounts.Tax or "gov:city:tax"
+    local masterAcc = Config.Accounts.Master or "gov:city:master"
     local collected = Nyx.Treasury.GetBalance(taxAcc)
 
-    if collected <= 10.00 then
-        return -- Defer sweep until meaningful balance accumulates
+    if collected < 10.00 then
+        return { success = false, reason = "INSUFFICIENT_POOL_BALANCE", collected = collected }
     end
 
     local allocations = MySQL.query.await("SELECT * FROM `nyx_treasury_allocations`")
     if not allocations or #allocations == 0 then
-        -- Default: Route 100% to municipal master reserve
-        Nyx.Treasury.ExecuteTransfer(
+        -- Default fallback: Route 100% to municipal master reserve
+        local ok, res = Nyx.Treasury.ExecuteTransfer(
             taxAcc,
-            Config.Accounts.Master or "gov:city:master",
+            masterAcc,
             collected,
             "allocation",
-            "REVENUE_SWEEP",
+            executedBy,
             "Default unallocated tax sweep to master reserve"
         )
-        return
+        return { success = ok, collected = collected, fallback = true }
     end
 
-    print(string.format("^4[Nyx:Treasury]^7 Executing revenue sweep of $%.2f across department allocations...", collected))
-
+    -- Hydrate current department balances for cap headroom evaluation
+    local currentBalances = {}
     for _, alloc in ipairs(allocations) do
-        local percentage = tonumber(alloc.percentage_split) or 0.0
-        local share = math.floor((collected * (percentage / 100.0)) * 100) / 100
+        local dept = alloc.target_department
+        currentBalances[dept] = Nyx.Treasury.GetBalance(dept)
+    end
 
-        if share > 0 then
+    local sweepResult = Nyx.PublicLedger.CalculateSweepSplits(collected, allocations, currentBalances)
+    if not sweepResult or not sweepResult.success then
+        return sweepResult or { success = false }
+    end
+
+    print(string.format("^4[Nyx:Treasury]^7 Executing statutory revenue sweep: Collected $%.2f | Allocated $%.2f | Retained Surplus $%.2f^7",
+        collected, sweepResult.totalAllocated, sweepResult.masterSurplusRetained))
+
+    local sweepUuid = Nyx.RPC.GenerateNonce()
+    local fiscalState = Nyx.Treasury.GetFiscalState()
+
+    -- 1. Transfer departmental shares
+    for _, split in ipairs(sweepResult.splits or {}) do
+        if split.effectiveShare and split.effectiveShare > 0 then
+            Nyx.Treasury.EnsureAccount(split.targetDepartment, split.departmentLabel, "department", 0.00)
+            local memo = string.format("Automated statutory tax allocation (%.1f%%) [%s]", split.percentageSplit, split.allocationCategory)
             Nyx.Treasury.ExecuteTransfer(
                 taxAcc,
-                alloc.target_department,
-                share,
+                split.targetDepartment,
+                split.effectiveShare,
                 "allocation",
-                "REVENUE_SWEEP",
-                string.format("Automated %.1f%% tax allocation ratified by bill %s", percentage, alloc.ratified_by_bill_id)
+                executedBy,
+                memo
             )
+
+            pcall(function()
+                MySQL.prepare.await([[
+                    UPDATE `nyx_treasury_allocations`
+                    SET `last_allocated_amount` = ?, `last_allocated_at` = CURRENT_TIMESTAMP
+                    WHERE `target_department` = ?
+                ]], { split.effectiveShare, split.targetDepartment })
+            end)
         end
     end
+
+    -- 2. Transfer master retained surplus (cap overflows & cent dust) if present
+    if sweepResult.masterSurplusRetained and sweepResult.masterSurplusRetained > 0 then
+        Nyx.Treasury.EnsureAccount(masterAcc, "Municipal Master Reserve", "public_master", 0.00)
+        Nyx.Treasury.ExecuteTransfer(
+            taxAcc,
+            masterAcc,
+            sweepResult.masterSurplusRetained,
+            "allocation",
+            executedBy,
+            "Cap overflow surplus retained in Municipal Master Reserve"
+        )
+    end
+
+    -- 3. Record immutable audit record in nyx_treasury_revenue_sweeps
+    pcall(function()
+        MySQL.prepare.await([[
+            INSERT INTO `nyx_treasury_revenue_sweeps`
+            (`sweep_uuid`, `tax_pool_balance_before`, `total_swept`, `master_surplus_retained`, `allocations_count`, `allocations_json`, `fiscal_state`, `executed_by`)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ]], {
+            sweepUuid,
+            collected,
+            sweepResult.totalSwept,
+            sweepResult.masterSurplusRetained,
+            #sweepResult.splits,
+            json.encode(sweepResult.splits),
+            fiscalState,
+            executedBy
+        })
+    end)
+
+    -- 4. Broadcast event across server & clients
+    TriggerEvent("nyx:treasury:revenueSweepExecuted", sweepUuid, sweepResult)
+    TriggerClientEvent("nyx:treasury:client:sweepExecuted", -1, {
+        sweepUuid = sweepUuid,
+        collected = collected,
+        totalSwept = sweepResult.totalSwept,
+        splits = sweepResult.splits,
+        fiscalState = fiscalState,
+        timestamp = os.time()
+    })
+
+    return {
+        success = true,
+        sweepUuid = sweepUuid,
+        sweepResult = sweepResult
+    }
 end
 
 -- Revenue Sweep Background Thread

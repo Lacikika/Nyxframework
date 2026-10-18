@@ -111,11 +111,50 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Democratic Parliamentary Elections & Recall Referendums (`nyx_parliament` & `nyx_ui`)**
   - **Implementation:** Candidate registration with signatures and collateral deposits, physical voting booth terminal interaction, and automated term limit expiration with citizen recall referendums.
 
-- [ ] **Feature: Auditable Public Treasury Ledger & Department Allocation Monitor (`nyx_treasury` & `nyx_ui`)**
+- [x] **Feature: Auditable Public Treasury Ledger & Department Allocation Monitor (`nyx_treasury` & `nyx_ui`)**
   - **Implementation:** Real-time read-only webview showing open municipal balance sheets, categorized transaction logs, automated percentage splits (emergency services, infrastructure, social dividend), and fiscal crisis threshold telemetry.
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Auditable Public Treasury Ledger & Department Allocation Monitor (`nyx_treasury` & `nyx_ui`)**
+  - **Database Migration (`057_auditable_public_treasury_ledger_and_department_monitor.sql`)**:
+    - Created migration file and registered Step 57 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Mirrored migration to `FiveM/nyx_treasury/sql/migrations/057_auditable_public_treasury_ledger_and_department_monitor.sql`.
+    - Extended `nyx_treasury_accounts` with Citizen Universal Dividend Grant Pool (`gov:dept:dividend`, $250k initial seed, grant_pool type).
+    - Extended `nyx_treasury_allocations` with `department_label`, `allocation_category` ENUM('emergency_services','infrastructure','social_dividend','general'), `last_allocated_amount`, and `last_allocated_at`.
+    - Seeded canonical statutory allocation schedules matching Tervek.md: Police (35%), EMS (25%), Public Works (25%), Social Dividend (15%) with statutory caps.
+    - Created `nyx_treasury_revenue_sweeps` immutable audit log table (`sweep_id` PK, `sweep_uuid`, `tax_pool_balance_before`, `total_swept`, `master_surplus_retained`, `allocations_count`, `allocations_json`, `fiscal_state`, `executed_by`, `created_at`) with indexes on `sweep_uuid` and `created_at`.
+  - **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_treasury/shared/public_ledger.lua`)**:
+    - Created taxonomies: `Nyx.PublicLedger.AllocationCategories` (3 statutory pillars: Emergency Services, Infrastructure, Social Dividend) and `Nyx.PublicLedger.TransactionCategories` (14 categorized flows with badge styling and flow direction).
+    - Implemented `CalculateBalanceSheet(accounts, targetReserve, criticalReserve)` aggregating total municipal liquidity, calculating percentage shares, and evaluating per-account solvency (`SOLVENT`, `LOW_RESERVE`, `DEFICIT_WARNING`, `DEPLETED`).
+    - Implemented `CalculateSweepSplits(collectedAmount, allocations, currentBalances)` with strict exact cent conservation ($\sum \text{Shares} + \text{MasterSurplus} \equiv \text{CollectedAmount}$, $\Delta \equiv 0.00$), capturing rounding remainder cents into master surplus and redirecting department cap excess overflow to `gov:city:master`.
+    - Implemented `CalculateFiscalTelemetry(masterReserve, circuitTelemetry, targetReserve, criticalReserve, cautionReserve)` calculating state progression (`SOLVENT`, `THROTTLED`, `AUSTERITY`, `CRITICAL_DEFICIT`, `CIRCUIT_TRIPPED`), logarithmic wage multiplier ($w = \text{floor} + (1 - \text{floor}) \cdot \frac{\ln(R/R_{crit})}{\ln(R_{targ}/R_{crit})}$), drain velocity runway hours estimation, and public infrastructure degradation flags (auto-repair offline, impound surcharge active, degraded AI dispatch).
+    - Implemented `SanitizeLedgerQuery(params)` for zero-trust ledger querying with page/pageSize clamping (5-100), category whitelisting, and SQL/HTML injection character stripping.
+    - Implemented `FormatLedgerReport(balanceSheet, telemetry)` for ASCII audit exports.
+  - **Manifest Declarations**:
+    - Registered `shared/public_ledger.lua` in `FiveM/nyx_treasury/fxmanifest.lua`.
+    - Registered `@nyx_treasury/shared/public_ledger.lua` in `FiveM/nyx_ui/fxmanifest.lua`.
+  - **Authoritative Server Subsystems & RPCs (`nyx_treasury`)**:
+    - Enhanced `SweepTaxes` in `server/taxes.lua` to load active allocations, compute statutory splits using pure domain engine, execute double-entry ledger transfers, record immutable record in `nyx_treasury_revenue_sweeps`, and broadcast `nyx:treasury:client:sweepExecuted` to all connected clients.
+    - Registered and secured zero-trust RPC routes in `server/main.lua`: `treasury:getPublicOverview`, `treasury:getBalanceSheet`, `treasury:getLedgerPage` (paginated & category/search filtered), `treasury:getAllocations`, and `treasury:getRevenueSweeps`.
+    - Exported public helpers in `server/exports.lua`: `GetBalanceSheet`, `GetPublicOverview`, `ExecuteRevenueSweep`, `GetRevenueSweeps`.
+  - **Client Subsystems & NUI Bridge (`nyx_treasury` & `nyx_ui`)**:
+    - Updated `FiveM/nyx_treasury/client/main.lua` with `/treasury` and `/cityledger` commands, live ticker listeners for `nyx:treasury:client:tickerUpdate` and `nyx:treasury:client:sweepExecuted`, and terminal open/close logic forwarding through `nyx_ui` SPA.
+    - Updated `FiveM/nyx_ui/client/exports.lua` with `OpenTreasuryDashboard` and `CloseTreasuryDashboard`.
+    - Updated `FiveM/nyx_ui/client/bridge.lua` with sanitized NUI callbacks: `treasury:getOverview`, `treasury:getLedgerPage`, `treasury:getAllocations`, `treasury:getBalanceSheet`, `treasury:getRevenueSweeps`, and `treasury:getFiscalCrisisTelemetry`.
+  - **Single-Frame Web Master SPA Interface (`nyx_ui/web`)**:
+    - Completely redesigned `treasury-overlay` in `index.html` with modern 4-tab layout:
+      1. *Mérleg & Likviditás*: KPI cards (Master Reserve, Total Liquidity, Target %, Tax Rates, Solvency Status), Fiscal Crisis Alert Banner, and Municipal Accounts table.
+      2. *Főkönyvi Napló*: Category dropdown filter, real-time debounced search bar, transaction table with flow badges, and paginated navigation.
+      3. *Költségvetési Elosztás*: 3 Statutory Pillars cards with percentage bars, Department Allocations table with progress meters, and Audit Trail of Automated Sweeps.
+      4. *Fiskális Krízis & Telemetria*: Logarithmic wage multiplier card with live percentage pill, drain velocity & runway hours estimation, circuit breaker status, and municipal infrastructure degradation indicators.
+    - Extended `css/app.css` with dark theme cybernetic styling: `.treasury-dialog` (1080px max-width, zero blur), `.treasury-nav-tabs`, `.treasury-tab`, `.treasury-tab-pane`, `.treasury-crisis-banner`, `.allocation-pillars-grid`, `.telemetry-grid`, and `.cap-progress`.
+    - Enhanced `js/app.js` with `NyxState.treasury` state machine, 4-tab renderers (`renderTreasuryAccountsTable`, `renderTreasuryLedgerTable`, `renderTreasuryAllocations`, `renderTreasurySweeps`, `renderTreasuryTelemetry`), pagination/search handlers, real-time NUI message listeners (`TREASURY_DASHBOARD_OPEN`, `TREASURY_TICKER_UPDATE`, `TREASURY_SWEEP_UPDATE`), and desktop dev mode mock data.
+  - **Automated Test Coverage**:
+    - Created `tests/test_auditable_public_treasury_ledger_and_department_monitor.py` with 10 comprehensive tests validating categories taxonomy, balance sheets, exact cent conservation, cap overflow redirection, fiscal telemetry, query sanitization, SQL migration 057, manifest declarations, Web SPA integration, and in-engine tests.
+    - Added Test 52 (`Nyx.Tests.TestAuditablePublicTreasuryLedgerAndDepartmentMonitor`) to `FiveM/nyx_core/server/tests.lua` with 8 sub-tests, registered into `Nyx.Tests.RunAll()`.
+    - Verified entire test suite: 487/487 tests passing; `scripts/validator.py` and `scripts/verify.ps1` clean.
+
 - **[2026-10-18] Feature: Democratic Parliamentary Elections & Recall Referendums (`nyx_parliament` & `nyx_ui`)**
   - **Database Migration (`056_democratic_parliamentary_elections_and_recall_referendums.sql`)**:
     - Created migration file and registered Step 56 in `FiveM/nyx_core/sql/migrations/index.json`.

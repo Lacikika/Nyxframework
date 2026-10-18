@@ -142,6 +142,10 @@ function Nyx.UI.SanitizePayload(data)
     if data.plate and type(data.plate) == "string" then sanitized.plate = string.sub(data.plate, 1, 16) end
     if data.serviceType and type(data.serviceType) == "string" then sanitized.serviceType = string.sub(data.serviceType, 1, 32) end
     if data.lotId and type(data.lotId) == "string" then sanitized.lotId = string.sub(data.lotId, 1, 64) end
+    -- Auditable Public Treasury Ledger parameters
+    if data.category and type(data.category) == "string" then sanitized.category = string.sub(data.category, 1, 32) end
+    if data.page and type(data.page) == "number" then sanitized.page = math.max(1, math.floor(data.page)) end
+    if data.pageSize and type(data.pageSize) == "number" then sanitized.pageSize = math.max(5, math.min(100, math.floor(data.pageSize))) end
     -- Citizen OS Master Smartphone Framework parameters
     if data.recipientCitizenId and type(data.recipientCitizenId) == "string" then sanitized.recipientCitizenId = string.sub(data.recipientCitizenId, 1, 64) end
     if data.transferAmount and type(data.transferAmount) == "number" then sanitized.transferAmount = math.max(0.01, math.min(10000000.0, data.transferAmount)) end
@@ -211,6 +215,61 @@ Nyx.UI.SafeNUICallback("closeTreasury", function(_, cb)
     Nyx.UI.SetFocus(false, false)
     TriggerEvent("nyx:ui:closed:treasury", {})
     cb({ success = true })
+end)
+
+Nyx.UI.SafeNUICallback("treasury:getOverview", function(_, cb)
+    CreateThread(function()
+        local ok, res = pcall(function()
+            return exports['nyx_core']:TriggerRPCAwait("treasury:getPublicOverview")
+        end)
+        cb(ok and res or { success = false })
+    end)
+end)
+
+Nyx.UI.SafeNUICallback("treasury:getLedgerPage", function(payload, cb)
+    CreateThread(function()
+        local ok, res = pcall(function()
+            return exports['nyx_core']:TriggerRPCAwait("treasury:getLedgerPage", payload)
+        end)
+        cb(ok and res or { success = false, entries = {}, totalEntries = 0, totalPages = 1 })
+    end)
+end)
+
+Nyx.UI.SafeNUICallback("treasury:getAllocations", function(_, cb)
+    CreateThread(function()
+        local ok, res = pcall(function()
+            return exports['nyx_core']:TriggerRPCAwait("treasury:getAllocations")
+        end)
+        cb(ok and res or {})
+    end)
+end)
+
+Nyx.UI.SafeNUICallback("treasury:getBalanceSheet", function(_, cb)
+    CreateThread(function()
+        local ok, res = pcall(function()
+            return exports['nyx_core']:TriggerRPCAwait("treasury:getBalanceSheet")
+        end)
+        cb(ok and res or { success = false })
+    end)
+end)
+
+Nyx.UI.SafeNUICallback("treasury:getRevenueSweeps", function(payload, cb)
+    CreateThread(function()
+        local limit = payload and payload.limit or 15
+        local ok, res = pcall(function()
+            return exports['nyx_core']:TriggerRPCAwait("treasury:getRevenueSweeps", limit)
+        end)
+        cb(ok and res or { success = false, sweeps = {} })
+    end)
+end)
+
+Nyx.UI.SafeNUICallback("treasury:getFiscalCrisisTelemetry", function(_, cb)
+    CreateThread(function()
+        local ok, res = pcall(function()
+            return exports['nyx_core']:TriggerRPCAwait("treasury:getCircuitStatus")
+        end)
+        cb(ok and res or { success = false })
+    end)
 end)
 
 Nyx.UI.SafeNUICallback("closeMdt", function(_, cb)

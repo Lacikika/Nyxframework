@@ -1,80 +1,73 @@
-# Task Plan: Anatomical Trauma & Organ-Specific Medical Injury Engine (`nyx_services`)
+# Task Plan: Auditable Public Treasury Ledger & Department Allocation Monitor (`nyx_treasury` & `nyx_ui`)
 
 ## Goal
-Implement a comprehensive limb-specific anatomical trauma and medical injury engine in `nyx_services`. The system tracks localized trauma across 6 anatomical regions (`head`, `torso`, `left_arm`, `right_arm`, `left_leg`, `right_leg`) with distinct wound types (arterial bleeding, fractures, ballistic trauma, lacerations, burns, blunt impact). It simulates dynamic blood volume depletion (5000 mL normal, multi-tier hypovolemic shock), pain levels, and physical debuffs (limping, aim sway, fainting spells). Field stabilization requires physical medical items (`bandage_sterile`, `first_aid_pack`, `tourniquet`, `splint`), with full database persistence, zero-trust RPC validation, client damage detection and debuff loops, and in-engine integration tests.
+Implement a comprehensive, auditable real-time public treasury ledger and department allocation monitor in `nyx_treasury` and `nyx_ui`. The system delivers an open municipal balance sheet, categorized transaction logs with pagination and search, automated percentage splits across statutory pillars (Emergency Services, Infrastructure, Social Dividend), and real-time fiscal crisis threshold telemetry with logarithmic wage scaling and drain velocity analytics.
 
 ## Architecture & Requirements
-1. **Database Migration (`041_anatomical_trauma_and_medical_injury_engine.sql` & `index.json`)**:
-   - `nyx_medical_trauma`: Persistent player trauma state (`citizen_id` PK, `blood_volume_ml`, `bleeding_rate`, `pain_level`, `wounds_json`, `is_unconscious`, `last_updated_at`).
-   - `nyx_medical_treatments_log`: Immutable field treatment audit log (`log_id` PK, `treatment_uuid`, `patient_citizen_id`, `medic_citizen_id`, `item_used`, `target_limb`, `treatment_type`, `blood_volume_before`, `blood_volume_after`, `treated_at`).
-   - Register in `FiveM/nyx_core/sql/migrations/index.json` (Step 41) and mirror in `FiveM/nyx_services/sql/migrations/`.
+1. **Database Migration (`057_auditable_public_treasury_ledger_and_department_monitor.sql` & `index.json`)**:
+   - Extend `nyx_treasury_accounts` with `gov:dept:dividend` (Social Dividend & Civic Grants Reserve).
+   - Extend `nyx_treasury_allocations` with `department_label`, `allocation_category` (ENUM: `'emergency_services'`, `'infrastructure'`, `'social_dividend'`, `'general'`), `last_allocated_amount`, and `last_allocated_at`.
+   - Seed statutory allocation splits matching `Tervek.md` section 1:
+     - Emergency Services: Police (35%), EMS (25%) -> 60%
+     - Public Works / Infrastructure: Works (25%)
+     - Social Dividend & Small Grants: Dividend (15%)
+   - Create `nyx_treasury_revenue_sweeps` immutable audit ledger (`sweep_id` PK, `sweep_uuid` UNIQUE, `tax_pool_balance_before`, `total_swept`, `master_surplus_retained`, `allocations_count`, `allocations_json`, `fiscal_state`, `executed_by`, `created_at`).
+   - Register in `FiveM/nyx_core/sql/migrations/index.json` (Step 57) and mirror in `FiveM/nyx_treasury/sql/migrations/`.
 
-2. **Declarative Items Registration (`nyx_inventory/shared/items.lua`)**:
-   - Register physical medical consumable items:
-     - `bandage_sterile`: Sterile pressure bandage for lacerations, minor wounds, and bleeding control.
-     - `first_aid_pack`: Advanced trauma kit for fractures, ballistic trauma stabilization, and deep wound dressing.
-     - `tourniquet`: Extremity arterial bleed clamp (`left_arm`, `right_arm`, `left_leg`, `right_leg`).
-     - `splint`: Structural stabilization for fractured limbs.
-     - `morphine_ampoule`: Fast-acting analgesic reducing pain level and stabilizing shock symptoms.
-   - Maintain backward compatibility with existing items (`med_bandage`, `med_firstaid`, `med_plasma`, `med_surgical_pack`).
+2. **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_treasury/shared/public_ledger.lua`)**:
+   - `Nyx.PublicLedger.AllocationCategories`: Whitelist & metadata for statutory categories (`emergency_services`, `infrastructure`, `social_dividend`, `general`).
+   - `Nyx.PublicLedger.TransactionCategories`: Human-readable labels, badges, and flow types (inflow, outflow, internal) for all 11+ treasury categories.
+   - `Nyx.PublicLedger.CalculateBalanceSheet(accounts, targetReserve, criticalReserve)`: Pure calculator for municipal balance sheet, total public liquidity, departmental distribution shares, solvency ratings, and double-entry conservation verification.
+   - `Nyx.PublicLedger.CalculateSweepSplits(collectedAmount, allocations, accounts)`: Exact zero-cent closed-loop revenue sweep calculator respecting department caps and routing overflow surplus to master reserve.
+   - `Nyx.PublicLedger.CalculateFiscalTelemetry(masterReserve, circuitTelemetry, degradationState)`: Computes reserve ratios, fiscal state badge, wage multiplier, burn rate, runway hours, and infrastructure degradation statuses.
+   - `Nyx.PublicLedger.SanitizeLedgerQuery(params)`: Zero-trust input sanitization for pagination, category filters, and search terms.
+   - `Nyx.PublicLedger.FormatLedgerReport(balanceSheet, telemetry, allocations)`: Text/ASCII formatted public finance audit report for terminal printing.
+   - Declare in `FiveM/nyx_treasury/fxmanifest.lua` and `@nyx_treasury/shared/public_ledger.lua` in `FiveM/nyx_ui/fxmanifest.lua`.
 
-3. **Pure Lua 5.4 Shared Engine (`nyx_services/shared/trauma.lua`)**:
-   - `Nyx.Trauma.ValidLimbs`: Whitelist of anatomical regions (`head`, `torso`, `left_arm`, `right_arm`, `left_leg`, `right_leg`).
-   - `Nyx.Trauma.WoundTypes`: Whitelist of wound classifications (`laceration`, `ballistic`, `arterial_bleed`, `fracture`, `blunt`, `burn`).
-   - `Nyx.Trauma.BoneToLimb`: Deterministic mapping from GTA ped bone IDs to anatomical limbs.
-   - `Nyx.Trauma.CreateInitialTraumaState()`: Generates initial trauma state table (5000 mL blood, 0 pain, full limb health, no bleeding/fractures).
-   - `Nyx.Trauma.CalculateBleedRate(state)`: Calculates blood loss rate in mL/second based on active wounds, arterial bleeds, and applied tourniquets.
-   - `Nyx.Trauma.CalculateShockClass(bloodVolume)`: Determines hypovolemic shock class (Class I, II, III, IV) with physiological symptoms.
-   - `Nyx.Trauma.SimulateBloodTick(state, deltaSeconds)`: Pure function updating blood volume, applying bleed rate, and evaluating shock/unconsciousness.
-   - `Nyx.Trauma.AddWound(state, limb, woundType, severity)`: Applies localized wound, updates limb condition, and recalculates bleeding rate.
-   - `Nyx.Trauma.CanTreatLimb(state, limb, item)`: Zero-trust validation for medical item applicability on specific limbs.
-   - `Nyx.Trauma.ApplyTreatment(state, limb, item)`: Applies field stabilization effect, fixes fractures, arrests bleeding, reduces pain, and heals limb.
-   - `Nyx.Trauma.FormatTraumaDiagnosis(state)`: Generates detailed medical diagnostic summary for EMS and triage examination.
-   - Register in `FiveM/nyx_services/fxmanifest.lua`.
+3. **Authoritative Server Subsystems & RPCs (`FiveM/nyx_treasury/server/`)**:
+   - `server/taxes.lua`: Update `Nyx.Treasury.SweepTaxes` to use the pure split calculator, record immutable sweep records into `nyx_treasury_revenue_sweeps`, update `last_allocated_amount`/`last_allocated_at` in `nyx_treasury_allocations`, and trigger `nyx:treasury:client:sweepExecuted` broadcasts.
+   - `server/main.lua`: Register new/enhanced RPC routes:
+     - `treasury:getPublicOverview`: Comprehensive overview (balance sheet, accounts, fiscal crisis telemetry, allocations, active tax rates).
+     - `treasury:getBalanceSheet`: Structured balance sheet with breakdown of assets, reserves, and conservation proof.
+     - `treasury:getLedgerPage`: Paginated, categorized transaction logs with search filter and total entry counts.
+     - `treasury:getAllocations`: Department allocation schedules grouped by statutory pillar with progress towards caps.
+     - `treasury:getRevenueSweeps`: Immutable history of automated percentage sweeps.
+     - `treasury:getFiscalCrisisTelemetry`: Real-time telemetry on wage scaling, drain velocity, runway, and degradation.
+   - `server/exports.lua`: Export public server APIs: `GetBalanceSheet`, `GetPublicOverview`, `ExecuteRevenueSweep`, `GetRevenueSweeps`.
 
-4. **Server-Side Subsystem & RPCs (`nyx_services/server/trauma.lua`, `server/exports.lua`)**:
-   - In-memory trauma state management for active players with periodic debounced database sync.
-   - Character load hydration and disconnect persistence.
-   - RPC routes:
-     - `services:getTraumaState`: Fetches own trauma telemetry or nearby patient's trauma telemetry.
-     - `services:applyMedicalItem`: Validates inventory item possession, verifies distance, applies treatment, deducts item from inventory, and logs to `nyx_medical_treatments_log`.
-     - `services:diagnosePatient`: Medical examination of nearby player.
-     - `services:syncTraumaDamage`: Ingests client damage reports with server validation.
-     - `services:revivePlayer`: Integrated with `ProcessRevival` to reset trauma state.
-   - Server exports in `server/exports.lua`:
-     - `GetPlayerTraumaState`, `AddLimbDamage`, `ApplyMedicalTreatment`, `SetPlayerBloodVolume`, `DiagnosePlayerTrauma`, `ResetTraumaState`.
+4. **Client-Side Subsystems & NUI Bridge (`FiveM/nyx_treasury/client/` & `FiveM/nyx_ui/client/`)**:
+   - `nyx_treasury/client/main.lua`: Update `OpenTerminal` and `CloseTerminal` to use standardized `TREASURY_DASHBOARD_OPEN` envelope and pass full overview data. Register commands `/treasury` and `/cityledger`.
+   - `nyx_treasury/client/terminals.lua`: Spatial interaction terminals in world.
+   - `nyx_treasury/client/exports.lua`: Public client exports: `OpenTreasuryDashboard`, `CloseTreasuryDashboard`.
+   - `nyx_ui/client/bridge.lua`: Whitelist treasury parameters, register NUI callbacks (`treasury:getLedgerPage`, `treasury:getAllocations`, `treasury:getRevenueSweeps`, `treasury:getBalanceSheet`, `closeTreasury`).
+   - `nyx_ui/client/exports.lua`: Export `OpenTreasuryDashboard` and `CloseTreasuryDashboard`.
 
-5. **Client-Side Damage Listener & Debuff Loop (`nyx_services/client/trauma.lua`, `client/exports.lua`)**:
-   - Event listener: captures `CEventNetworkEntityDamage` or bone damage events, determines hit bone via `GetPedLastDamageBone`, maps to anatomical limb, and dispatches to server.
-   - Debuff execution loop:
-     - Leg injury/fracture: triggers limp animation set (`move_m@injured`).
-     - Arm injury/fracture: triggers weapon sway and handling degradation.
-     - Arterial bleed / severe blood loss: screen pulsation, vignette flash, and stumbling.
-     - Class IV hypovolemic shock (< 3000 mL): blackouts and ragdoll collapse.
-   - Commands:
-     - `/diagnose [targetId]` to perform a trauma triage check.
-     - `/treat [targetId] [limb] [item]` for field stabilization.
-   - Client exports:
-     - `GetLocalTraumaState`, `GetLimbHealth`, `IsBleeding`, `GetShockClass`.
-   - Register in `FiveM/nyx_services/fxmanifest.lua`.
+5. **Web Master Single-Page Application (`FiveM/nyx_ui/web/`)**:
+   - `index.html`: Redesign `treasury-overlay` with modern tabs:
+     - Tab 1: **Mérleg & Likviditás (Balance Sheet & Liquidity)** - Municipal asset cards, accounts table, solvency badges, net double-entry conservation verification.
+     - Tab 2: **Főkönyvi Napló (Audited Transaction Ledger)** - Live filterable transaction table by category, search bar, pagination (Page X of Y, Prev/Next), and live ticker.
+     - Tab 3: **Költségvetési Elosztás (Department Allocation Monitor)** - The 3 statutory pillars (Emergency Services, Infrastructure, Social Dividend) with percentage splits, cap gauges, and sweep history.
+     - Tab 4: **Fiskális Krízis Telemetria (Fiscal Crisis Telemetry)** - Reserve status gauge, logarithmic wage scale breakdown, drain velocity / burn rate meter, runway hours, and public infrastructure degradation status.
+   - `css/app.css`: Styling for treasury tabs, allocation progress bars, fiscal crisis status banners, and ledger filters.
+   - `js/app.js`: Implement `openTreasuryDashboard`, tab switching, filter handlers, pagination handlers, live ticker updates (`TREASURY_TICKER_UPDATE`, `TREASURY_SWEEP_UPDATE`), and browser dev mock data.
 
 6. **In-Engine Integration Test (`FiveM/nyx_core/server/tests.lua`)**:
-   - Test 36: `Nyx.Tests.TestAnatomicalTraumaAndInjuryEngine()`
-   - Validates bone-to-limb mapping, initial state generation, wound application, bleed rate calculations, shock classification, item treatment effects, and zero-trust validation rules.
+   - Test 52: `Nyx.Tests.TestAuditablePublicTreasuryLedgerAndDepartmentMonitor()`
+   - Validates balance sheet computation, exact cent sweep splits, department cap enforcement, fiscal crisis telemetry, search/pagination sanitization, and double-entry conservation.
    - Wire into `Nyx.Tests.RunAll()`.
 
 7. **Verification & Completion**:
-   - Dedicated Python test suite `tests/test_anatomical_trauma_and_injury_engine.py` (all tests passing).
-   - Full pytest regression suite.
-   - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`.
+   - Dedicated pytest test suite: `tests/test_auditable_public_treasury_ledger_and_department_monitor.py`.
+   - Run full pytest suite (all 477+ tests passing).
+   - Run `python scripts/validator.py` and `powershell -File scripts/verify.ps1`.
    - Update `AGENT_TASK.md` marking task completed.
 
 ## Phase Plan
-- [x] Phase 1: Test-Driven Design — Create pytest test suite (`tests/test_anatomical_trauma_and_injury_engine.py`)
-- [x] Phase 2: Database Migration — Create `041_anatomical_trauma_and_medical_injury_engine.sql`, register in `index.json`, mirror to `nyx_services`
-- [x] Phase 3: Declarative Items — Register medical items in `FiveM/nyx_inventory/shared/items.lua`
-- [x] Phase 4: Shared Pure Lua 5.4 Trauma Engine — Implement `FiveM/nyx_services/shared/trauma.lua` & update `fxmanifest.lua`
-- [x] Phase 5: Server-Side Trauma Subsystem & RPCs — Implement `FiveM/nyx_services/server/trauma.lua`, update `server/main.lua`, `server/exports.lua`
-- [x] Phase 6: Client-Side Trauma & Debuff Subsystem — Implement `FiveM/nyx_services/client/trauma.lua`, update `client/exports.lua`, `client/main.lua`
-- [x] Phase 7: In-Engine Integration Test — Implement Test 36 in `FiveM/nyx_core/server/tests.lua` & wire into `RunAll()`
-- [x] Phase 8: Full Verification & Completion — Run pytest, validator, verify.ps1, update `AGENT_TASK.md`
+- [x] Phase 1: Test-Driven Design — Create pytest test suite (`tests/test_auditable_public_treasury_ledger_and_department_monitor.py`)
+- [x] Phase 2: Database Migration — Create `057_auditable_public_treasury_ledger_and_department_monitor.sql`, register in `index.json`, mirror to `nyx_treasury`
+- [x] Phase 3: Shared Pure Lua 5.4 Public Ledger Engine — Implement `FiveM/nyx_treasury/shared/public_ledger.lua`, update `fxmanifest.lua` in `nyx_treasury` & `nyx_ui`
+- [x] Phase 4: Authoritative Server Subsystems & RPCs — Update `FiveM/nyx_treasury/server/taxes.lua`, `server/main.lua`, `server/exports.lua`
+- [x] Phase 5: Client-Side Subsystems & NUI Bridge — Update `FiveM/nyx_treasury/client/main.lua`, `client/exports.lua`, `FiveM/nyx_ui/client/bridge.lua`, `client/exports.lua`
+- [x] Phase 6: Web Master SPA UI Integration — Update `FiveM/nyx_ui/web/index.html`, `web/css/app.css`, `web/js/app.js`
+- [x] Phase 7: In-Engine Integration Test — Implement Test 52 in `FiveM/nyx_core/server/tests.lua` & wire into `RunAll()`
+- [x] Phase 8: Full Verification & Completion — Run pytest, validator.py, verify.ps1, update `AGENT_TASK.md`

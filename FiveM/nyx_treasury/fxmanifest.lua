@@ -19,7 +19,8 @@ shared_scripts {
     '@nyx_factions/shared/laundering.lua',
     '@nyx_factions/shared/equity.lua',
     'shared/subpoena_audit.lua',
-    'shared/cash_transit.lua'
+    'shared/cash_transit.lua',
+    'shared/public_ledger.lua'
 }
 
 server_scripts {

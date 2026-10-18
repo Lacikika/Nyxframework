@@ -54,5 +54,6 @@
   "053_armored_cash_transit_and_banking_freight.sql",
   "054_end_to_end_stress_simulation_audits.sql",
   "055_municipal_utility_metering_and_automated_grid_billing.sql",
-  "056_democratic_parliamentary_elections_and_recall_referendums.sql"
+  "056_democratic_parliamentary_elections_and_recall_referendums.sql",
+  "057_auditable_public_treasury_ledger_and_department_monitor.sql"
 ]

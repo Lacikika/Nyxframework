@@ -16,7 +16,8 @@ files {
 }
 
 shared_scripts {
-    'shared/phone.lua'
+    'shared/phone.lua',
+    '@nyx_treasury/shared/public_ledger.lua'
 }
 
 server_scripts {

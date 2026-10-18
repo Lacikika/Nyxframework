@@ -1117,12 +1117,332 @@ html, body {
     background: rgba(245, 158, 11, 0.08);
 }
 
-/* Treasury Dialog */
+/* Treasury Dialog Enhanced Layout */
 .treasury-dialog {
-    max-width: 960px;
-    width: 94%;
-    border-color: rgba(16, 185, 129, 0.25);
+    max-width: 1080px;
+    width: 95%;
+    max-height: 90vh;
+    border-color: rgba(16, 185, 129, 0.35);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(16, 185, 129, 0.15);
 }
+
+.treasury-nav-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    background: rgba(15, 23, 42, 0.6);
+}
+
+.treasury-tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-secondary);
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.treasury-tab:hover {
+    color: var(--text-main);
+}
+
+.treasury-tab.active {
+    color: var(--accent-emerald);
+    border-bottom-color: var(--accent-emerald);
+    background: rgba(16, 185, 129, 0.08);
+}
+
+.treasury-tab-pane {
+    display: none;
+}
+
+.treasury-tab-pane.active {
+    display: block;
+}
+
+/* Fiscal Crisis Banner */
+.treasury-crisis-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin-bottom: 16px;
+}
+
+.treasury-crisis-banner.throttled {
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.35);
+}
+
+.treasury-crisis-banner.austerity {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.35);
+}
+
+.crisis-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.crisis-banner-text strong {
+    display: block;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+}
+
+.crisis-banner-text span {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+/* Treasury Filters & Pagination */
+.treasury-filter-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.search-group {
+    position: relative;
+    flex: 1;
+    max-width: 360px;
+}
+
+.search-group .search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
+.search-group input {
+    padding-left: 30px;
+    width: 100%;
+}
+
+.treasury-pagination-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 4px 0 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* Allocation Pillars Grid */
+.allocation-pillars-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.pillar-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pillar-card.emergency { border-top: 3px solid #3B82F6; }
+.pillar-card.infrastructure { border-top: 3px solid #F59E0B; }
+.pillar-card.social { border-top: 3px solid #10B981; }
+
+.pillar-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.pillar-icon {
+    font-size: 18px;
+}
+.pillar-card.emergency .pillar-icon { color: #60A5FA; }
+.pillar-card.infrastructure .pillar-icon { color: #FBBF24; }
+.pillar-card.social .pillar-icon { color: #34D399; }
+
+.pillar-header h5 {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-main);
+}
+
+.pillar-sub {
+    font-size: 10px;
+    color: var(--text-dim);
+}
+
+.pillar-share {
+    margin-left: auto;
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.pillar-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 11px;
+}
+
+.pillar-sub-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.pillar-sub-item span {
+    color: var(--text-secondary);
+}
+
+.pillar-sub-item strong {
+    color: var(--text-main);
+}
+
+/* Telemetry Grid */
+.telemetry-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+}
+
+.telemetry-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.telemetry-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.telemetry-card-header h5 {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-main);
+}
+
+.telemetry-icon {
+    color: var(--accent-emerald);
+}
+
+.telemetry-metric {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.metric-huge {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--accent-emerald);
+}
+
+.metric-sub {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.telemetry-formula code {
+    display: block;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 10px;
+    color: #93C5FD;
+}
+
+.telemetry-note {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.telemetry-status-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.telemetry-status-row span { color: var(--text-secondary); }
+.telemetry-status-row strong { color: var(--text-main); }
+
+.telemetry-status-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.degrade-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.cap-progress {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.cap-progress-fill {
+    height: 100%;
+    background: var(--accent-emerald);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.cap-progress-fill.warning { background: #F59E0B; }
+.cap-progress-fill.danger { background: #EF4444; }
 
 .treasury-kpi-grid {
     display: grid;

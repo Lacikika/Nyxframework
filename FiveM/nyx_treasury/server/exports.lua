@@ -140,3 +140,30 @@ end)
 exports("GetTransitHistory", function(factionId)
     return Nyx.Treasury.GetTransitHistory(factionId)
 end)
+
+-- Auditable Public Treasury Ledger & Allocation Monitor Exports
+exports("GetBalanceSheet", function()
+    local dbAccounts = MySQL.query.await("SELECT `account_id`, `label`, `balance`, `type`, `circuit_exempt` FROM `nyx_treasury_accounts`") or {}
+    return Nyx.PublicLedger.CalculateBalanceSheet(dbAccounts, Config.TargetReserve or 5000000.00, Config.CriticalReserve or 500000.00)
+end)
+
+exports("GetPublicOverview", function()
+    local dbAccounts = MySQL.query.await("SELECT `account_id`, `label`, `balance`, `type`, `circuit_exempt` FROM `nyx_treasury_accounts`") or {}
+    local sheet = Nyx.PublicLedger.CalculateBalanceSheet(dbAccounts, Config.TargetReserve or 5000000.00, Config.CriticalReserve or 500000.00)
+    local master = Nyx.Treasury.GetBalance(Config.Accounts.Master or "gov:city:master")
+    local telemetry = Nyx.PublicLedger.CalculateFiscalTelemetry(master, Nyx.Treasury.GetCircuitTelemetry(), Config.TargetReserve, Config.CriticalReserve, Config.CautionReserve)
+    return {
+        balanceSheet = sheet,
+        fiscalTelemetry = telemetry
+    }
+end)
+
+exports("ExecuteRevenueSweep", function(executedBy)
+    return Nyx.Treasury.SweepTaxes(executedBy)
+end)
+
+exports("GetRevenueSweeps", function(limit)
+    limit = math.max(1, math.min(50, tonumber(limit) or 15))
+    return MySQL.query.await("SELECT * FROM `nyx_treasury_revenue_sweeps` ORDER BY `sweep_id` DESC LIMIT ?", { limit }) or {}
+end)
+

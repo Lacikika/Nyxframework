@@ -10838,7 +10838,205 @@ function Nyx.Tests.TestDemocraticParliamentaryElectionsAndRecallReferendums()
     return passes == total
 end
 
--- 45. Master Test Runner (Suite 1 - Suite 51)
+-- 52. Test Auditable Public Treasury Ledger & Department Allocation Monitor
+function Nyx.Tests.TestAuditablePublicTreasuryLedgerAndDepartmentMonitor()
+    print("^3[Nyx:Tests] Running Auditable Public Treasury Ledger & Department Monitor Suite...^7")
+    local passes = 0
+    local total = 8
+
+    -- Shared domain loader
+    local PublicLedger = Nyx.PublicLedger
+    if not PublicLedger then
+        local chunk = nil
+        if LoadResourceFile then
+            chunk = LoadResourceFile("nyx_treasury", "shared/public_ledger.lua")
+        end
+        if not chunk and io and io.open then
+            local f = io.open("FiveM/nyx_treasury/shared/public_ledger.lua", "r")
+            if f then
+                chunk = f:read("*a")
+                f:close()
+            end
+        end
+        if chunk then
+            local fn = load(chunk, "nyx_treasury/shared/public_ledger.lua")
+            if fn then fn() end
+        end
+        PublicLedger = Nyx.PublicLedger
+    end
+
+    if not PublicLedger then
+        print("^1[Nyx:Test:FAIL] Could not load nyx_treasury/shared/public_ledger.lua^7")
+        return false
+    end
+
+    -- Sub-test A: Statutory Pillars & Transaction Categories Taxonomy
+    local cats = PublicLedger.AllocationCategories
+    local txCats = PublicLedger.TransactionCategories
+    local testA_ok = (cats ~= nil and cats["emergency_services"] ~= nil and cats["infrastructure"] ~= nil and cats["social_dividend"] ~= nil) and
+                     (txCats ~= nil and txCats["pos_tax"] ~= nil and txCats["transfer_duty"] ~= nil and txCats["payroll"] ~= nil and txCats["allocation"] ~= nil)
+
+    if assertTest(testA_ok == true,
+        "Statutory Allocation Pillars & Transaction Flow Taxonomy Integrity",
+        "Allocation or transaction taxonomies missing canonical categories") then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Municipal Balance Sheet Closed-Loop Calculation & Total Liquidity
+    local mockAccounts = {
+        { account_id = "gov:city:master", label = "Master Reserve", type = "public_master", balance = 3500000.00, cap_limit = nil },
+        { account_id = "gov:tax:pool", label = "Tax Accumulation Pool", type = "tax_pool", balance = 150000.00, cap_limit = nil },
+        { account_id = "gov:dept:police", label = "LSPD", type = "department", balance = 450000.00, cap_limit = 1500000.00 },
+        { account_id = "gov:dept:ems", label = "SAEMS", type = "department", balance = 300000.00, cap_limit = 1000000.00 },
+        { account_id = "gov:dept:works", label = "DPW", type = "department", balance = 200000.00, cap_limit = 1000000.00 },
+        { account_id = "gov:dept:dividend", label = "Citizen Dividend", type = "grant_pool", balance = 150000.00, cap_limit = nil }
+    }
+    local sheet = PublicLedger.CalculateBalanceSheet(mockAccounts, 5000000.00, 500000.00)
+    local testB_ok = (sheet.totalLiquidity == 4750000.00) and
+                     (sheet.accountCount == 6) and
+                     (sheet.isBalanced == true) and
+                     (sheet.conservationVariance == 0.00) and
+                     (sheet.accounts[1].sharePercentage > 70.0)
+
+    if assertTest(testB_ok == true,
+        "Municipal Balance Sheet Aggregation, Solvency Ratio & Closed-Loop Balance",
+        string.format("totalLiquidity=%.2f, accounts=%d, isBalanced=%s",
+            sheet.totalLiquidity or 0.0, sheet.accountCount or 0, tostring(sheet.isBalanced))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Exact Cent Conservation in Statutory Revenue Sweeps (Delta == 0.00)
+    local collectedTax = 125432.17
+    local statutoryAllocations = {
+        { target_department = "gov:dept:police", department_label = "LSPD", allocation_category = "emergency_services", percentage_split = 35.0, cap_limit = 1500000.0 },
+        { target_department = "gov:dept:ems", department_label = "SAEMS", allocation_category = "emergency_services", percentage_split = 25.0, cap_limit = 1000000.0 },
+        { target_department = "gov:dept:works", department_label = "DPW", allocation_category = "infrastructure", percentage_split = 25.0, cap_limit = 1000000.0 },
+        { target_department = "gov:dept:dividend", department_label = "Social Dividend", allocation_category = "social_dividend", percentage_split = 15.0, cap_limit = nil }
+    }
+    local currentBalances = {
+        ["gov:dept:police"] = 100000.00,
+        ["gov:dept:ems"] = 100000.00,
+        ["gov:dept:works"] = 100000.00,
+        ["gov:dept:dividend"] = 50000.00
+    }
+    local sweepRes = PublicLedger.CalculateSweepSplits(collectedTax, statutoryAllocations, currentBalances)
+    local sumShares = 0.00
+    for _, s in ipairs(sweepRes.splits) do
+        sumShares = sumShares + s.effectiveShare
+    end
+    sumShares = math.floor(sumShares * 100) / 100
+
+    local testC_ok = (sweepRes.success == true) and
+                     (sweepRes.variance == 0.00) and
+                     (math.abs((sumShares + sweepRes.masterSurplusRetained) - collectedTax) < 0.001)
+
+    if assertTest(testC_ok == true,
+        "Statutory Revenue Sweep Splits Exact Cent Conservation (Delta == 0.00)",
+        string.format("collected=%.2f, swept=%.2f, surplus=%.2f, variance=%.2f",
+            collectedTax, sweepRes.totalSwept, sweepRes.masterSurplusRetained, sweepRes.variance)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Department Caps Overflow Redirection into Municipal Master Reserve
+    local cappedAllocations = {
+        { target_department = "gov:dept:police", percentage_split = 50.0, cap_limit = 1000000.00 },
+        { target_department = "gov:dept:ems", percentage_split = 50.0, cap_limit = 500000.00 }
+    }
+    local nearCapBalances = {
+        ["gov:dept:police"] = 980000.00,
+        ["gov:dept:ems"] = 490000.00
+    }
+    local bigCollected = 100000.00
+    local capSweep = PublicLedger.CalculateSweepSplits(bigCollected, cappedAllocations, nearCapBalances)
+
+    local testD_ok = (capSweep.success == true) and
+                     (capSweep.splits[1].effectiveShare == 20000.00) and
+                     (capSweep.splits[1].divertedToMaster == 30000.00) and
+                     (capSweep.splits[2].effectiveShare == 10000.00) and
+                     (capSweep.splits[2].divertedToMaster == 40000.00) and
+                     (capSweep.masterSurplusRetained == 70000.00) and
+                     (capSweep.totalSwept == 100000.00)
+
+    if assertTest(testD_ok == true,
+        "Department Budget Cap Enforcement & Automated Overflow Redirection to Master Reserve",
+        string.format("policeEffective=%.2f, policeDiverted=%.2f, totalSurplus=%.2f",
+            capSweep.splits[1].effectiveShare, capSweep.splits[1].divertedToMaster, capSweep.masterSurplusRetained)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Fiscal Crisis State Progression & Logarithmic Wage Multipliers
+    local teleSolvent = PublicLedger.CalculateFiscalTelemetry(6000000.00, { tripped = false }, 5000000.00, 500000.00, 2500000.00)
+    local teleThrottled = PublicLedger.CalculateFiscalTelemetry(3500000.00, { tripped = false }, 5000000.00, 500000.00, 2500000.00)
+    local teleAusterity = PublicLedger.CalculateFiscalTelemetry(1500000.00, { tripped = false }, 5000000.00, 500000.00, 2500000.00)
+    local teleCritical = PublicLedger.CalculateFiscalTelemetry(300000.00, { tripped = false }, 5000000.00, 500000.00, 2500000.00)
+    local teleTripped = PublicLedger.CalculateFiscalTelemetry(4000000.00, { tripped = true }, 5000000.00, 500000.00, 2500000.00)
+
+    local testE_ok = (teleSolvent.fiscalState == "SOLVENT" and teleSolvent.wageMultiplier == 1.00) and
+                     (teleThrottled.fiscalState == "THROTTLED" and teleThrottled.wageMultiplier < 1.00 and teleThrottled.wageMultiplier > 0.60) and
+                     (teleAusterity.fiscalState == "AUSTERITY" and teleAusterity.infrastructure.impoundSurchargeActive == true) and
+                     (teleCritical.fiscalState == "CRITICAL_DEFICIT" and teleCritical.wageMultiplier == 0.00 and teleCritical.infrastructure.autoRepair == "OFFLINE") and
+                     (teleTripped.fiscalState == "CIRCUIT_TRIPPED" and teleTripped.wageMultiplier == 0.00)
+
+    if assertTest(testE_ok == true,
+        "Fiscal Crisis State Progression, Logarithmic Wage Scaling & Infrastructure Degradation",
+        string.format("solvent=%.2f, throttled=%.2f, austerityState=%s, critWage=%.2f, tripped=%s",
+            teleSolvent.wageMultiplier, teleThrottled.wageMultiplier, teleAusterity.fiscalState, teleCritical.wageMultiplier, teleTripped.fiscalState)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Capital Drain Velocity & Runway Estimation Hours
+    local circuitDrain = {
+        tripped = false,
+        drainVelocity = { velocityPerHour = 50000.00 }
+    }
+    local teleDrain = PublicLedger.CalculateFiscalTelemetry(3500000.00, circuitDrain, 5000000.00, 500000.00, 2500000.00)
+    local testF_ok = (teleDrain.drainVelocityPerHour == 50000.00) and
+                     (teleDrain.runwayHours == 60.0)
+
+    if assertTest(testF_ok == true,
+        "Capital Drain Velocity & Projected Treasury Runway Hours Calculation",
+        string.format("velocity=%.2f, runway=%s",
+            teleDrain.drainVelocityPerHour, tostring(teleDrain.runwayHours))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Zero-Trust Ledger Query Sanitizer & Bounds Clamping
+    local dirtyQuery = {
+        page = -10,
+        pageSize = 99999,
+        category = "UNKNOWN_CATEGORY",
+        search = "DROP TABLE nyx_treasury_accounts; --"
+    }
+    local cleanQuery = PublicLedger.SanitizeLedgerQuery(dirtyQuery)
+    local testG_ok = (cleanQuery.page == 1) and
+                     (cleanQuery.pageSize == 100) and
+                     (cleanQuery.category == "ALL") and
+                     (cleanQuery.search:find(";") == nil)
+
+    if assertTest(testG_ok == true,
+        "Zero-Trust Ledger Query Sanitizer (Page Clamping, Category Whitelist & Injection Stripping)",
+        string.format("page=%d, pageSize=%d, cat=%s, search=%s",
+            cleanQuery.page, cleanQuery.pageSize, cleanQuery.category, cleanQuery.search)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test H: Web ASCII Financial Telemetry Report Formatter
+    local report = PublicLedger.FormatLedgerReport(sheet, teleThrottled)
+    local testH_ok = (type(report) == "string") and
+                     (report:find("AUDITABLE PUBLIC FINANCIAL TELEMETRY") ~= nil) and
+                     (report:find("MUNICIPAL MASTER RESERVE") ~= nil) and
+                     (report:find("WAGE MULTIPLIER") ~= nil)
+
+    if assertTest(testH_ok == true,
+        "ASCII Public Financial Telemetry Report Generation & String Formatting",
+        string.format("reportLength=%d, containsHeader=%s", #report, tostring(report:find("NYX CIVIC TREASURY") ~= nil))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 45. Master Test Runner (Suite 1 - Suite 52)
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -10895,6 +11093,7 @@ function Nyx.Tests.RunAll()
     local t49 = Nyx.Tests.TestEndToEndStressSimulationAcross14Resources()
     local t50 = Nyx.Tests.TestMunicipalUtilityMeteringAndGridBilling()
     local t51 = Nyx.Tests.TestDemocraticParliamentaryElectionsAndRecallReferendums()
+    local t52 = Nyx.Tests.TestAuditablePublicTreasuryLedgerAndDepartmentMonitor()
 
     print("^5--------------------------------------------------^7")
     local suites1to50Passed = false
@@ -10902,7 +11101,7 @@ function Nyx.Tests.RunAll()
         suites1to50Passed = true
     end
 
-    if suites1to50Passed and t51 then
+    if suites1to50Passed and t51 and t52 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

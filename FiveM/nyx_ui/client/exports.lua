@@ -80,6 +80,16 @@ exports('CloseVehicleTerminalUI', function()
     Nyx.UI.Send("vehicle", "VEHICLE_TERMINAL_CLOSE", {})
 end)
 
+exports('OpenTreasuryDashboard', function(data)
+    Nyx.UI.SetFocus(true, true)
+    Nyx.UI.Send("treasury", "TREASURY_DASHBOARD_OPEN", data or {})
+end)
+
+exports('CloseTreasuryDashboard', function()
+    Nyx.UI.SetFocus(false, false)
+    Nyx.UI.Send("treasury", "TREASURY_DASHBOARD_CLOSE", {})
+end)
+
 exports('OpenPhone', function(initialApp)
     if Nyx.UI.OpenPhone then
         Nyx.UI.OpenPhone(initialApp)

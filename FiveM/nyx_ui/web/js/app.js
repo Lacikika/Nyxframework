@@ -1227,7 +1227,14 @@ const NyxState = {
     },
     treasury: {
         isOpen: false,
-        data: null
+        activeTab: 'balance_sheet',
+        data: null,
+        ledgerPage: 1,
+        ledgerPageSize: 20,
+        ledgerCategory: 'ALL',
+        ledgerSearch: '',
+        ledgerTotalEntries: 0,
+        ledgerTotalPages: 1
     },
     mdt: {
         isOpen: false,
@@ -1773,44 +1780,416 @@ function updateHotbar(slotsData) {
 
 // 9. Civic Treasury Open Ledger Dashboard (`nyx_treasury`)
 function openTreasuryDashboard(data) {
+    if (!data) data = {};
     NyxState.treasury.isOpen = true;
     NyxState.treasury.data = data;
 
     const overlay = document.getElementById('treasury-overlay');
     if (overlay) overlay.classList.remove('hidden');
 
-    // KPIs
-    const kpiReserve = document.getElementById('treasury-kpi-reserve');
-    const kpiPosTax = document.getElementById('treasury-kpi-postax');
-    const kpiP2pTax = document.getElementById('treasury-kpi-p2ptax');
-    const kpiBal = document.getElementById('treasury-kpi-balance');
+    // 1. Top Fiscal Badge & Crisis Banner
+    const fiscalBadge = document.getElementById('treasury-fiscal-badge');
+    const crisisBanner = document.getElementById('treasury-crisis-banner');
+    const crisisTitle = document.getElementById('treasury-crisis-title');
+    const crisisDesc = document.getElementById('treasury-crisis-desc');
+    const wageScalePill = document.getElementById('treasury-wage-scale-pill');
 
-    if (kpiReserve) kpiReserve.textContent = `$${Number(data.reserveBalance || 0).toLocaleString()}`;
-    if (kpiPosTax) kpiPosTax.textContent = `${((data.salesTax || 0.08) * 100).toFixed(2)}%`;
-    if (kpiP2pTax) kpiP2pTax.textContent = `${((data.transferTax || 0.02) * 100).toFixed(2)}%`;
-    if (kpiBal) {
-        kpiBal.textContent = data.isBalanced ? 'BALANCED' : 'IMBALANCE ALERT';
-        kpiBal.classList.toggle('status-ok', data.isBalanced);
+    const state = data.fiscalState || (data.fiscalTelemetry && data.fiscalTelemetry.fiscalState) || 'SOLVENT';
+    const wageMultiplier = (data.fiscalTelemetry && data.fiscalTelemetry.wageMultiplier !== undefined) 
+        ? data.fiscalTelemetry.wageMultiplier 
+        : (data.wageMultiplier !== undefined ? data.wageMultiplier : 1.0);
+    const wagePct = (wageMultiplier * 100).toFixed(1);
+
+    if (fiscalBadge) {
+        fiscalBadge.className = 'badge';
+        if (state === 'SOLVENT') {
+            fiscalBadge.classList.add('badge-emerald');
+            fiscalBadge.textContent = `SOLVENT (${wagePct}% WAGE)`;
+        } else if (state === 'THROTTLED') {
+            fiscalBadge.classList.add('badge-blue');
+            fiscalBadge.textContent = `THROTTLED (${wagePct}% WAGE)`;
+        } else if (state === 'AUSTERITY') {
+            fiscalBadge.classList.add('badge-amber');
+            fiscalBadge.textContent = `AUSTERITY (${wagePct}% WAGE)`;
+        } else if (state === 'CRITICAL_DEFICIT') {
+            fiscalBadge.classList.add('badge-red');
+            fiscalBadge.textContent = 'CRITICAL DEFICIT (FROZEN)';
+        } else if (state === 'CIRCUIT_TRIPPED') {
+            fiscalBadge.classList.add('badge-red');
+            fiscalBadge.textContent = 'CIRCUIT TRIPPED (LOCKED)';
+        }
     }
 
-    // Table rows with Virtualization for 100+ items
+    if (crisisBanner) {
+        if (state === 'SOLVENT') {
+            crisisBanner.classList.add('hidden');
+        } else {
+            crisisBanner.classList.remove('hidden');
+            crisisBanner.className = 'treasury-crisis-banner ' + state.toLowerCase();
+            if (wageScalePill) wageScalePill.textContent = `BÉRSKÁLA: ${wagePct}%`;
+
+            if (state === 'THROTTLED') {
+                if (crisisTitle) crisisTitle.textContent = 'MÉRSÉKELT FISKÁLIS KORLÁTOZÁS (THROTTLED)';
+                if (crisisDesc) crisisDesc.textContent = 'A városi tartalék $5M alá csökkent. A közszolgálati bérek logaritmikus skálázás alatt állnak.';
+            } else if (state === 'AUSTERITY') {
+                if (crisisTitle) crisisTitle.textContent = 'MEGSZORÍTÁSI ÁLLAPOT (AUSTERITY)';
+                if (crisisDesc) crisisDesc.textContent = 'Tartalék < $2.5M. Szigorú kiadási fékek, elszállítási felár és csökkentett bérek aktívak.';
+            } else if (state === 'CRITICAL_DEFICIT') {
+                if (crisisTitle) crisisTitle.textContent = 'KRITIKUS FISKÁLIS DEFICIT (CRITICAL DEFICIT)';
+                if (crisisDesc) crisisDesc.textContent = 'Tartalék <= $500,000. Közszolgálati bérek befagyasztva (0%), önkormányzati infrastruktúra leállt.';
+            } else if (state === 'CIRCUIT_TRIPPED') {
+                if (crisisTitle) crisisTitle.textContent = 'FISKÁLIS ÁRAMKÖRVÉDELEM AKTIVÁLVA (CIRCUIT TRIPPED)';
+                if (crisisDesc) crisisDesc.textContent = 'Hirtelen tőkekiáramlás vagy anomális tranzakció miatt a városi kifizetések automatikusan zárolva!';
+            }
+        }
+    }
+
+    // 2. Tab 1: Balance Sheet & Liquidity Overview
+    const kpiReserve = document.getElementById('treasury-kpi-reserve');
+    const kpiTarget = document.getElementById('treasury-kpi-target');
+    const kpiTotalLiquidity = document.getElementById('treasury-kpi-total-liquidity');
+    const kpiTaxes = document.getElementById('treasury-kpi-taxes');
+    const kpiBal = document.getElementById('treasury-kpi-balance');
+
+    const masterReserve = Number(data.masterReserve || data.reserveBalance || 0);
+    const targetReserve = Number(data.targetReserve || 5000000.0);
+    const reserveRatio = targetReserve > 0 ? ((masterReserve / targetReserve) * 100).toFixed(1) : '0.0';
+
+    if (kpiReserve) kpiReserve.textContent = `$${masterReserve.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (kpiTarget) kpiTarget.textContent = `Céltartalék: $${targetReserve.toLocaleString()} (${reserveRatio}%)`;
+
+    const sheet = data.balanceSheet || {};
+    const totalLiquidity = Number(sheet.totalLiquidity || masterReserve);
+    if (kpiTotalLiquidity) kpiTotalLiquidity.textContent = `$${totalLiquidity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const salesTax = Number(data.salesTaxRate || data.salesTax || 0.08) * 100;
+    const transferTax = Number(data.transferTaxRate || data.transferTax || 0.02) * 100;
+    if (kpiTaxes) kpiTaxes.textContent = `ÁFA ${salesTax.toFixed(1)}% | P2P ${transferTax.toFixed(1)}%`;
+
+    if (kpiBal) {
+        const isBalanced = data.isBalanced !== false && (sheet.isBalanced !== false);
+        kpiBal.textContent = isBalanced ? 'BALANCED' : 'IMBALANCE ALERT';
+        kpiBal.classList.toggle('status-ok', isBalanced);
+        kpiBal.classList.toggle('status-danger', !isBalanced);
+    }
+
+    renderTreasuryAccountsTable(sheet.accounts || data.accounts || []);
+
+    // 3. Tab 2: Ledger Table
+    renderTreasuryLedgerTable(data.recentTransactions || [], data.totalEntries || (data.recentTransactions ? data.recentTransactions.length : 0), 1, 1);
+
+    // 4. Tab 3: Allocations & Sweeps
+    renderTreasuryAllocations(data.allocations || []);
+    renderTreasurySweeps(data.lastSweep ? [data.lastSweep] : (data.sweeps || []));
+
+    // 5. Tab 4: Telemetry
+    renderTreasuryTelemetry(data.fiscalTelemetry, data.circuitBreaker);
+}
+
+function renderTreasuryAccountsTable(accounts) {
+    const tbody = document.getElementById('treasury-accounts-rows');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!accounts || accounts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-dim" style="padding: 20px;">Nincs rögzített önkormányzati számla.</td></tr>';
+        return;
+    }
+
+    accounts.forEach(acc => {
+        const tr = document.createElement('tr');
+        const bal = Number(acc.balance || 0);
+        const cap = acc.capLimit ? `$${Number(acc.capLimit).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
+        const share = Number(acc.sharePercentage || 0).toFixed(1);
+
+        let solvencyBadge = '<span class="badge badge-emerald">SOLVENT</span>';
+        if (acc.solvencyStatus === 'DEPLETED') solvencyBadge = '<span class="badge badge-red">DEPLETED</span>';
+        else if (acc.solvencyStatus === 'DEFICIT_WARNING') solvencyBadge = '<span class="badge badge-red">DEFICIT WARNING</span>';
+        else if (acc.solvencyStatus === 'LOW_RESERVE') solvencyBadge = '<span class="badge badge-amber">LOW RESERVE</span>';
+
+        let typeBadge = `<span class="badge">${acc.type || 'department'}</span>`;
+        if (acc.type === 'public_master') typeBadge = '<span class="badge badge-emerald">MASTER</span>';
+        else if (acc.type === 'tax_pool') typeBadge = '<span class="badge badge-amber">TAX POOL</span>';
+        else if (acc.type === 'grant_pool') typeBadge = '<span class="badge badge-blue">GRANT POOL</span>';
+
+        tr.innerHTML = `
+            <td><code>${acc.accountId || acc.id || '-'}</code></td>
+            <td><strong>${acc.label || '-'}</strong></td>
+            <td>${typeBadge}</td>
+            <td><strong>$${bal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+            <td>${share}%</td>
+            <td>${cap}</td>
+            <td>${solvencyBadge}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function renderTreasuryLedgerTable(entries, totalEntries, page, totalPages) {
     const tbody = document.getElementById('treasury-ledger-rows');
-    if (tbody) {
-        tbody.innerHTML = '';
-        const txs = data.recentTransactions || [];
-        txs.forEach(tx => {
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!entries || entries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-dim" style="padding: 24px;">Nem található tranzakció a megadott szűrési feltételekkel.</td></tr>';
+    } else {
+        entries.forEach(tx => {
             const tr = document.createElement('tr');
+            const amt = Number(tx.amount || 0);
+            const ts = tx.created_at || tx.timestamp || 'NOW';
+            const cat = tx.category || 'TRANSFER';
+            const uuid = tx.transaction_uuid || tx.txUuid || '-';
+            const debit = tx.debit_account || tx.debitAccount || '-';
+            const credit = tx.credit_account || tx.creditAccount || '-';
+            const auth = tx.authorized_by || tx.authorizedBy || '-';
+            const memo = tx.memo || '-';
+
+            let catBadge = `<span class="badge">${cat}</span>`;
+            if (cat.includes('tax') || cat.includes('duty') || cat.includes('fee')) catBadge = `<span class="badge badge-emerald">${cat}</span>`;
+            else if (cat.includes('payroll')) catBadge = `<span class="badge badge-blue">${cat}</span>`;
+            else if (cat.includes('allocation') || cat.includes('subvention')) catBadge = `<span class="badge badge-amber">${cat}</span>`;
+            else if (cat.includes('laundering')) catBadge = `<span class="badge badge-red">${cat}</span>`;
+
             tr.innerHTML = `
-                <td>${tx.timestamp || 'NOW'}</td>
-                <td><span class="badge">${tx.category || 'TRANSFER'}</span></td>
-                <td><code>${tx.debitAccount}</code></td>
-                <td><code>${tx.creditAccount}</code></td>
-                <td><strong>$${Number(tx.amount || 0).toFixed(2)}</strong></td>
-                <td class="truncate" style="max-width: 200px;">${tx.memo || '-'}</td>
+                <td style="font-size: 11px;">${ts}</td>
+                <td>${catBadge}</td>
+                <td><code>${debit}</code></td>
+                <td><code>${credit}</code></td>
+                <td><strong>$${amt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+                <td style="font-size: 11px;"><code>${auth}</code></td>
+                <td class="truncate" style="max-width: 220px;" title="${memo}">${memo}</td>
             `;
             tbody.appendChild(tr);
         });
     }
+
+    NyxState.treasury.ledgerTotalEntries = totalEntries || 0;
+    NyxState.treasury.ledgerTotalPages = totalPages || 1;
+    NyxState.treasury.ledgerPage = page || 1;
+
+    const pageInfo = document.getElementById('treasury-ledger-page-info');
+    if (pageInfo) {
+        pageInfo.textContent = `Oldal ${page} / ${totalPages} (Összesen ${totalEntries} tétel)`;
+    }
+
+    const prevBtn = document.getElementById('treasury-ledger-prev-btn');
+    const nextBtn = document.getElementById('treasury-ledger-next-btn');
+    if (prevBtn) prevBtn.disabled = (page <= 1);
+    if (nextBtn) nextBtn.disabled = (page >= totalPages);
+}
+
+function renderTreasuryAllocations(allocations) {
+    const tbody = document.getElementById('treasury-allocations-rows');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!allocations || allocations.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-dim" style="padding: 20px;">Nincs konfigurált költségvetési elosztás.</td></tr>';
+        return;
+    }
+
+    allocations.forEach(alloc => {
+        const tr = document.createElement('tr');
+        const dept = alloc.departmentLabel || alloc.label || alloc.targetDepartment;
+        const cat = alloc.allocationCategory || 'general';
+        const splitPct = Number(alloc.percentageSplit || 0).toFixed(1);
+        const curBal = Number(alloc.currentBalance || 0);
+        const cap = alloc.capLimit ? `$${Number(alloc.capLimit).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'NINCS KORLÁT';
+        const progress = Math.min(100.0, Number(alloc.progressPercentage || 0));
+
+        let catBadge = `<span class="badge">${cat}</span>`;
+        if (cat === 'emergency_services') catBadge = '<span class="badge badge-blue">KÉSZENLÉTI SZERVEK</span>';
+        else if (cat === 'infrastructure') catBadge = '<span class="badge badge-amber">INFRASTRUKTÚRA</span>';
+        else if (cat === 'social_dividend') catBadge = '<span class="badge badge-emerald">TÁRSADALMI OSZTALÉK</span>';
+
+        let progressClass = '';
+        if (progress >= 90) progressClass = 'danger';
+        else if (progress >= 70) progressClass = 'warning';
+
+        const lastAlloc = alloc.lastAllocatedAmount ? `$${Number(alloc.lastAllocatedAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-';
+        const lastDate = alloc.lastAllocatedAt || '-';
+
+        tr.innerHTML = `
+            <td><strong>${dept}</strong><br><code style="font-size: 10px;">${alloc.targetDepartment}</code></td>
+            <td>${catBadge}</td>
+            <td><strong>${splitPct}%</strong></td>
+            <td><strong>$${curBal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+            <td>${cap}</td>
+            <td style="min-width: 130px;">
+                <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px;">
+                    <span>${progress.toFixed(1)}%</span>
+                </div>
+                <div class="cap-progress">
+                    <div class="cap-progress-fill ${progressClass}" style="width: ${progress}%;"></div>
+                </div>
+            </td>
+            <td style="font-size: 11px;">${lastAlloc}<br><span class="text-dim" style="font-size: 9px;">${lastDate}</span></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function renderTreasurySweeps(sweeps) {
+    const tbody = document.getElementById('treasury-sweeps-rows');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!sweeps || sweeps.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-dim" style="padding: 16px;">Még nem futott automatikus adóelszámolási ciklus.</td></tr>';
+        return;
+    }
+
+    sweeps.forEach(s => {
+        const tr = document.createElement('tr');
+        const uuid = (s.sweep_uuid || s.sweepUuid || '-').substring(0, 18);
+        const ts = s.created_at || s.timestamp || 'NOW';
+        const before = Number(s.tax_pool_balance_before || s.collected || 0);
+        const swept = Number(s.total_swept || s.totalSwept || 0);
+        const retained = Number(s.master_surplus_retained || s.masterSurplusRetained || 0);
+        const count = s.allocations_count || (s.splits ? s.splits.length : 0);
+        const state = s.fiscal_state || s.fiscalState || 'SOLVENT';
+
+        let stateBadge = `<span class="badge badge-emerald">${state}</span>`;
+        if (state !== 'SOLVENT') stateBadge = `<span class="badge badge-amber">${state}</span>`;
+
+        tr.innerHTML = `
+            <td><code>${uuid}...</code></td>
+            <td style="font-size: 11px;">${ts}</td>
+            <td><strong>$${before.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+            <td><strong>$${swept.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+            <td>$${retained.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td>${count} számla</td>
+            <td>${stateBadge}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function renderTreasuryTelemetry(telemetry, circuit) {
+    telemetry = telemetry || {};
+    circuit = circuit || {};
+
+    const wageMult = Number(telemetry.wageMultiplier !== undefined ? telemetry.wageMultiplier : 1.0);
+    const multEl = document.getElementById('telemetry-wage-mult');
+    const pctEl = document.getElementById('telemetry-wage-pct');
+    if (multEl) multEl.textContent = `${wageMult.toFixed(2)}x`;
+    if (pctEl) pctEl.textContent = `${(wageMult * 100).toFixed(1)}% Közszolgálati Bérkifizetés`;
+
+    const drainEl = document.getElementById('telemetry-drain-hr');
+    const runwayEl = document.getElementById('telemetry-runway-hours');
+    const drainVal = Number(telemetry.drainVelocityPerHour || 0);
+    if (drainEl) drainEl.textContent = `$${drainVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / óra`;
+
+    if (runwayEl) {
+        if (telemetry.runwayHours !== null && telemetry.runwayHours !== undefined) {
+            runwayEl.textContent = `Becsült tartalékidő: ${telemetry.runwayHours} óra`;
+        } else {
+            runwayEl.textContent = 'Becsült tartalékidő: STABIL (Kritikus küszöb felett)';
+        }
+    }
+
+    const rollingEl = document.getElementById('telemetry-rolling-outflow');
+    const rollingVal = Number(circuit.drainVelocity?.totalOutflow || 0);
+    if (rollingEl) rollingEl.textContent = `$${rollingVal.toLocaleString()} / $750,000`;
+
+    const circuitStatusEl = document.getElementById('telemetry-circuit-status');
+    const tripReasonEl = document.getElementById('telemetry-trip-reason');
+    const isTripped = Boolean(circuit.tripped || telemetry.circuitTripped);
+
+    if (circuitStatusEl) {
+        circuitStatusEl.textContent = isTripped ? 'LEOLDVA (TRIPPED)' : 'NORMAL (ZÁRT)';
+        circuitStatusEl.className = 'badge ' + (isTripped ? 'badge-red' : 'badge-emerald');
+    }
+    if (tripReasonEl) tripReasonEl.textContent = circuit.tripReason || 'Nincs aktív leoldás';
+
+    const autoRepairEl = document.getElementById('telemetry-autorepair-status');
+    const impoundEl = document.getElementById('telemetry-impound-status');
+    const dispatchEl = document.getElementById('telemetry-dispatch-status');
+    const infra = telemetry.infrastructure || {};
+
+    if (autoRepairEl) {
+        const isOffline = infra.autoRepair === 'OFFLINE';
+        autoRepairEl.textContent = isOffline ? 'LEÁLLVA (OFFLINE)' : 'ÜZEMEL';
+        autoRepairEl.className = 'badge ' + (isOffline ? 'badge-red' : 'badge-emerald');
+    }
+    if (impoundEl) {
+        const hasSurcharge = Boolean(infra.impoundSurchargeActive);
+        impoundEl.textContent = hasSurcharge ? '+50% VÁLSÁG DÍJ' : 'NORMÁL DÍJAK';
+        impoundEl.className = 'badge ' + (hasSurcharge ? 'badge-amber' : 'badge-emerald');
+    }
+    if (dispatchEl) {
+        const isDegraded = infra.aiDispatch === 'DEGRADED';
+        dispatchEl.textContent = isDegraded ? 'CSÖKKENTETT KÉSZENLÉT' : 'OPTIMÁLIS';
+        dispatchEl.className = 'badge ' + (isDegraded ? 'badge-red' : 'badge-emerald');
+    }
+}
+
+function fetchTreasuryLedgerPage(page) {
+    NyxState.treasury.ledgerPage = page;
+    postNui('treasury:getLedgerPage', {
+        page: page,
+        pageSize: NyxState.treasury.ledgerPageSize,
+        category: NyxState.treasury.ledgerCategory,
+        search: NyxState.treasury.ledgerSearch
+    }, function(res) {
+        if (res && res.success) {
+            renderTreasuryLedgerTable(res.entries || [], res.totalEntries || 0, res.page || 1, res.totalPages || 1);
+        }
+    });
+}
+
+function prependTreasuryLedgerRow(tx) {
+    if (!tx || !NyxState.treasury.isOpen) return;
+    const tbody = document.getElementById('treasury-ledger-rows');
+    if (!tbody) return;
+
+    const tr = document.createElement('tr');
+    tr.style.animation = 'flash-in 0.8s ease';
+    const amt = Number(tx.amount || 0);
+    const ts = tx.created_at || tx.timestamp || 'ÉPP MOST';
+    const cat = tx.category || 'TRANSFER';
+    const debit = tx.debit_account || tx.debitAccount || '-';
+    const credit = tx.credit_account || tx.creditAccount || '-';
+    const auth = tx.authorized_by || tx.authorizedBy || '-';
+    const memo = tx.memo || '-';
+
+    tr.innerHTML = `
+        <td style="font-size: 11px;">${ts}</td>
+        <td><span class="badge badge-emerald">${cat}</span></td>
+        <td><code>${debit}</code></td>
+        <td><code>${credit}</code></td>
+        <td><strong>$${amt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+        <td style="font-size: 11px;"><code>${auth}</code></td>
+        <td class="truncate" style="max-width: 220px;">${memo}</td>
+    `;
+    if (tbody.firstChild) tbody.insertBefore(tr, tbody.firstChild);
+    else tbody.appendChild(tr);
+}
+
+function prependTreasurySweepRow(sweep) {
+    if (!sweep || !NyxState.treasury.isOpen) return;
+    const tbody = document.getElementById('treasury-sweeps-rows');
+    if (!tbody) return;
+
+    const tr = document.createElement('tr');
+    tr.style.animation = 'flash-in 0.8s ease';
+    const uuid = (sweep.sweepUuid || sweep.sweep_uuid || '-').substring(0, 18);
+    const before = Number(sweep.collected || 0);
+    const swept = Number(sweep.totalSwept || 0);
+    const count = sweep.splits ? sweep.splits.length : 0;
+    const state = sweep.fiscalState || 'SOLVENT';
+
+    tr.innerHTML = `
+        <td><code>${uuid}...</code></td>
+        <td style="font-size: 11px;">ÉPP MOST</td>
+        <td><strong>$${before.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+        <td><strong>$${swept.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+        <td>$0.00</td>
+        <td>${count} számla</td>
+        <td><span class="badge badge-emerald">${state}</span></td>
+    `;
+    if (tbody.firstChild) tbody.insertBefore(tr, tbody.firstChild);
+    else tbody.appendChild(tr);
 }
 
 function closeTreasuryDashboard() {
@@ -6290,10 +6669,14 @@ window.addEventListener('message', (event) => {
     }
 
     // Treasury Transparency Board
-    else if (action === 'TREASURY_DASHBOARD_OPEN') {
-        openTreasuryDashboard(packet.payload);
-    } else if (action === 'TREASURY_DASHBOARD_CLOSE') {
+    else if (action === 'TREASURY_DASHBOARD_OPEN' || action === 'OPEN_TREASURY_DASHBOARD') {
+        openTreasuryDashboard(packet.payload || packet.data);
+    } else if (action === 'TREASURY_DASHBOARD_CLOSE' || action === 'CLOSE_TREASURY_DASHBOARD') {
         closeTreasuryDashboard();
+    } else if (action === 'TREASURY_TICKER_UPDATE') {
+        prependTreasuryLedgerRow(packet.payload || packet.data);
+    } else if (action === 'TREASURY_SWEEP_UPDATE') {
+        prependTreasurySweepRow(packet.payload || packet.data);
     }
 
     // MDT CAD Terminal
@@ -6432,6 +6815,58 @@ document.addEventListener('DOMContentLoaded', () => {
     // Treasury Actions
     const treasuryCloseBtn = document.getElementById('treasury-close-btn');
     if (treasuryCloseBtn) treasuryCloseBtn.addEventListener('click', closeTreasuryDashboard);
+
+    document.querySelectorAll('.treasury-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.treasury-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.treasury-tab-pane').forEach(p => p.classList.add('hidden'));
+
+            tab.classList.add('active');
+            const targetPaneId = `treasury-tab-${tab.dataset.tab}`;
+            const targetPane = document.getElementById(targetPaneId);
+            if (targetPane) targetPane.classList.remove('hidden');
+        });
+    });
+
+    const treasuryCatSelect = document.getElementById('treasury-ledger-category-select');
+    if (treasuryCatSelect) {
+        treasuryCatSelect.addEventListener('change', (e) => {
+            NyxState.treasury.ledgerCategory = e.target.value;
+            NyxState.treasury.ledgerPage = 1;
+            fetchTreasuryLedgerPage(1);
+        });
+    }
+
+    const treasurySearchInput = document.getElementById('treasury-ledger-search');
+    let treasurySearchDebounce = null;
+    if (treasurySearchInput) {
+        treasurySearchInput.addEventListener('input', (e) => {
+            clearTimeout(treasurySearchDebounce);
+            treasurySearchDebounce = setTimeout(() => {
+                NyxState.treasury.ledgerSearch = e.target.value.trim();
+                NyxState.treasury.ledgerPage = 1;
+                fetchTreasuryLedgerPage(1);
+            }, 250);
+        });
+    }
+
+    const treasuryPrevBtn = document.getElementById('treasury-ledger-prev-btn');
+    if (treasuryPrevBtn) {
+        treasuryPrevBtn.addEventListener('click', () => {
+            if (NyxState.treasury.ledgerPage > 1) {
+                fetchTreasuryLedgerPage(NyxState.treasury.ledgerPage - 1);
+            }
+        });
+    }
+
+    const treasuryNextBtn = document.getElementById('treasury-ledger-next-btn');
+    if (treasuryNextBtn) {
+        treasuryNextBtn.addEventListener('click', () => {
+            if (NyxState.treasury.ledgerPage < NyxState.treasury.ledgerTotalPages) {
+                fetchTreasuryLedgerPage(NyxState.treasury.ledgerPage + 1);
+            }
+        });
+    }
 
     // MDT Actions & Auto-Focused Search Inputs
     const mdtCloseBtn = document.getElementById('mdt-close-btn');
@@ -7248,14 +7683,59 @@ function initBrowserDevMode() {
             closeTreasuryDashboard();
         } else {
             openTreasuryDashboard({
-                reserveBalance: 1250000,
-                salesTax: 0.08,
-                transferTax: 0.02,
-                isBalanced: true,
+                fiscalState: 'THROTTLED',
+                masterReserve: 3850000.0,
+                targetReserve: 5000000.0,
+                criticalReserve: 500000.0,
+                cautionReserve: 2500000.0,
+                salesTaxRate: 0.08,
+                transferTaxRate: 0.02,
+                balanceSheet: {
+                    totalLiquidity: 5250000.0,
+                    masterReserve: 3850000.0,
+                    isBalanced: true,
+                    accounts: [
+                        { accountId: 'gov:city:master', label: 'Los Santos City Master Reserve', type: 'public_master', balance: 3850000.0, sharePercentage: 73.3, capLimit: null, solvencyStatus: 'SOLVENT' },
+                        { accountId: 'gov:tax:pool', label: 'Municipal Tax Accumulation Pool', type: 'tax_pool', balance: 150000.0, sharePercentage: 2.9, capLimit: null, solvencyStatus: 'SOLVENT' },
+                        { accountId: 'gov:dept:police', label: 'Los Santos Police Department', type: 'department', balance: 450000.0, sharePercentage: 8.6, capLimit: 1500000.0, solvencyStatus: 'SOLVENT' },
+                        { accountId: 'gov:dept:ems', label: 'San Andreas Emergency Medical Services', type: 'department', balance: 320000.0, sharePercentage: 6.1, capLimit: 1000000.0, solvencyStatus: 'SOLVENT' },
+                        { accountId: 'gov:dept:works', label: 'Department of Public Works & Transit', type: 'department', balance: 280000.0, sharePercentage: 5.3, capLimit: 1000000.0, solvencyStatus: 'SOLVENT' },
+                        { accountId: 'gov:dept:dividend', label: 'Citizen Universal Dividend Pool', type: 'grant_pool', balance: 200000.0, sharePercentage: 3.8, capLimit: null, solvencyStatus: 'SOLVENT' }
+                    ]
+                },
+                allocations: [
+                    { departmentLabel: 'Los Santos Police Department', targetDepartment: 'gov:dept:police', allocationCategory: 'emergency_services', percentageSplit: 35.0, currentBalance: 450000.0, capLimit: 1500000.0, progressPercentage: 30.0, lastAllocatedAmount: 52500.0, lastAllocatedAt: '2026-10-18 14:00' },
+                    { departmentLabel: 'San Andreas Emergency Medical Services', targetDepartment: 'gov:dept:ems', allocationCategory: 'emergency_services', percentageSplit: 25.0, currentBalance: 320000.0, capLimit: 1000000.0, progressPercentage: 32.0, lastAllocatedAmount: 37500.0, lastAllocatedAt: '2026-10-18 14:00' },
+                    { departmentLabel: 'Department of Public Works & Transit', targetDepartment: 'gov:dept:works', allocationCategory: 'infrastructure', percentageSplit: 25.0, currentBalance: 280000.0, capLimit: 1000000.0, progressPercentage: 28.0, lastAllocatedAmount: 37500.0, lastAllocatedAt: '2026-10-18 14:00' },
+                    { departmentLabel: 'Citizen Universal Dividend Pool', targetDepartment: 'gov:dept:dividend', allocationCategory: 'social_dividend', percentageSplit: 15.0, currentBalance: 200000.0, capLimit: null, progressPercentage: 0.0, lastAllocatedAmount: 22500.0, lastAllocatedAt: '2026-10-18 14:00' }
+                ],
+                lastSweep: {
+                    sweepUuid: 'swp-20261018-mock-01',
+                    collected: 150000.0,
+                    totalSwept: 150000.0,
+                    masterSurplusRetained: 0.0,
+                    allocationsCount: 4,
+                    fiscalState: 'THROTTLED',
+                    timestamp: '2026-10-18 14:00'
+                },
                 recentTransactions: [
-                    { timestamp: '14:20:05', category: 'POS_TAX', debitAccount: 'ACCT_RETAIL_01', creditAccount: 'ACCT_TREASURY_RESERVE', amount: 120.50, memo: 'Point-of-sale tax split' },
-                    { timestamp: '14:21:12', category: 'PAYROLL', debitAccount: 'ACCT_PUBLIC_WORKS', creditAccount: 'ACCT_CITIZEN_402', amount: 850.00, memo: 'Public sector wage disbursement' }
-                ]
+                    { timestamp: '14:20:05', category: 'pos_tax', debitAccount: 'char:1002:bank', creditAccount: 'gov:tax:pool', amount: 120.50, memo: 'Point-of-sale tax split', authorizedBy: 'system:tax_engine' },
+                    { timestamp: '14:21:12', category: 'payroll', debitAccount: 'gov:dept:police', creditAccount: 'char:1005:bank', amount: 850.00, memo: 'Public sector wage disbursement', authorizedBy: 'system:payroll' },
+                    { timestamp: '14:25:30', category: 'allocation', debitAccount: 'gov:tax:pool', creditAccount: 'gov:dept:police', amount: 52500.00, memo: 'Statutory Revenue Sweep Split (35%)', authorizedBy: 'cron:tax_sweep' }
+                ],
+                fiscalTelemetry: {
+                    fiscalState: 'THROTTLED',
+                    wageMultiplier: 0.88,
+                    drainVelocityPerHour: 14500.0,
+                    runwayHours: 265.5,
+                    circuitTripped: false,
+                    infrastructure: { autoRepair: 'ONLINE', impoundSurchargeActive: false, aiDispatch: 'OPTIMAL' }
+                },
+                circuitBreaker: {
+                    tripped: false,
+                    tripReason: 'Nincs aktív leoldás',
+                    drainVelocity: { totalOutflow: 43500.0 }
+                }
             });
         }
     });

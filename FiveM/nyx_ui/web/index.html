@@ -346,55 +346,332 @@
                     <div class="header-left">
                         <i class="fa-solid fa-scale-balanced icon-accent emerald"></i>
                         <div>
-                            <h3>Nyilvános Államkincstári Főkönyv</h3>
-                            <span class="sub-heading">Autonomous Double-Entry Treasury & Fiscal Transparency Portal</span>
+                            <h3>Nyilvános Államkincstári Főkönyv & Alokációs Monitor</h3>
+                            <span class="sub-heading">Autonomous Double-Entry Civic Finance, Statutory Splits & Fiscal Crisis Telemetry</span>
                         </div>
                     </div>
-                    <button id="treasury-close-btn" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                    <div class="header-right-actions">
+                        <span id="treasury-fiscal-badge" class="badge badge-emerald">SOLVENT (100% WAGE)</span>
+                        <button id="treasury-close-btn" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
                 </div>
+
+                <!-- Navigation Tabs -->
+                <div class="treasury-nav-tabs">
+                    <button class="treasury-tab active" data-tab="balance_sheet"><i class="fa-solid fa-scale-balanced"></i> Mérleg & Likviditás</button>
+                    <button class="treasury-tab" data-tab="ledger"><i class="fa-solid fa-book-journal-whills"></i> Főkönyvi Napló</button>
+                    <button class="treasury-tab" data-tab="allocations"><i class="fa-solid fa-chart-pie"></i> Költségvetési Elosztás</button>
+                    <button class="treasury-tab" data-tab="telemetry"><i class="fa-solid fa-gauge-high"></i> Fiskális Krízis & Telemetria</button>
+                </div>
+
                 <div class="modal-body treasury-body">
-                    <!-- Metrics Overview Cards -->
-                    <div class="treasury-kpi-grid">
-                        <div class="kpi-card">
-                            <span class="kpi-label">VÁROSI TARTALÉK ALAP</span>
-                            <span id="treasury-kpi-reserve" class="kpi-val">$0.00</span>
-                            <span class="kpi-sub">Fiskális Krízis Küszöb: $500,000</span>
+                    <!-- Top Fiscal Warning Banner -->
+                    <div id="treasury-crisis-banner" class="treasury-crisis-banner hidden">
+                        <div class="crisis-banner-content">
+                            <i id="treasury-crisis-icon" class="fa-solid fa-triangle-exclamation"></i>
+                            <div class="crisis-banner-text">
+                                <strong id="treasury-crisis-title">FISKÁLIS KRÍZIS ÁLLAPOT</strong>
+                                <span id="treasury-crisis-desc">A városi tartalékalap a biztonsági küszöb alá csökkent. Logaritmikus bérskála érvényben.</span>
+                            </div>
                         </div>
-                        <div class="kpi-card">
-                            <span class="kpi-label">ÉRVÉNYES ÁFA (POS TAX)</span>
-                            <span id="treasury-kpi-postax" class="kpi-val">8.00%</span>
-                            <span class="kpi-sub">Parlamenti Rendelet Hatálya</span>
-                        </div>
-                        <div class="kpi-card">
-                            <span class="kpi-label">P2P ÁTUTALÁSI ILLETÉK</span>
-                            <span id="treasury-kpi-p2ptax" class="kpi-val">2.00%</span>
-                            <span class="kpi-sub">Kincstári Transzfer Adó</span>
-                        </div>
-                        <div class="kpi-card">
-                            <span class="kpi-label">FŐKÖNYVI EGYENSÚLY (ΣD == ΣC)</span>
-                            <span id="treasury-kpi-balance" class="kpi-val status-ok">BALANCED</span>
-                            <span class="kpi-sub">Zárt Gazdasági Megmaradás</span>
+                        <div class="crisis-banner-action">
+                            <span id="treasury-wage-scale-pill" class="badge">BÉRSKÁLA: 85.0%</span>
                         </div>
                     </div>
 
-                    <!-- Recent Ledger Transactions Table -->
-                    <h4 class="section-title">Valós Idejű Főkönyvi Tranzakciós Napló (Audit Ledger)</h4>
-                    <div class="table-container">
-                        <table class="nyx-table">
-                            <thead>
-                                <tr>
-                                    <th>Időpont</th>
-                                    <th>Kategória</th>
-                                    <th>Terhelt Számla (Debit)</th>
-                                    <th>Jóváírt Számla (Credit)</th>
-                                    <th>Összeg</th>
-                                    <th>Megjegyzés</th>
-                                </tr>
-                            </thead>
-                            <tbody id="treasury-ledger-rows">
-                                <!-- Dynamic audit entries -->
-                            </tbody>
-                        </table>
+                    <!-- TAB 1: MÉRLEG & LIKVIDITÁS -->
+                    <div id="treasury-tab-balance_sheet" class="treasury-tab-pane active">
+                        <!-- Metrics Overview Cards -->
+                        <div class="treasury-kpi-grid">
+                            <div class="kpi-card">
+                                <span class="kpi-label">VÁROSI TARTALÉK ALAP</span>
+                                <span id="treasury-kpi-reserve" class="kpi-val">$0.00</span>
+                                <span id="treasury-kpi-target" class="kpi-sub">Céltartalék: $5,000,000 (100.0%)</span>
+                            </div>
+                            <div class="kpi-card">
+                                <span class="kpi-label">TELJES KÖZINTÉZMÉNYI LIKVIDITÁS</span>
+                                <span id="treasury-kpi-total-liquidity" class="kpi-val">$0.00</span>
+                                <span class="kpi-sub">Minden számla konszolidált egyenlege</span>
+                            </div>
+                            <div class="kpi-card">
+                                <span class="kpi-label">ÉRVÉNYES ADÓKULCSOK</span>
+                                <span id="treasury-kpi-taxes" class="kpi-val">ÁFA 8.0% | P2P 2.0%</span>
+                                <span class="kpi-sub">Parlamenti határozat alapján</span>
+                            </div>
+                            <div class="kpi-card">
+                                <span class="kpi-label">FŐKÖNYVI EGYENSÚLY (ΣD == ΣC)</span>
+                                <span id="treasury-kpi-balance" class="kpi-val status-ok">BALANCED</span>
+                                <span class="kpi-sub">Zárt Gazdasági Megmaradás (Δ = $0.00)</span>
+                            </div>
+                        </div>
+
+                        <div class="section-header-row">
+                            <h4 class="section-title">Konszolidált Városi Számlák & Likviditási Megoszlás</h4>
+                            <span class="sub-text">Minden önkormányzati és szakhatósági bankszámla auditált egyenlege</span>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="nyx-table">
+                                <thead>
+                                    <tr>
+                                        <th>Számlaszám (Account ID)</th>
+                                        <th>Megnevezés</th>
+                                        <th>Besorolás</th>
+                                        <th>Egyenleg</th>
+                                        <th>Részarány</th>
+                                        <th>Felső Plafon</th>
+                                        <th>Szolvencia Státusz</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="treasury-accounts-rows">
+                                    <!-- Dynamic accounts rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: VALÓS IDEJŰ FŐKÖNYVI NAPLÓ -->
+                    <div id="treasury-tab-ledger" class="treasury-tab-pane">
+                        <div class="treasury-filter-bar">
+                            <div class="filter-group">
+                                <label for="treasury-ledger-category-select"><i class="fa-solid fa-filter"></i> Kategória:</label>
+                                <select id="treasury-ledger-category-select" class="nyx-select">
+                                    <option value="ALL">Minden Kategória</option>
+                                    <option value="pos_tax">Értékesítési Adó (pos_tax)</option>
+                                    <option value="pos_sale">Kereskedelmi Értékesítés (pos_sale)</option>
+                                    <option value="payroll">Közszolgálati Bér (payroll)</option>
+                                    <option value="allocation">Költségvetési Elosztás (allocation)</option>
+                                    <option value="emergency_subvention">Kincstári Szubvenció (emergency_subvention)</option>
+                                    <option value="transfer_p2p">P2P Átutalás (transfer_p2p)</option>
+                                    <option value="transfer_duty">Tranzakciós Illeték (transfer_duty)</option>
+                                    <option value="cash_transit_deposit">Páncélozott Befizetés (cash_transit_deposit)</option>
+                                    <option value="commercial_laundering">Pénzmosási Forgalom (commercial_laundering)</option>
+                                    <option value="utility_bill">Közműdíj Befizetés (utility_bill)</option>
+                                    <option value="equity_dividend">Társasági Osztalék (equity_dividend)</option>
+                                </select>
+                            </div>
+                            <div class="search-group">
+                                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                                <input type="text" id="treasury-ledger-search" class="nyx-input" placeholder="Keresés számlaszám, UUID vagy megjegyzés szerint...">
+                            </div>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="nyx-table">
+                                <thead>
+                                    <tr>
+                                        <th>Időpont</th>
+                                        <th>Kategória</th>
+                                        <th>Terhelt Számla (Debit)</th>
+                                        <th>Jóváírt Számla (Credit)</th>
+                                        <th>Összeg</th>
+                                        <th>Engedélyező</th>
+                                        <th>Megjegyzés</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="treasury-ledger-rows">
+                                    <!-- Dynamic audit entries -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="treasury-pagination-bar">
+                            <button id="treasury-ledger-prev-btn" class="btn btn-secondary btn-sm" disabled><i class="fa-solid fa-chevron-left"></i> Előző</button>
+                            <span id="treasury-ledger-page-info" class="page-info">Oldal 1 / 1 (0 tétel)</span>
+                            <button id="treasury-ledger-next-btn" class="btn btn-secondary btn-sm" disabled>Következő <i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: KÖLTSÉGVETÉSI ELOSZTÁS & STATUTÓRIUS PILLÉREK -->
+                    <div id="treasury-tab-allocations" class="treasury-tab-pane">
+                        <div class="section-header-row">
+                            <h4 class="section-title">Statutórius Költségvetési Pillérek (Tervek 1.1 - 1.2)</h4>
+                            <span class="sub-text">Automatikus százalékos bevétel-elosztás a közszolgáltatások fenntartására</span>
+                        </div>
+
+                        <div class="allocation-pillars-grid">
+                            <div class="pillar-card emergency">
+                                <div class="pillar-header">
+                                    <i class="fa-solid fa-shield-halved pillar-icon"></i>
+                                    <div>
+                                        <h5>Készenléti Szervek</h5>
+                                        <span class="pillar-sub">Rendvédelem & Sürgősségi Ellátás</span>
+                                    </div>
+                                    <span class="pillar-share">60.0%</span>
+                                </div>
+                                <div class="pillar-body">
+                                    <div class="pillar-sub-item">
+                                        <span>Rendőrség (SASP):</span>
+                                        <strong>35.0% (Plafon: $1,500,000)</strong>
+                                    </div>
+                                    <div class="pillar-sub-item">
+                                        <span>Mentőszolgálat (EMS):</span>
+                                        <strong>25.0% (Plafon: $1,000,000)</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="pillar-card infrastructure">
+                                <div class="pillar-header">
+                                    <i class="fa-solid fa-bolt-lightning pillar-icon"></i>
+                                    <div>
+                                        <h5>Infrastruktúra & Közművek</h5>
+                                        <span class="pillar-sub">Közműhálózat & Transzformátorok</span>
+                                    </div>
+                                    <span class="pillar-share">25.0%</span>
+                                </div>
+                                <div class="pillar-body">
+                                    <div class="pillar-sub-item">
+                                        <span>Közművek (DPW):</span>
+                                        <strong>25.0% (Plafon: $800,000)</strong>
+                                    </div>
+                                    <div class="pillar-sub-item">
+                                        <span>Feladat:</span>
+                                        <strong>Áramellátás, transzformátorok, vízellátás</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="pillar-card social">
+                                <div class="pillar-header">
+                                    <i class="fa-solid fa-hand-holding-dollar pillar-icon"></i>
+                                    <div>
+                                        <h5>Társadalmi Osztalék</h5>
+                                        <span class="pillar-sub">Polgári Támogatások & Pályázatok</span>
+                                    </div>
+                                    <span class="pillar-share">15.0%</span>
+                                </div>
+                                <div class="pillar-body">
+                                    <div class="pillar-sub-item">
+                                        <span>Osztaléktartalék:</span>
+                                        <strong>15.0% (Plafon: $500,000)</strong>
+                                    </div>
+                                    <div class="pillar-sub-item">
+                                        <span>Cél:</span>
+                                        <strong>Közösségi ösztöndíjak & felzárkóztatás</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h4 class="section-title mt-4">Költségvetési Célelőirányzatok & Plafon Telítettség</h4>
+                        <div class="table-container">
+                            <table class="nyx-table">
+                                <thead>
+                                    <tr>
+                                        <th>Célszervezet</th>
+                                        <th>Pillér Kategória</th>
+                                        <th>Részarány</th>
+                                        <th>Jelenlegi Egyenleg</th>
+                                        <th>Statutórius Plafon</th>
+                                        <th>Plafon Telítettség</th>
+                                        <th>Utolsó Elosztás</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="treasury-allocations-rows">
+                                    <!-- Dynamic allocation rows -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <h4 class="section-title mt-4">Automatikus Adóelszámolási Történet (Revenue Sweeps Log)</h4>
+                        <div class="table-container">
+                            <table class="nyx-table">
+                                <thead>
+                                    <tr>
+                                        <th>Elszámolás UUID</th>
+                                        <th>Időpont</th>
+                                        <th>Beszedett Adóalap</th>
+                                        <th>Elosztott Összeg</th>
+                                        <th>Visszatartott Surplus (Master)</th>
+                                        <th>Érintett Számlák</th>
+                                        <th>Fiskális Állapot</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="treasury-sweeps-rows">
+                                    <!-- Dynamic revenue sweep log rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- TAB 4: FISKÁLIS KRÍZIS & TELEMETRIA -->
+                    <div id="treasury-tab-telemetry" class="treasury-tab-pane">
+                        <div class="telemetry-grid">
+                            <!-- Card 1: Logarithmic Wage Multiplier -->
+                            <div class="telemetry-card">
+                                <div class="telemetry-card-header">
+                                    <i class="fa-solid fa-calculator telemetry-icon"></i>
+                                    <h5>Logaritmikus Bérskála</h5>
+                                </div>
+                                <div class="telemetry-metric">
+                                    <span id="telemetry-wage-mult" class="metric-huge">1.00x</span>
+                                    <span id="telemetry-wage-pct" class="metric-sub">100.0% Közszolgálati Bér</span>
+                                </div>
+                                <div class="telemetry-formula">
+                                    <code>Payout = BaseWage * [0.10 + 0.90 * ln(R/Rcrit) / ln(Rtarget/Rcrit)]</code>
+                                </div>
+                                <p class="telemetry-note">Ha a tartalék $500,000 alá esik, a bérkifizetések automatikusan 0%-ra fagyasztódnak a csőd elkerülésére.</p>
+                            </div>
+
+                            <!-- Card 2: Outflow Velocity & Runway -->
+                            <div class="telemetry-card">
+                                <div class="telemetry-card-header">
+                                    <i class="fa-solid fa-gauge telemetry-icon"></i>
+                                    <h5>Kiáramlási Sebesség & Tartalékidő</h5>
+                                </div>
+                                <div class="telemetry-metric">
+                                    <span id="telemetry-drain-hr" class="metric-huge">$0.00 / óra</span>
+                                    <span id="telemetry-runway-hours" class="metric-sub">Becsült tartalékidő: STABIL</span>
+                                </div>
+                                <div class="telemetry-status-row">
+                                    <span>Gördülő 10 perces ablak:</span>
+                                    <strong id="telemetry-rolling-outflow">$0.00 / $750,000</strong>
+                                </div>
+                                <p class="telemetry-note">Maximális megengedett 10 perces kifizetési hullám: $750,000. E felett az áramkörvédelem leold.</p>
+                            </div>
+
+                            <!-- Card 3: Fiscal Circuit Breaker Status -->
+                            <div class="telemetry-card">
+                                <div class="telemetry-card-header">
+                                    <i class="fa-solid fa-plug-circle-bolt telemetry-icon"></i>
+                                    <h5>Fiskális Áramkörvédelem (Circuit Breaker)</h5>
+                                </div>
+                                <div class="telemetry-metric">
+                                    <span id="telemetry-circuit-status" class="badge badge-emerald">NORMAL (ZÁRT)</span>
+                                </div>
+                                <div class="telemetry-status-row">
+                                    <span>Utolsó leoldás oka:</span>
+                                    <strong id="telemetry-trip-reason">Nincs aktív leoldás</strong>
+                                </div>
+                                <div class="telemetry-status-row">
+                                    <span>Automatikus újraindítási küszöb:</span>
+                                    <strong>$1,000,000 (Recovery Reserve)</strong>
+                                </div>
+                            </div>
+
+                            <!-- Card 4: Infrastructure Degradation Status -->
+                            <div class="telemetry-card">
+                                <div class="telemetry-card-header">
+                                    <i class="fa-solid fa-city telemetry-icon"></i>
+                                    <h5>Közszolgáltatási Degradáció</h5>
+                                </div>
+                                <div class="telemetry-status-list">
+                                    <div class="degrade-item">
+                                        <span>Önkormányzati Autószerelő Műhelyek:</span>
+                                        <span id="telemetry-autorepair-status" class="badge badge-emerald">ÜZEMEL</span>
+                                    </div>
+                                    <div class="degrade-item">
+                                        <span>Civic Autóelszállítási Telepek:</span>
+                                        <span id="telemetry-impound-status" class="badge badge-emerald">NORMÁL DÍJAK</span>
+                                    </div>
+                                    <div class="degrade-item">
+                                        <span>AI Sürgősségi Diszpécser:</span>
+                                        <span id="telemetry-dispatch-status" class="badge badge-emerald">OPTIMÁLIS</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
