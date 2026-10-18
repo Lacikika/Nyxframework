@@ -46,6 +46,16 @@ exports['nyx_core']:RegisterRPC("properties:toggleLock", function(src, propertyI
         return { success = false, error = "INSUFFICIENT_KEY_TIER" }
     end
 
+    -- Check electrical power status for electronic maglocks
+    local isPowered = true
+    if exports['nyx_services'] and exports['nyx_services'].IsCoordsPowered then
+        isPowered = exports['nyx_services']:IsCoordsPowered(prop.entrance)
+    end
+
+    if not isPowered and not prop.hasBackupGenerator and (prop.type == 'commercial' or prop.type == 'industrial') then
+        return { success = false, error = "LOCK_OFFLINE_NO_POWER", message = "A mágneszár áramellátás hiányában nem működtethető!" }
+    end
+
     -- Toggle state
     prop.isLocked = not prop.isLocked
     local lockDbVal = prop.isLocked and 1 or 0

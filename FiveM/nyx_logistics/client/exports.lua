@@ -34,3 +34,18 @@ exports("DetachPallet", function(palletObj)
     return Nyx.Logistics.DetachPallet and Nyx.Logistics.DetachPallet(palletObj)
 end)
 
+exports("BreachPallet", function(palletId, toolItem)
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+    return exports['nyx_core']:TriggerRPCAwait("logistics:breachPallet", {
+        palletId = palletId,
+        toolItem = toolItem or "tool_crowbar",
+        coords = { x = coords.x, y = coords.y, z = coords.z }
+    })
+end)
+
+exports("InspectPalletForensics", function(palletId)
+    return exports['nyx_core']:TriggerRPCAwait("logistics:inspectPalletForensics", palletId)
+end)
+
+

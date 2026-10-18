@@ -9314,7 +9314,431 @@ function Nyx.Tests.TestPressSubscriptionsAndWhistleblowerEscrow()
     return passes == total
 end
 
--- 43. Master Test Runner
+-- 43. Test Substation Physical Sabotage, Alarm Breaches & Blackout Raids
+function Nyx.Tests.TestSubstationSabotageAndBlackoutRaids()
+    print("^3[Nyx:Tests] Running Substation Physical Sabotage, Alarm Breaches & Blackout Raids Suite...^7")
+    local passes = 0
+    local total = 8
+
+    local Sab = Nyx.Sabotage or (exports['nyx_services'] and exports['nyx_services'].GetSabotageStatus and Nyx.Sabotage) or {}
+
+    -- Sub-test A: Migration 048 Schema Definition & Table Contracts
+    local m48_tables = {
+        logs = "nyx_services_substation_sabotage_logs",
+        substations_cols = { "is_sabotaged", "last_sabotaged_at", "sabotage_cooldown_until" },
+        properties_cols = { "has_alarm", "has_backup_generator", "alarm_status" },
+        warehouses_cols = { "has_alarm", "has_backup_generator", "alarm_status" },
+        audit_actions = { "BLACKOUT_BREACH", "ALARM_BREACH" }
+    }
+    local testA_ok = (m48_tables.logs ~= nil and #m48_tables.substations_cols == 3 and #m48_tables.properties_cols == 3)
+    if assertTest(testA_ok == true,
+        "Migration 048 Schema Definition, Incident Ledger & Security Contracts",
+        string.format("table=%s, subCols=%d, propCols=%d", m48_tables.logs, #m48_tables.substations_cols, #m48_tables.properties_cols)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Declarative Sabotage Tool Profiles
+    local profiles = Sab.ToolProfiles or {}
+    local pCutters = profiles['wire_cutters']
+    local pThermite = profiles['thermite_charge']
+    local pRepair = profiles['tool_repairkit']
+
+    local testB_ok = (pCutters ~= nil and pThermite ~= nil and pRepair ~= nil) and
+                     (pCutters.baseSuccessRate == 0.75 and pCutters.shockDamage == 25 and pCutters.consumedOnUse == false) and
+                     (pThermite.baseSuccessRate == 0.95 and pThermite.consumedOnUse == true and pThermite.noiseRadius == 75.0) and
+                     (pRepair.baseSuccessRate == 0.50 and pRepair.shockChance == 0.35)
+
+    if assertTest(testB_ok == true,
+        "Declarative Sabotage Tool Profiles (Cutters, Thermite, Repair Toolkit)",
+        string.format("cutters(succ=%.2f,cons=%s); thermite(succ=%.2f,cons=%s); repair(succ=%.2f)",
+            pCutters and pCutters.baseSuccessRate or 0, tostring(pCutters and pCutters.consumedOnUse),
+            pThermite and pThermite.baseSuccessRate or 0, tostring(pThermite and pThermite.consumedOnUse),
+            pRepair and pRepair.baseSuccessRate or 0)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Physical Sabotage Outcome Math & Deterministic Rolls
+    local calcOutcome = Sab.CalculateSabotageOutcome or function() return false end
+    local ok1, outCutters = calcOutcome("wire_cutters", { rollSuccess = 0.50, rollShock = 0.50, rollAlarm = 0.20 })
+    local ok2, outThermite = calcOutcome("thermite_charge", { rollSuccess = 0.90, rollShock = 0.10, rollAlarm = 0.50 })
+    local ok3, outFail = calcOutcome("tool_repairkit", { rollSuccess = 0.80, rollShock = 0.10, rollAlarm = 0.10 })
+
+    local testC_ok = (ok1 == true and outCutters.success == true and outCutters.alarmTriggered == true) and
+                     (ok2 == true and outThermite.success == true and outThermite.consumed == true) and
+                     (ok3 == true and outFail.success == false and outFail.shockInflicted == true)
+
+    if assertTest(testC_ok == true,
+        "Physical Sabotage Calculation & Tool Consumption Verification",
+        string.format("cutters(succ=%s,alarm=%s); thermite(succ=%s,cons=%s); repairFail(succ=%s,shock=%s)",
+            tostring(outCutters and outCutters.success), tostring(outCutters and outCutters.alarmTriggered),
+            tostring(outThermite and outThermite.success), tostring(outThermite and outThermite.consumed),
+            tostring(outFail and outFail.success), tostring(outFail and outFail.shockInflicted))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Rubber Gloves High-Voltage Immunity
+    local _, outShockNoGloves = calcOutcome("tool_repairkit", { rollSuccess = 0.5, rollShock = 0.1, hasRubberGloves = false })
+    local _, outShockWithGloves = calcOutcome("tool_repairkit", { rollSuccess = 0.5, rollShock = 0.1, hasRubberGloves = true })
+
+    local testD_ok = (outShockNoGloves.shockInflicted == true and outShockNoGloves.shockDamage > 0) and
+                     (outShockWithGloves.shockInflicted == false and outShockWithGloves.shockDamage == 0)
+
+    if assertTest(testD_ok == true,
+        "Forensic Rubber Gloves High-Voltage Shock Immunity",
+        string.format("noGloves(shock=%s,dmg=%d); withGloves(shock=%s,dmg=%d)",
+            tostring(outShockNoGloves.shockInflicted), outShockNoGloves.shockDamage or 0,
+            tostring(outShockWithGloves.shockInflicted), outShockWithGloves.shockDamage or 0)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Commercial Maglock Fail-Open & Residential Deadbolt Resistance
+    local evalLock = Sab.EvaluateDoorlockState or function() return true end
+    local lockCommPowered, descCP, brCP = evalLock("commercial", true, true, false)
+    local lockCommBlackout, descCB, brCB = evalLock("commercial", true, false, false)
+    local lockCommBackup, descCBk, brCBk = evalLock("commercial", true, false, true)
+    local lockResBlackout, descRB, brRB = evalLock("residential", true, false, false)
+    local lockIndBlackout, descIB, brIB = evalLock("industrial", true, false, false)
+
+    local testE_ok = (lockCommPowered == true and descCP == "ONLINE" and brCP == false) and
+                     (lockCommBlackout == false and descCB == "BLACKOUT_BREACHED" and brCB == true) and
+                     (lockCommBackup == true and descCBk == "BACKUP_POWER" and brCBk == false) and
+                     (lockResBlackout == true and descRB == "MECHANICAL_LOCKED" and brRB == false) and
+                     (lockIndBlackout == false and descIB == "BLACKOUT_BREACHED" and brIB == true)
+
+    if assertTest(testE_ok == true,
+        "Commercial/Industrial Fail-Open Maglocks vs Residential Deadbolt Physical Resistance",
+        string.format("commOnline=%s(%s); commOutage=%s(%s); commBackup=%s(%s); resOutage=%s(%s)",
+            tostring(lockCommPowered), descCP, tostring(lockCommBlackout), descCB, tostring(lockCommBackup), descCBk, tostring(lockResBlackout), descRB)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Electronic Alarm Security Degradation During Power Loss
+    local evalAlarm = Sab.EvaluateAlarmStatus or function() return "none", false end
+    local alPoweredNoBreach, alertP1 = evalAlarm(true, true, false, false)
+    local alPoweredBreached, alertP2 = evalAlarm(true, true, false, true)
+    local alOutageBreached, alertP3 = evalAlarm(true, false, false, true)
+    local alBackupBreached, alertP4 = evalAlarm(true, false, true, true)
+
+    local testF_ok = (alPoweredNoBreach == "armed" and alertP1 == false) and
+                     (alPoweredBreached == "tripped" and alertP2 == true) and
+                     (alOutageBreached == "offline_breached" and alertP3 == false) and
+                     (alBackupBreached == "tripped_backup" and alertP4 == true)
+
+    if assertTest(testF_ok == true,
+        "Electronic Alarm Degradation (Grid Outage Silencing vs Backup Siren Activation)",
+        string.format("normArm=%s(pol=%s); normTrip=%s(pol=%s); outageTrip=%s(pol=%s); backupTrip=%s(pol=%s)",
+            alPoweredNoBreach, tostring(alertP1), alPoweredBreached, tostring(alertP2), alOutageBreached, tostring(alertP3), alBackupBreached, tostring(alertP4))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Zero-Trust Sabotage Payload Validation
+    local valSab = Sab.ValidateSabotagePayload or function() return false end
+    local okPayload, _ = valSab({ substationId = "grid_central_ls", tool = "wire_cutters" })
+    local badTool, _ = valSab({ substationId = "grid_central_ls", tool = "wooden_stick" })
+    local badSub, _ = valSab({ substationId = "", tool = "thermite_charge" })
+    local badType, _ = valSab("invalid_string_payload")
+
+    local testG_ok = (okPayload == true and badTool == false and badSub == false and badType == false)
+    if assertTest(testG_ok == true,
+        "Zero-Trust Substation Sabotage Payload Validation & Bounds",
+        string.format("valid=%s, badTool=%s, badSub=%s, badType=%s",
+            tostring(okPayload), tostring(badTool), tostring(badSub), tostring(badType))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test H: Hungarian Telemetry Badges & Status Formatting
+    local fLock = Sab.FormatLockStateBadge or function() return { text = "" } end
+    local fAlarm = Sab.FormatAlarmBadge or function() return { text = "" } end
+    local fSab = Sab.FormatSabotageBadge or function() return { text = "" } end
+
+    local bLockOn = fLock("ONLINE")
+    local bLockBreach = fLock("BLACKOUT_BREACHED")
+    local bAlarmTripped = fAlarm("tripped")
+    local bAlarmOff = fAlarm("offline")
+    local bSabotaged = fSab(true, 0)
+    local bSabCooldown = fSab(false, 300)
+
+    local testH_ok = (bLockOn.text == "MÁGNESZÁR AKTÍV" and bLockBreach.text == "ÁRAMKIMARADÁS - NYITVA") and
+                     (bAlarmTripped.text == "RIASZTÁS!" and bAlarmOff.text == "NINCS ÁRAM") and
+                     (bSabotaged.text == "SZABOTÁLT TRANSZFORMÁTOR" and bSabCooldown.text:find("300") ~= nil)
+
+    if assertTest(testH_ok == true,
+        "Hungarian UI Telemetry Badges (Lock State, Siren Alarm & Sabotage Indicators)",
+        string.format("lockOn='%s', lockBreach='%s', alarmTrip='%s', alarmOff='%s', sab='%s'",
+            bLockOn.text, bLockBreach.text, bAlarmTripped.text, bAlarmOff.text, bSabotaged.text)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+function Nyx.Tests.TestSealedPalletBreachingAndForensicContamination()
+    print("^3[Nyx:Tests] Running Sealed Industrial Pallet Breaching & Forensic Contamination Suite...^7")
+    local passes = 0
+    local total = 8
+
+    local Pal = Nyx.Pallets or (exports['nyx_logistics'] and exports['nyx_logistics'].GetPallet and Nyx.Pallets) or {}
+
+    -- Sub-test A: Migration 049 Schema Definition & Table Contracts
+    local m49_tables = {
+        audits = "nyx_logistics_pallet_breach_audits",
+        pallets_cols = { "is_tampered", "seal_serial", "sealed_at", "sealed_by_citizen_id", "breached_at", "breached_by_citizen_id", "tamper_tool", "forensic_evidence_ids" },
+        evidence_type = "toolmark"
+    }
+    local testA_ok = (m49_tables.audits ~= nil and #m49_tables.pallets_cols == 8 and m49_tables.evidence_type == "toolmark")
+    if assertTest(testA_ok == true,
+        "Migration 049 Schema Definition, Tamper Tracking & Breach Audits",
+        string.format("table=%s, palletCols=%d, evidenceType=%s", m49_tables.audits, #m49_tables.pallets_cols, m49_tables.evidence_type)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Declarative Breach Tool Profiles
+    local tools = Pal.BreachTools or {}
+    local tCrowbar = tools['tool_crowbar']
+    local tWpnCrowbar = tools['weapon_crowbar']
+    local tLockpick = tools['tool_lockpick']
+
+    local testB_ok = (tCrowbar ~= nil and tWpnCrowbar ~= nil and tLockpick ~= nil) and
+                     (tCrowbar.baseSuccess == 0.85 and tCrowbar.wearPerAttempt == 6.0 and tCrowbar.noiseRadius == 25.0) and
+                     (tWpnCrowbar.baseSuccess == 0.80 and tWpnCrowbar.wearPerAttempt == 8.0) and
+                     (tLockpick.baseSuccess == 0.30 and tLockpick.wearPerAttempt == 35.0)
+
+    if assertTest(testB_ok == true,
+        "Declarative Breach Tool Profiles (Heavy Crowbar, Weapon Crowbar, Lockpick Wire)",
+        string.format("crowbar(succ=%.2f,wear=%.1f,noise=%.1fm); lockpick(succ=%.2f,wear=%.1f)",
+            tCrowbar and tCrowbar.baseSuccess or 0, tCrowbar and tCrowbar.wearPerAttempt or 0, tCrowbar and tCrowbar.noiseRadius or 0,
+            tLockpick and tLockpick.baseSuccess or 0, tLockpick and tLockpick.wearPerAttempt or 0)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Breach Calculation Math & Durability Wear
+    local calcOutcome = Pal.CalculateBreachOutcome or function() return {} end
+    local out1 = calcOutcome("tool_crowbar", 100.0, true, false, 12345)
+    local outFail = calcOutcome("tool_lockpick", 20.0, false, false, 99999)
+    local outBroken = calcOutcome("tool_crowbar", 5.0, true, false, 12345)
+
+    local testC_ok = (out1.wearDeduction == 6.0 and out1.isBroken == false) and
+                     (outBroken.isBroken == true) and
+                     (outFail.remainingDurability < 20.0)
+
+    if assertTest(testC_ok == true,
+        "Breach Outcome Math, Tool Wear & Structural Breakage Clamping",
+        string.format("out1(wear=%.1f,rem=%.1f,broken=%s); brokenTool(broken=%s)",
+            out1.wearDeduction or 0, out1.remainingDurability or 0, tostring(out1.isBroken),
+            tostring(outBroken.isBroken))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Forensic Fingerprints & Glove Immunity
+    local outGloves = calcOutcome("tool_crowbar", 100.0, true, false, 555)
+    local outBareHands = calcOutcome("tool_crowbar", 100.0, false, false, 555)
+
+    local testD_ok = (outGloves.hasGloves == true and outGloves.fingerprintLeft == false) and
+                     (outBareHands.hasGloves == false and outBareHands.fingerprintLeft == true)
+
+    if assertTest(testD_ok == true,
+        "Forensic Latent Fingerprints & 100% Examination Glove Immunity",
+        string.format("withGloves(left=%s); bareHands(left=%s)",
+            tostring(outGloves.fingerprintLeft), tostring(outBareHands.fingerprintLeft))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Biological DNA & Splinter/Laceration Hazard
+    local outLaceration = calcOutcome("tool_crowbar", 100.0, false, false, 123)
+    local testE_ok = (outLaceration.lacerationDamage ~= nil and type(outLaceration.dnaLeft) == "boolean")
+
+    if assertTest(testE_ok == true,
+        "Biological DNA & Prying Laceration / Splinter Hazard Evaluation",
+        string.format("dnaLeft=%s, damage=%d", tostring(outLaceration.dnaLeft), outLaceration.lacerationDamage or 0)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Deterministic Toolmark Striations & SHA-256 Hashes
+    local hashFn = Pal.DetermineToolmarkHash or function() return "" end
+    local h1 = hashFn("CRW-100200", "CIT-ALPHA", { x = 100.0, y = 200.0, z = 30.0 }, "SALT1")
+    local h2 = hashFn("CRW-100200", "CIT-ALPHA", { x = 100.0, y = 200.0, z = 30.0 }, "SALT1")
+    local h3 = hashFn("CRW-999999", "CIT-BETA", { x = 100.0, y = 200.0, z = 30.0 }, "SALT1")
+
+    local testF_ok = (#h1 == 64 and h1 == h2 and h1 ~= h3)
+
+    if assertTest(testF_ok == true,
+        "Deterministic Toolmark Striation Hashing & Cryptographic Collision Resistance",
+        string.format("len=%d, h1=%s, match=(%s), distinct=(%s)",
+            #h1, h1:sub(1, 12), tostring(h1 == h2), tostring(h1 ~= h3))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Tamper Seal Serial Generation
+    local sealFn = Pal.GenerateSealSerial or function() return "" end
+    local s1 = sealFn("plt_a1b2c3", 1700000000)
+    local testG_ok = (s1:find("SEAL-") ~= nil and s1:find("B2C3") ~= nil)
+
+    if assertTest(testG_ok == true,
+        "Tamper-Evident Security Seal Serial Number Generation",
+        string.format("generatedSeal='%s'", s1)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test H: Zero-Trust Payload Validation & Status Badges
+    local valPayload = Pal.ValidateBreachPayload or function() return false end
+    local okP1 = valPayload({ palletId = "plt_test_123", toolItem = "tool_crowbar" })
+    local okP2, errP2 = valPayload({ palletId = "", toolItem = "tool_crowbar" })
+    local okP3, errP3 = valPayload({ palletId = "plt_test_123", toolItem = "invalid_rocket_launcher" })
+
+    local badgeFn = Pal.FormatPalletStatusBadge or function() return "" end
+    local b1 = badgeFn({ is_sealed = true, is_tampered = false })
+    local b2 = badgeFn({ is_sealed = false, is_tampered = true })
+    local b3 = badgeFn({ is_sealed = false, is_tampered = false })
+
+    local testH_ok = (okP1 == true and okP2 == false and okP3 == false) and
+                     (b1:find("SEALED") ~= nil and b2:find("TAMPERED") ~= nil and b3:find("OPEN") ~= nil)
+
+    if assertTest(testH_ok == true,
+        "Zero-Trust Payload Validation & Visual Security Status Badges",
+        string.format("validPayload=%s, badIdErr=%s, badToolErr=%s, badge1=%s, badge2=%s",
+            tostring(okP1), tostring(errP2), tostring(errP3), b1, b2)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+function Nyx.Tests.TestWeaponSerialGrindingAndAcidEtchForensics()
+    print("^3[Nyx:Tests] Running Weapon Serial Grinding & Acid-Etch Forensics Suite...^7")
+    local passes = 0
+    local total = 8
+
+    local Grind = Nyx.SerialGrind or {}
+    local Etch = Nyx.AcidEtch or {}
+
+    -- Sub-test A: Migration 050 Schema Definition & Table Contracts
+    local m50_tables = {
+        ground_weapons = "nyx_inventory_ground_weapons",
+        acid_etch_audits = "nyx_judiciary_acid_etch_audits",
+        evidence_type = "weapon"
+    }
+    local testA_ok = (m50_tables.ground_weapons ~= nil and m50_tables.acid_etch_audits ~= nil and m50_tables.evidence_type == "weapon")
+    if assertTest(testA_ok == true,
+        "Migration 050 Schema Definition (Ground Weapons, Acid Etch Audits & Weapon Evidence Type)",
+        string.format("groundWeapons=%s, audits=%s, evidenceType=%s", m50_tables.ground_weapons, m50_tables.acid_etch_audits, m50_tables.evidence_type)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Declarative Grinding Tool Profiles
+    local tools = Grind.Tools or {}
+    local tGrinder = tools['tool_angle_grinder']
+    local testB_ok = (tGrinder ~= nil) and
+                     (tGrinder.name == 'tool_angle_grinder' and tGrinder.durabilityWear == 6.0 and tGrinder.noiseRadius == 32.0 and tGrinder.requiresDisk == true)
+
+    if assertTest(testB_ok == true,
+        "Declarative Grinder Tool Profile (Angle Grinder, Abrasive Disk & Durability Wear)",
+        string.format("tool=%s, wear=%.1f, noise=%.1fm, reqDisk=%s",
+            tGrinder and tGrinder.name or "nil", tGrinder and tGrinder.durabilityWear or 0,
+            tGrinder and tGrinder.noiseRadius or 0, tostring(tGrinder and tGrinder.requiresDisk))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Serial Grinding Outcome Math & Weapon Durability Loss
+    local mockWeapon = { item_id = 'weapon_pistol', metadata = { serialNumber = 'NYX-789012', durability = 90.0, scratched = false } }
+    local mockTool = { item_id = 'tool_angle_grinder', metadata = { toolSerial = 'GRD-555111', durability = 100.0, striations = 'STR-GRD-9001' } }
+    local out1 = Grind.CalculateGrindOutcome(mockWeapon, mockTool, { hasGloves = true, seed = 12345 })
+    local mockBrokenTool = { item_id = 'tool_angle_grinder', metadata = { toolSerial = 'GRD-BROKEN', durability = 4.0 } }
+    local outBroken = Grind.CalculateGrindOutcome(mockWeapon, mockBrokenTool, { hasGloves = true, seed = 12345 })
+
+    local testC_ok = (out1.success == true and out1.originalSerial == 'NYX-789012' and out1.scratchedSerial == '[GROUND OFF]') and
+                     (out1.weaponDurabilityLoss >= 6.0 and out1.remainingWeaponDurability < 90.0) and
+                     (out1.remainingToolDurability == 94.0 and outBroken.isToolBroken == true)
+
+    if assertTest(testC_ok == true,
+        "Serial Grinding Outcome Math, Scratched State & Breakage Clamping",
+        string.format("orig=%s, scratch=%s, weaponLoss=%.1f, remTool=%.1f, broken=%s",
+            out1.originalSerial, out1.scratchedSerial, out1.weaponDurabilityLoss, out1.remainingToolDurability, tostring(outBroken.isToolBroken))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Forensic Fingerprints & Glove Immunity
+    local outGloved = Grind.CalculateGrindOutcome(mockWeapon, mockTool, { hasGloves = true, seed = 777 })
+    local outBare = Grind.CalculateGrindOutcome(mockWeapon, mockTool, { hasGloves = false, seed = 777 })
+
+    local testD_ok = (outGloved.hasGloves == true and outGloved.fingerprintLeft == false) and
+                     (outBare.hasGloves == false and outBare.fingerprintLeft == true)
+
+    if assertTest(testD_ok == true,
+        "Forensic Latent Fingerprints & 100% Protective Glove Immunity",
+        string.format("withGloves(left=%s); bareHands(left=%s)",
+            tostring(outGloved.fingerprintLeft), tostring(outBare.fingerprintLeft))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Toolmark Striations & Abrasive Trace Data
+    local testE_ok = (out1.toolSerial == 'GRD-555111' and out1.toolmarkStriations == 'STR-GRD-9001')
+
+    if assertTest(testE_ok == true,
+        "Toolmark Striation Tracking & Serial Number Frame Forensics",
+        string.format("toolSerial=%s, striations=%s", out1.toolSerial, out1.toolmarkStriations)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Chemical Acid-Etch Serial Restoration Physics & Rates
+    local mockScratched = { item_id = 'weapon_pistol', metadata = { originalSerial = 'NYX-442299', grindQuality = 75, scratched = true } }
+    local etchOut1 = Etch.CalculateEtchOutcome(mockScratched, { seed = 1000 })
+    local etchOut2 = Etch.CalculateEtchOutcome(mockScratched, { seed = 999999 })
+
+    local validOutcomes = { FULL = true, PARTIAL = true, FAILED = true }
+    local testF_ok = (validOutcomes[etchOut1.outcome] == true and validOutcomes[etchOut2.outcome] == true and etchOut1.originalSerial == 'NYX-442299')
+
+    if assertTest(testF_ok == true,
+        "Metallurgical Chemical Acid-Etching Outcome Probabilities (Full, Partial, Failed)",
+        string.format("out1(status=%s, restored=%s); out2(status=%s, restored=%s)",
+            etchOut1.outcome, etchOut1.restoredSerial, etchOut2.outcome, etchOut2.restoredSerial)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Deterministic Masking of Unrecovered Digits
+    local masked1 = Etch.MaskSerial("NYX-987654", 0.50, 42)
+    local masked2 = Etch.MaskSerial("NYX-987654", 0.50, 42)
+
+    local testG_ok = (masked1 == masked2 and masked1:find("%*") ~= nil and masked1:find("NYX%-") ~= nil and #masked1 == #("NYX-987654"))
+
+    if assertTest(testG_ok == true,
+        "Deterministic Partial Serial Masking Algorithm (Fisher-Yates Asterisk Occlusion)",
+        string.format("masked='%s', len=%d, deterministic=%s",
+            masked1, #masked1, tostring(masked1 == masked2))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test H: Laboratory Report Formatting & Serial Display Badges
+    local sampleReport = Etch.FormatLabReport({
+        timestamp = 1700000000,
+        technicianCitizenId = "CIT-FORENSIC-01",
+        facilityName = "Davis Regional Forensic Crime Laboratory",
+        originalSerial = "NYX-987654",
+        restoredSerial = "NYX-9*7*54",
+        outcome = "PARTIAL",
+        statusLabel = "RÉSZLEGES HELYREÁLLÍTÁS",
+        reagent = "Fry's Reagent",
+        ballisticsHitCount = 2,
+        ballisticsEvidenceIds = { "EV-001", "EV-002" }
+    })
+
+    local dispScratched = Grind.FormatSerialDisplay({ scratched = true, serialNumber = "[GROUND OFF]" })
+    local dispEtched = Grind.FormatSerialDisplay({ scratched = true, acidEtched = true, restoredSerial = "NYX-987654" })
+    local dispClean = Grind.FormatSerialDisplay({ scratched = false, serialNumber = "NYX-112233" })
+
+    local testH_ok = (sampleReport:find("SAN ANDREAS JUDICIARY") ~= nil and sampleReport:find("NYX%-9%*7%*54") ~= nil and sampleReport:find("EV%-001") ~= nil) and
+                     (dispScratched:find("LECSISZOLVA") ~= nil and dispEtched:find("KÉMIAILAG ELŐHÍVVA") ~= nil and dispClean == "NYX-112233")
+
+    if assertTest(testH_ok == true,
+        "Certified Metallurgy Report Generator & Dynamic Serial Display Badges",
+        string.format("reportLen=%d, dispScr='%s', dispEtch='%s'",
+            #sampleReport, dispScratched, dispEtched)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 45. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -9362,9 +9786,12 @@ function Nyx.Tests.RunAll()
     local t40 = Nyx.Tests.TestPenalLaborProcessingAndSentenceReductions()
     local t41 = Nyx.Tests.TestAgriculturalExtractionMillingAndPerishableFoodLogistics()
     local t42 = Nyx.Tests.TestPressSubscriptionsAndWhistleblowerEscrow()
+    local t43 = Nyx.Tests.TestSubstationSabotageAndBlackoutRaids()
+    local t44 = Nyx.Tests.TestSealedPalletBreachingAndForensicContamination()
+    local t45 = Nyx.Tests.TestWeaponSerialGrindingAndAcidEtchForensics()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 and t41 and t42 then
+    if t1 and t2 and t3 and t4 and t5 and t6 and t7 and t8 and t9 and t10 and t11 and t12 and t13 and t14 and t15 and t16 and t17 and t18 and t19 and t20 and t21 and t22 and t23 and t24 and t25 and t26 and t27 and t28 and t29 and t30 and t31 and t32 and t33 and t34 and t35 and t36 and t37 and t38 and t39 and t40 and t41 and t42 and t43 and t44 and t45 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

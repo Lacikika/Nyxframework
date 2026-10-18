@@ -20,7 +20,8 @@ shared_scripts {
     'shared/decay.lua',
     'shared/items.lua',
     'shared/drops.lua',
-    'shared/batch.lua'
+    'shared/batch.lua',
+    'shared/serial_grind.lua'
 }
 
 server_scripts {
@@ -31,6 +32,7 @@ server_scripts {
     'server/drops.lua',
     'server/freight.lua',
     'server/actions.lua',
+    'server/grinder.lua',
     'server/main.lua',
     'server/exports.lua'
 }
@@ -39,6 +41,7 @@ client_scripts {
     'client/placement.lua',
     'client/drops.lua',
     'client/freight.lua',
+    'client/grinder.lua',
     'client/main.lua',
     'client/exports.lua'
 }

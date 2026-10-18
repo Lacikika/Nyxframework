@@ -361,4 +361,12 @@ exports("RepairItem", function(invId, targetSlot, toolSlot)
     return true, newDur, gain
 end)
 
+-- Illicit Weapon Serial Grinding Export
+exports("GrindWeaponSerial", function(invId, weaponSlot, toolSlot, diskSlot, src)
+    if Nyx.SerialGrind and Nyx.SerialGrind.ExecuteGrind then
+        return Nyx.SerialGrind.ExecuteGrind(invId, weaponSlot, toolSlot, diskSlot, src)
+    end
+    return false, "SYSTEM_UNAVAILABLE"
+end)
+
 

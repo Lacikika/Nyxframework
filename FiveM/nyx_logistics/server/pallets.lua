@@ -56,6 +56,14 @@ CreateThread(function()
                 offset = r.attached_offset
             end
 
+            local forensicEvidence = {}
+            if r.forensic_evidence_ids and type(r.forensic_evidence_ids) == "string" then
+                local ok, parsed = pcall(json.decode, r.forensic_evidence_ids)
+                if ok and type(parsed) == "table" then forensicEvidence = parsed end
+            elseif type(r.forensic_evidence_ids) == "table" then
+                forensicEvidence = r.forensic_evidence_ids
+            end
+
             Nyx.Logistics.Pallets[r.pallet_id] = {
                 id = r.pallet_id,
                 inventory_id = r.inventory_id,
@@ -69,6 +77,14 @@ CreateThread(function()
                 attached_offset = offset,
                 shelf_node_id = r.shelf_node_id,
                 is_sealed = (tonumber(r.is_sealed) == 1),
+                is_tampered = (tonumber(r.is_tampered) == 1),
+                seal_serial = r.seal_serial,
+                sealed_at = r.sealed_at,
+                sealed_by_citizen_id = r.sealed_by_citizen_id,
+                breached_at = r.breached_at,
+                breached_by_citizen_id = r.breached_by_citizen_id,
+                tamper_tool = r.tamper_tool,
+                forensic_evidence_ids = forensicEvidence,
                 created_by_citizen_id = r.created_by_citizen_id
             }
 
@@ -136,6 +152,9 @@ function Nyx.Logistics.CreateFreightPallet(coords, heading, bucket, initialItems
         attached_offset = nil,
         shelf_node_id = nil,
         is_sealed = false,
+        is_tampered = false,
+        seal_serial = nil,
+        forensic_evidence_ids = {},
         created_by_citizen_id = citizenId
     }
 
@@ -325,23 +344,32 @@ function Nyx.Logistics.SealPallet(src, palletId)
         return false, err or "CANNOT_SEAL_PALLET"
     end
 
+    local sealSerial = Nyx.Pallets.GenerateSealSerial(palletId, os.time())
     pallet.is_sealed = true
+    pallet.is_tampered = false
+    pallet.seal_serial = sealSerial
+    pallet.sealed_at = os.time()
+    pallet.sealed_by_citizen_id = player.citizenId
 
     MySQL.prepare.await([[
         UPDATE `nyx_logistics_pallets`
-        SET `is_sealed` = 1
+        SET `is_sealed` = 1,
+            `is_tampered` = 0,
+            `seal_serial` = ?,
+            `sealed_at` = CURRENT_TIMESTAMP,
+            `sealed_by_citizen_id` = ?
         WHERE `pallet_id` = ?
-    ]], { palletId })
+    ]], { sealSerial, player.citizenId, palletId })
 
     MySQL.prepare.await([[
         INSERT INTO `nyx_logistics_pallet_logs`
             (`pallet_id`, `action`, `actor_citizen_id`, `details`)
         VALUES (?, 'sealed', ?, ?)
-    ]], { palletId, player.citizenId, json.encode({ itemCount = itemCount, totalWeight = totalWeight }) })
+    ]], { palletId, player.citizenId, json.encode({ sealSerial = sealSerial, itemCount = itemCount, totalWeight = totalWeight }) })
 
-    TriggerClientEvent("nyx:logistics:client:palletSealUpdated", -1, palletId, true)
+    TriggerClientEvent("nyx:logistics:client:palletSealUpdated", -1, palletId, true, sealSerial)
 
-    return true, { palletId = palletId, isSealed = true }
+    return true, { palletId = palletId, isSealed = true, sealSerial = sealSerial }
 end
 
 function Nyx.Logistics.UnsealPallet(src, palletId)
@@ -369,10 +397,247 @@ function Nyx.Logistics.UnsealPallet(src, palletId)
         VALUES (?, 'unsealed', ?)
     ]], { palletId, player.citizenId })
 
-    TriggerClientEvent("nyx:logistics:client:palletSealUpdated", -1, palletId, false)
+    TriggerClientEvent("nyx:logistics:client:palletSealUpdated", -1, palletId, false, nil)
 
     return true, { palletId = palletId, isSealed = false }
 end
+
+-- 5b. Breach Sealed Freight Pallet (Crowbar Prying & Forensic Contamination)
+function Nyx.Logistics.BreachPallet(src, palletId, toolItem)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return false, "UNAUTHENTICATED" end
+
+    local pallet = Nyx.Logistics.Pallets[palletId]
+    if not pallet then return false, "PALLET_NOT_FOUND" end
+
+    if not pallet.is_sealed then
+        return false, "PALLET_NOT_SEALED"
+    end
+
+    toolItem = toolItem or "tool_crowbar"
+    if not Nyx.Pallets.BreachTools[toolItem] then
+        toolItem = "tool_crowbar"
+    end
+
+    local invId = "citizen:" .. player.citizenId
+
+    -- Verify player possesses required prying tool
+    local hasTool = false
+    local toolItemData = nil
+    if exports['nyx_inventory'] then
+        if exports['nyx_inventory'].HasItem and exports['nyx_inventory']:HasItem(invId, toolItem, 1) then
+            hasTool = true
+        elseif exports['nyx_inventory'].HasItem and exports['nyx_inventory']:HasItem(invId, "weapon_crowbar", 1) then
+            hasTool = true
+            toolItem = "weapon_crowbar"
+        end
+
+        if hasTool and exports['nyx_inventory'].GetFirstItem then
+            toolItemData = exports['nyx_inventory']:GetFirstItem(invId, toolItem)
+        end
+    else
+        hasTool = true
+    end
+
+    if not hasTool then
+        return false, "MISSING_BREACH_TOOL"
+    end
+
+    local toolDurability = (toolItemData and toolItemData.metadata and toolItemData.metadata.durability) or 100.0
+    local toolSerial = (toolItemData and toolItemData.metadata and toolItemData.metadata.toolSerial) or string.format("CRW-%06d", math.random(100000, 999999))
+
+    -- Check glove status for forensic fingerprint immunity
+    local hasGloves = false
+    if player:getMetadata("glovesEquipped") == true then
+        hasGloves = true
+    elseif exports['nyx_inventory'] and exports['nyx_inventory'].HasItem then
+        if exports['nyx_inventory']:HasItem(invId, "latex_gloves", 1) or exports['nyx_inventory']:HasItem(invId, "nitrile_gloves", 1) then
+            hasGloves = true
+        end
+    end
+
+    -- Check trade union membership for mechanical leverage buff
+    local isUnionMember = false
+    if exports['nyx_factions'] and exports['nyx_factions'].IsCitizenInUnion then
+        isUnionMember = exports['nyx_factions']:IsCitizenInUnion(player.citizenId, "union:transport_workers")
+    end
+
+    -- Calculate physical breach outcome
+    local outcome = Nyx.Pallets.CalculateBreachOutcome(toolItem, toolDurability, hasGloves, isUnionMember)
+
+    -- Apply tool wear / breakage
+    if exports['nyx_inventory'] then
+        if outcome.isBroken then
+            exports['nyx_inventory']:RemoveItem(invId, toolItem, 1)
+            TriggerClientEvent("nyx:core:client:notify", src, "A feszítővas elpattant a fém zárópánt feszítése közben!", "error")
+        else
+            if toolItemData and toolItemData.slot and exports['nyx_inventory'].SetItemMetadata then
+                toolItemData.metadata = toolItemData.metadata or {}
+                toolItemData.metadata.durability = outcome.remainingDurability
+                toolItemData.metadata.toolSerial = toolSerial
+                exports['nyx_inventory']:SetItemMetadata(invId, toolItemData.slot, toolItemData.metadata)
+            end
+        end
+    end
+
+    -- Resolve coordinates
+    local pPos = player:getPosition()
+    local palletCoords = pallet.coords or { x = pPos.x, y = pPos.y, z = pPos.z }
+    local coordsJson = jsonEncodeCoords(palletCoords)
+
+    -- Audit failure if roll failed
+    if not outcome.success then
+        local auditUuid = string.format("pba_%x%04d", os.time(), math.random(1000, 9999))
+        MySQL.prepare.await([[
+            INSERT INTO `nyx_logistics_pallet_breach_audits`
+                (`audit_uuid`, `pallet_id`, `citizen_id`, `tool_used`, `tool_serial`, `success`,
+                 `alarm_triggered`, `dna_left`, `fingerprint_left`, `toolmark_left`, `coords`, `notes`)
+            VALUES (?, ?, ?, ?, ?, 0, ?, 0, 0, 1, ?, 'Failed breach attempt')
+        ]], { auditUuid, palletId, player.citizenId, toolItem, toolSerial, outcome.alarmTriggered and 1 or 0, coordsJson })
+
+        return false, "BREACH_ATTEMPT_FAILED", outcome
+    end
+
+    -- Success State: Pallet seal severed and opened
+    pallet.is_sealed = false
+    pallet.is_tampered = true
+    pallet.breached_at = os.time()
+    pallet.breached_by_citizen_id = player.citizenId
+    pallet.tamper_tool = toolItem
+
+    local evidenceRecords = {}
+
+    -- 1. Register microscopic toolmark striation evidence in nyx_judiciary
+    local toolmarkHash = Nyx.Pallets.DetermineToolmarkHash(toolSerial, player.citizenId, palletCoords)
+    if exports['nyx_judiciary'] and exports['nyx_judiciary'].RegisterToolmarkEvent then
+        local tmId, tmHash = exports['nyx_judiciary']:RegisterToolmarkEvent(src, toolItem, "severed_steel_pallet_banding", palletCoords, toolSerial)
+        if tmId then
+            evidenceRecords[#evidenceRecords + 1] = { type = "toolmark", id = tmId, hash = tmHash or toolmarkHash }
+        end
+    else
+        evidenceRecords[#evidenceRecords + 1] = { type = "toolmark", id = "tm_" .. palletId, hash = toolmarkHash }
+    end
+
+    -- 2. Register latent fingerprints if operating without gloves
+    if outcome.fingerprintLeft then
+        if exports['nyx_judiciary'] and exports['nyx_judiciary'].RegisterFingerprintEvent then
+            local fpId, fpHash = exports['nyx_judiciary']:RegisterFingerprintEvent(src, "pallet_tamper_seal_casing", palletCoords)
+            if fpId then
+                evidenceRecords[#evidenceRecords + 1] = { type = "fingerprint", id = fpId, hash = fpHash }
+            end
+        end
+    end
+
+    -- 3. Register biological DNA / blood if laceration injury occurred
+    if outcome.dnaLeft then
+        if exports['nyx_judiciary'] and exports['nyx_judiciary'].RegisterTraumaEvent then
+            local blId, blHash = exports['nyx_judiciary']:RegisterTraumaEvent(src, src, "slashing", palletCoords)
+            if blId then
+                evidenceRecords[#evidenceRecords + 1] = { type = "blood", id = blId, hash = blHash }
+            end
+        end
+        TriggerClientEvent("nyx:core:client:notify", src, string.format("A feszítővas megcsúszott a fém szalagon! Kézfejsérülés (-%d HP).", outcome.lacerationDamage), "error")
+    end
+
+    pallet.forensic_evidence_ids = evidenceRecords
+
+    -- 4. Commercial Alarm & MDT Dispatch Trigger
+    if outcome.alarmTriggered then
+        if exports['nyx_mdt'] and exports['nyx_mdt'].CreateDispatchCall then
+            exports['nyx_mdt']:CreateDispatchCall({
+                code = "10-31",
+                title = "Ipari Teheráru / Raklap Felfeszítés",
+                message = string.format("Riasztó rezgésérzékelő aktiválódott: leplombált raklap (#%s) feltörve feszítővassal.", palletId),
+                coords = palletCoords,
+                priority = 2,
+                caller = "CIVIC_AUTOMATED_SECURITY"
+            })
+        end
+    end
+
+    -- Commit to Database
+    local evidenceJson = json.encode(evidenceRecords)
+    MySQL.prepare.await([[
+        UPDATE `nyx_logistics_pallets`
+        SET `is_sealed` = 0,
+            `is_tampered` = 1,
+            `breached_at` = CURRENT_TIMESTAMP,
+            `breached_by_citizen_id` = ?,
+            `tamper_tool` = ?,
+            `forensic_evidence_ids` = ?
+        WHERE `pallet_id` = ?
+    ]], { player.citizenId, toolItem, evidenceJson, palletId })
+
+    local auditUuid = string.format("pba_%x%04d", os.time(), math.random(1000, 9999))
+    MySQL.prepare.await([[
+        INSERT INTO `nyx_logistics_pallet_breach_audits`
+            (`audit_uuid`, `pallet_id`, `citizen_id`, `tool_used`, `tool_serial`, `success`,
+             `alarm_triggered`, `dna_left`, `fingerprint_left`, `toolmark_left`, `evidence_hashes`, `coords`, `notes`)
+        VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, 1, ?, ?, 'Successful crowbar breach')
+    ]], {
+        auditUuid,
+        palletId,
+        player.citizenId,
+        toolItem,
+        toolSerial,
+        outcome.alarmTriggered and 1 or 0,
+        outcome.dnaLeft and 1 or 0,
+        outcome.fingerprintLeft and 1 or 0,
+        evidenceJson,
+        coordsJson
+    })
+
+    MySQL.prepare.await([[
+        INSERT INTO `nyx_logistics_pallet_logs`
+            (`pallet_id`, `action`, `actor_citizen_id`, `coords`, `details`)
+        VALUES (?, 'breached', ?, ?, ?)
+    ]], { palletId, player.citizenId, coordsJson, json.encode({ tool = toolItem, toolSerial = toolSerial, outcome = outcome }) })
+
+    -- Synchronize with clients
+    TriggerClientEvent("nyx:logistics:client:palletSealUpdated", -1, palletId, false, nil)
+    TriggerClientEvent("nyx:logistics:client:palletBreached", -1, {
+        palletId = palletId,
+        coords = palletCoords,
+        toolItem = toolItem,
+        outcome = outcome
+    })
+
+    return true, {
+        palletId = palletId,
+        isBreached = true,
+        outcome = outcome,
+        evidence = evidenceRecords,
+        sealSerial = pallet.seal_serial
+    }
+end
+
+-- 5c. Inspect Pallet Forensics (Forensic Investigator Analysis)
+function Nyx.Logistics.InspectPalletForensics(src, palletId)
+    local player = exports['nyx_core']:GetPlayer(src)
+    if not player then return false, "UNAUTHENTICATED" end
+
+    local pallet = Nyx.Logistics.Pallets[palletId]
+    if not pallet then return false, "PALLET_NOT_FOUND" end
+
+    local statusBadge = Nyx.Pallets.FormatPalletStatusBadge(pallet)
+    local result = {
+        palletId = pallet.id,
+        label = pallet.label,
+        statusBadge = statusBadge,
+        isSealed = pallet.is_sealed,
+        isTampered = pallet.is_tampered,
+        sealSerial = pallet.seal_serial,
+        sealedAt = pallet.sealed_at,
+        sealedBy = pallet.sealed_by_citizen_id,
+        breachedAt = pallet.breached_at,
+        breachedBy = pallet.breached_by_citizen_id,
+        tamperTool = pallet.tamper_tool,
+        evidenceMarkers = pallet.forensic_evidence_ids or {}
+    }
+
+    return true, result
+end
+
 
 -- 6. Snap Pallet to Warehouse Shelf Node
 function Nyx.Logistics.SnapPalletToShelf(src, palletId, shelfNodeId)
@@ -558,3 +823,28 @@ Nyx.RPC.Register("logistics:packItemsToPallet", function(src, payload)
 
     return { success = true, data = resOrErr }
 end)
+
+Nyx.RPC.Register("logistics:breachPallet", function(src, payload)
+    local okPayload, payloadErr = Nyx.Pallets.ValidateBreachPayload(payload)
+    if not okPayload then
+        return { success = false, error = payloadErr }
+    end
+
+    local palletId = payload.palletId
+    local toolItem = payload.toolItem or "tool_crowbar"
+
+    local ok, resOrErr, extra = Nyx.Logistics.BreachPallet(src, palletId, toolItem)
+    if not ok then
+        return { success = false, error = resOrErr, data = extra }
+    end
+    return { success = true, data = resOrErr }
+end)
+
+Nyx.RPC.Register("logistics:inspectPalletForensics", function(src, palletId)
+    local ok, resOrErr = Nyx.Logistics.InspectPalletForensics(src, palletId)
+    if not ok then
+        return { success = false, error = resOrErr }
+    end
+    return { success = true, data = resOrErr }
+end)
+

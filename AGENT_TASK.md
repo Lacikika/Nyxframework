@@ -84,13 +84,13 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Investigative Press Leaks, Dropbox Whistleblowing & Subscriptions (`nyx_press` & `nyx_treasury`)**
   - **Implementation:** Anonymous physical dropboxes for whistleblowers submitting evidence hashes, newspaper printing costs, and automated revenue splits from public newsstands.
 
-- [ ] **Feature: Substation Physical Sabotage, Alarm Breaches & Blackout Raids (`nyx_services` & `nyx_properties`)**
+- [x] **Feature: Substation Physical Sabotage, Alarm Breaches & Blackout Raids (`nyx_services` & `nyx_properties`)**
   - **Implementation:** Transformer sabotage mechanics triggering localized blackout sectors, disabling commercial warehouse doorlocks and security alarms while alerting police dispatch.
 
-- [ ] **Feature: Sealed Industrial Pallet Breaching & Forensic Contamination (`nyx_logistics` & `nyx_judiciary`)**
+- [x] **Feature: Sealed Industrial Pallet Breaching & Forensic Contamination (`nyx_logistics` & `nyx_judiciary`)**
   - **Implementation:** Allow players to crowbar open tamper-sealed freight pallets in the world, generating ballistic scratches and DNA/fingerprint evidence markers.
 
-- [ ] **Feature: Weapon Serial Number Grinding & Acid-Etch Forensics (`nyx_inventory` & `nyx_judiciary`)**
+- [x] **Feature: Weapon Serial Number Grinding & Acid-Etch Forensics (`nyx_inventory` & `nyx_judiciary`)**
   - **Implementation:** Illicit workbench action stripping weapon metadata (`scratched = true`), with laboratory acid-etching allowing forensic investigators a chance to recover original serials.
 
 - [ ] **Feature: Commercial Money Laundering & Subpoena Ledger Auditing (`nyx_factions` & `nyx_treasury`)**
@@ -107,6 +107,109 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-18] Feature: Weapon Serial Number Grinding & Acid-Etch Forensics (`nyx_inventory` & `nyx_judiciary`)**
+  - **Database Migrations (`050_weapon_serial_grinding_and_acid_etch_forensics.sql`)**:
+    - Created migration file and registered Step 50 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Mirrored migration to `FiveM/nyx_inventory/sql/migrations/` and `FiveM/nyx_judiciary/sql/migrations/`.
+    - Extended `nyx_judiciary_evidence.type` ENUM with `'weapon'`.
+    - Created `nyx_inventory_ground_weapons` registry table storing original factory serials, obfuscated scratched states, grind qualities, technician citizen IDs, and restoration timestamps.
+    - Created `nyx_judiciary_acid_etch_audits` immutable audit ledger with indexes on `weapon_uuid`, `technician_citizen_id`, `outcome`, and `created_at`.
+  - **Item Registry Integration (`FiveM/nyx_inventory/shared/items.lua`)**:
+    - Registered `tool_angle_grinder` (High-Speed Cordless Angle Grinder, 3200g, decayRate 0.03, tool type).
+    - Registered `grinding_disk` (Abrasive Metal Grinding Disk 4.5in, 200g, stackable up to 10, utility type).
+    - Registered `acid_etch_kit` (Forensic Acid-Etch Chemical Kit with Fry's reagent, 1200g, stackable up to 5, tool type).
+    - Extended `CreateDefaultMetadata` to auto-populate `toolSerial` (`GRD-%06d`) and `striations` (`STR-GRD-%04d`) for angle grinders, and `lotNumber` (`ETCH-LOT-%05d`) and `usesRemaining` (5 uses) for acid etch kits.
+  - **Shared Pure Lua 5.4 Domain Engines**:
+    - `FiveM/nyx_inventory/shared/serial_grind.lua`: Declarative grinder profile (`tool_angle_grinder`), pure validation helper (`CanGrindWeapon`), mathematical grinding evaluator (`CalculateGrindOutcome`), glove immunity against latent fingerprints, laceration risk/DNA hazards, toolmark striation generation, and display formatter (`FormatSerialDisplay`).
+    - `FiveM/nyx_judiciary/shared/acid_etch.lua`: Certified chemistry config (Fry's reagent, certified lab locations), pure validation helper (`CanEtchWeapon`), deterministic Fisher-Yates partial character serial masking algorithm (`MaskSerial`), metallurgical restoration curve calculator (`CalculateEtchOutcome`), and certified laboratory report generator (`FormatLabReport`).
+  - **Authoritative Server Subsystems & RPCs**:
+    - `FiveM/nyx_inventory/server/grinder.lua`: Authoritative `inventory:grindWeaponSerial` RPC and `GrindWeaponSerial` export, validating inventory locks, tool wear, disk consumption, mutating weapon metadata (`scratched = true`, `originalSerial`, `[GROUND OFF]`), logging to `nyx_inventory_ground_weapons`, depositing forensic toolmarks/fingerprints/DNA into `nyx_judiciary`, and broadcasting acoustic grinding whine & spark effects.
+    - `FiveM/nyx_judiciary/server/acid_etch.lua`: Authoritative `judiciary:acidEtchWeapon` and `judiciary:getAcidEtchHistory` RPCs and `AcidEtchWeapon`, `GetAcidEtchRecord`, `CrossReferenceEtchedSerialWithCasings` exports, verifying certified lab proximity, deducting chemical reagent uses, querying cold-case ballistic casings matching the original serial in `nyx_judiciary_evidence`, computing cryptographic SHA-256 report hashes, and committing audits to `nyx_judiciary_acid_etch_audits`.
+  - **Client Implementations & Interactions**:
+    - `FiveM/nyx_inventory/client/grinder.lua`: Grinding audiovisuals, looped sparks particle FX (`core`, `ent_amb_sparking_wires`), mechanic animation, camera shake, `/grindserial` player command, and export `StartGrind`.
+    - `FiveM/nyx_judiciary/client/acid_etch.lua`: Chemical pipette/swab animation, rich multi-line forensic metallurgical result notifications, confirmation sounds for cold case ballistic hits, `/acidetch` player command, and export `StartAcidEtching`.
+  - **Manifests & Verification**:
+    - Updated `fxmanifest.lua` in both `nyx_inventory` and `nyx_judiciary` declaring all shared, server, and client scripts.
+    - Added in-engine integration test Test 45 (`Nyx.Tests.TestWeaponSerialGrindingAndAcidEtchForensics`) to `FiveM/nyx_core/server/tests.lua` and wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_weapon_serial_grinding_and_acid_etch_forensics.py` (10/10 tests passing).
+    - Full pytest suite: 408/408 passed (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 248 Lua files, 50 migrations (100% clean).
+
+- **[2026-10-18] Feature: Sealed Industrial Pallet Breaching & Forensic Contamination (`nyx_logistics` & `nyx_judiciary`)**
+  - **Database Migration (`049_sealed_pallet_breaching_and_forensic_contamination.sql`, `index.json`)**:
+    - Extended `nyx_judiciary_evidence` type ENUM with `'toolmark'` for mechanical scratch and tool striation analysis.
+    - Extended `nyx_logistics_pallets` with tamper tracking and serialized seal columns: `is_tampered` (TINYINT default 0), `seal_serial` (VARCHAR(32)), `sealed_at` (TIMESTAMP), `sealed_by_citizen_id` (VARCHAR(64)), `breached_at` (TIMESTAMP), `breached_by_citizen_id` (VARCHAR(64)), `tamper_tool` (VARCHAR(32)), and `forensic_evidence_ids` (JSON).
+    - Created `nyx_logistics_pallet_breach_audits` immutable audit ledger (`audit_id` PK, `audit_uuid` UNIQUE, `pallet_id`, `citizen_id`, `tool_used`, `tool_serial`, `success`, `alarm_triggered`, `dna_left`, `fingerprint_left`, `toolmark_left`, `evidence_hashes`, `coords`, `notes`, `created_at`) with B-tree indexes on `pallet_id`, `citizen_id`, `tool_used`, and `created_at`.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 49) and mirrored to `FiveM/nyx_logistics/sql/migrations/` and `FiveM/nyx_judiciary/sql/migrations/`.
+  - **Item Registry Integration (`nyx_inventory/shared/items.lua`)**:
+    - Registered `tool_crowbar` (Heavy Forged Crowbar, 2500g, decayRate 0.04, hardened high-carbon steel wrecking bar).
+    - Registered `tamper_seal` (Serialized Tamper Seal, 50g, stackable up to 20, utility compound for locking heavy freight pallets).
+    - Updated `CreateDefaultMetadata` to auto-populate `toolSerial` (`CRW-%06d`) and `striations` for crowbars, and `sealSerial` (`SEAL-%07d`) and `sealedAt` for tamper seals.
+  - **Shared Pure Lua 5.4 Domain Engine (`nyx_logistics/shared/pallets.lua`)**:
+    - Implemented `Nyx.Pallets.BreachTools` specifying base success rates, wear per attempt, acoustic noise radius, laceration risk, laceration damage, fingerprint risk, and alarm trip rates for `tool_crowbar`, `weapon_crowbar`, and `tool_lockpick`.
+    - Implemented `Nyx.Pallets.CalculateBreachOutcome`: pure deterministic/stochastic evaluator computing success rolls, tool wear deductions, breakage clamping, latent fingerprint risk, glove immunity, biological DNA laceration hazards, acoustic noise propagation, and facility alarm trips.
+    - Implemented pure Lua 5.4 SHA-256 hasher `Nyx.Pallets.Sha256` and deterministic toolmark striation generator `Nyx.Pallets.DetermineToolmarkHash`.
+    - Implemented `Nyx.Pallets.GenerateSealSerial` formatting unique tamper seal codes (`SEAL-PLT-XXXX`).
+    - Implemented zero-trust `ValidateBreachPayload` and visual security badge formatter `FormatPalletStatusBadge`.
+  - **Judiciary Forensics Extension (`nyx_judiciary/server/evidence.lua`, `server/exports.lua`)**:
+    - Implemented `Nyx.Judiciary.RegisterToolmarkEvent` generating UUIDs, salts, and deterministic SHA-256 striation hashes (`TOOLMARK:<toolSerial>:<citizenId>:<coords>:<salt>`), streaming clues to client forensic personnel.
+    - Updated `VerifyChainOfCustody` and `VerifyEvidence` to verify `toolmark` cryptographic evidence authenticity.
+    - Exported `RegisterToolmarkEvent` in `FiveM/nyx_judiciary/server/exports.lua`.
+  - **Authoritative Server Subsystem & RPCs (`nyx_logistics/server/pallets.lua`, `server/exports.lua`)**:
+    - Hydrated tamper columns (`is_tampered`, `seal_serial`, `breached_at`, `breached_by_citizen_id`, `tamper_tool`, `forensic_evidence_ids`) on server startup.
+    - Updated `SealPallet` to generate unique serialized seals (`SEAL-...`), persist seal timestamp and actor, and broadcast updates to clients.
+    - Implemented `Nyx.Logistics.BreachPallet`: verifies player proximity, checks tool possession, computes outcome with `CalculateBreachOutcome`, deducts tool durability / handles breakage, registers forensic toolmark striations and latent fingerprints/DNA in `nyx_judiciary`, triggers MDT police dispatch call (`10-31 Cargo Tamper`) if alarms trip, commits to `nyx_logistics_pallet_breach_audits`, and broadcasts audiovisual breach event.
+    - Implemented `Nyx.Logistics.InspectPalletForensics` allowing investigators to examine severed seals, toolmark striations, and forensic contamination markers.
+    - Registered RPC endpoints: `logistics:breachPallet` and `logistics:inspectPalletForensics`.
+    - Exported public APIs in `FiveM/nyx_logistics/server/exports.lua`: `BreachPallet`, `InspectPalletForensics`, and `GetPalletForensics`.
+  - **Client-Side Subsystem & Third-Eye Interaction (`nyx_logistics/client/pallets.lua`, `client/exports.lua`)**:
+    - Added Third-Eye target option "Plomba Kifeszítése (Feszítővas)" with realistic crowbar prying animation (`melee@crowbar@streamed_core`), progress timing, and server RPC synchronization.
+    - Added Third-Eye target option "Bűnügyi Helyszínelés / Nyomelemzés" displaying forensic investigation findings in chat.
+    - Added event listener `nyx:logistics:client:palletBreached` playing metallic snap and wood splintering sound with camera shake.
+    - Registered player commands: `/breachpallet` and `/inspectpallet`.
+    - Exported `BreachPallet` and `InspectPalletForensics` in `FiveM/nyx_logistics/client/exports.lua`.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestSealedPalletBreachingAndForensicContamination()` (Test 44) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_sealed_pallet_breaching_and_forensic_contamination.py` with 11 test cases covering migration 049 schema, inventory item registrations, manifest declarations, tool profiles, outcome math, glove immunity, biological laceration hazards, deterministic toolmark hashing, seal serial generation, zero-trust validation, and in-engine registration (11/11 passing).
+    - Full pytest suite: 398/398 tests passing (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 242 Lua files, 49 migrations, 100% clean verification.
+- **[2026-10-18] Feature: Substation Physical Sabotage, Alarm Breaches & Blackout Raids (`nyx_services` & `nyx_properties`)**
+  - **Database Migration (`048_substation_sabotage_and_blackout_raids.sql`, `index.json`)**:
+    - Extended `nyx_services_substations` with physical sabotage tracking columns: `is_sabotaged` (TINYINT default 0), `last_sabotaged_at` (TIMESTAMP NULL), and `sabotage_cooldown_until` (TIMESTAMP NULL).
+    - Created `nyx_services_substation_sabotage_logs` table (`sabotage_id` PK, `sabotage_uuid` UNIQUE, `substation_id`, `saboteur_citizen_id`, `tool_used`, `success`, `alarm_triggered`, `shock_injury_inflicted`, `police_alerted`, `coords`, `notes`, `created_at`) with cascading foreign keys to `nyx_services_substations`.
+    - Extended `nyx_properties` and `nyx_logistics_warehouses` with security alarms and backup power generators: `has_alarm` (TINYINT default 1), `has_backup_generator` (TINYINT default 0), and `alarm_status` (ENUM('armed', 'tripped', 'offline', 'disabled') default 'armed').
+    - Extended `nyx_property_audit` action enum with `'BLACKOUT_BREACH'` and `'ALARM_BREACH'`.
+    - Registered migration in `FiveM/nyx_core/sql/migrations/index.json` (Step 48) and mirrored to `FiveM/nyx_services/sql/migrations/` and `FiveM/nyx_properties/sql/migrations/`.
+  - **Item Registry Integration (`nyx_inventory/shared/items.lua`)**:
+    - Registered `wire_cutters` (Insulated Wire Cutters, 800g, decayRate 0.05, tool for severing high-voltage conduits).
+    - Registered `thermite_charge` (Thermite Incendiary Charge, 1500g, stackable utility compound consumed on transformer breach).
+  - **Shared Pure Lua 5.4 Domain Engine (`nyx_services/shared/sabotage.lua`, `fxmanifest.lua`)**:
+    - Implemented `Nyx.Sabotage.ToolProfiles` specifying base success rates, shock electrocution chances, shock damage, durability loss, alarm trip rates, cooldowns, and acoustic noise radii for `wire_cutters`, `thermite_charge`, and `tool_repairkit`.
+    - Implemented `Nyx.Sabotage.CalculateSabotageOutcome`: models deterministic and stochastic tool outcomes, electrician trade union buffs, and forensic rubber glove shock immunity.
+    - Implemented `Nyx.Sabotage.EvaluateDoorlockState`: models electronic magnetic lock (maglock) fail-safe behavior; commercial and industrial properties de-energize and unlock during sector blackouts (`BLACKOUT_BREACHED`), residential mechanical deadbolts hold physical resistance (`MECHANICAL_LOCKED`), and auxiliary backup generators maintain power (`BACKUP_POWER`).
+    - Implemented `Nyx.Sabotage.EvaluateWarehouseLockState`: commercial warehouse doors de-energize during localized power outages, enabling unauthorized blackout raid entry.
+    - Implemented `Nyx.Sabotage.EvaluateAlarmStatus`: models siren and cellular transmitter power loss during grid outages, silencing alarms unless backed by auxiliary generator.
+    - Implemented `Nyx.Sabotage.ValidateSabotagePayload`, `FormatLockStateBadge`, `FormatAlarmBadge`, and `FormatSabotageBadge`.
+    - Declared `shared/sabotage.lua` in `FiveM/nyx_services/fxmanifest.lua` and `@nyx_services/shared/sabotage.lua` in `FiveM/nyx_properties/fxmanifest.lua`.
+  - **Authoritative Server Subsystem & Cross-Resource Interop (`nyx_services/server/sabotage.lua`, `server/powergrid.lua`, `server/exports.lua`, `nyx_properties/server/main.lua`, `server/locks.lua`, `nyx_logistics/server/warehouses.lua`)**:
+    - Implemented `Nyx.Services.SabotageSubstation`: server-authoritative proximity verification ($d \le 6.0$m to transformer), active cooldown verification, tool inventory consumption, high-voltage limb shock injury handling, automatic 911 dispatch notification to `nyx_mdt` (`10-90` Grid Sabotage Alarm), sector blackout cascade trigger, and immutable database event audit logging.
+    - Implemented `Nyx.Services.GetSabotageStatus` and `GetSabotageLogs` with RPCs: `services:sabotageSubstation`, `services:getSabotageStatus`, and `services:getSabotageLogs`.
+    - Updated `powergrid.lua` hydration and state evaluators: persists and exposes `isSabotaged`, and clears sabotage flags upon physical turbine restoration.
+    - Updated `nyx_properties/server/main.lua`: checks sector power status on property entrance; during blackout, commercial/industrial maglocks unlock, allowing unkeyed entry, logging `BLACKOUT_BREACH` to `nyx_property_audit`, and tripping alarms if backup power is present.
+    - Updated `nyx_properties/server/locks.lua`: blocks toggling commercial/industrial locks if grid power is dead and property lacks backup generator.
+    - Updated `nyx_logistics/server/warehouses.lua`: commercial warehouse doorlocks bypass when power grid sector fails.
+  - **Client-Side Subsystem & Interactions (`nyx_services/client/sabotage.lua`, `client/substations.lua`, `client/exports.lua`)**:
+    - Registered Third-Eye (LALT) target option on all regional substation transformers: `Sabotage Transformer`.
+    - Implemented interactive cutting/wiring mechanic animation (`anim@amb@clubhouse@tutorial@bkr_tut_ig3@`), progress timing, and server RPC synchronization.
+    - Implemented localized electrical arc explosion sound and spark particle FX (`sparks`) with screen camera shake on ground zero.
+    - Registered player commands: `/sabotage` and `/sabotagesubstation`.
+    - Exported `GetNearestTransformer` and `IsSabotaging` in `FiveM/nyx_services/client/exports.lua`.
+  - **Testing & Verification**:
+    - Added in-engine integration test suite `Nyx.Tests.TestSubstationSabotageAndBlackoutRaids()` (Test 43) in `FiveM/nyx_core/server/tests.lua`, wired into `RunAll()`.
+    - Created dedicated pytest suite `tests/test_substation_sabotage_and_blackout_raids.py` with 10 test cases covering migration 048 schema, item registry, manifest declarations, tool profiles, outcome math, rubber glove shock immunity, maglock fail-open behavior, warehouse blackout bypass, alarm degradation, zero-trust validation, and in-engine registration (10/10 passing).
+    - Full pytest suite: 387/387 tests passing (100% pass rate).
+    - `python scripts/validator.py` and `powershell -File scripts/verify.ps1`: 14 resources, 242 Lua files, 48 migrations, 100% clean verification.
+
 - **[2026-10-18] Feature: Investigative Press Leaks, Dropbox Whistleblowing & Subscriptions (`nyx_press` & `nyx_treasury`)**
   - **Database Migrations (`032_press_media_whistleblower_and_print_circulation.sql`, `047_press_subscriptions_and_whistleblower_escrow.sql`, `index.json`)**:
     - Created `nyx_press_outlets` table (`outlet_id` PK, `faction_id`, `name`, `license_status`, `accredited_union_id`, `press_coords`, `print_cost_per_copy`, `cover_price_default`, `revenue_balance`, `created_at`) managing registered publishing houses.

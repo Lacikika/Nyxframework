@@ -121,14 +121,38 @@ RegisterNetEvent("nyx:logistics:client:palletDetached", function(data)
     end
 end)
 
-RegisterNetEvent("nyx:logistics:client:palletSealUpdated", function(palletId, isSealed)
+RegisterNetEvent("nyx:logistics:client:palletSealUpdated", function(palletId, isSealed, sealSerial)
     local pallet = Nyx.Logistics.ClientPalletState[palletId]
     if pallet then
         pallet.is_sealed = isSealed
+        if sealSerial then
+            pallet.seal_serial = sealSerial
+        end
     end
 
-    local msg = isSealed and "Raklap zárolva és plombálva a szállításhoz." or "Raklap plomba feltörve, rakomány hozzáférhető."
+    local msg = isSealed and "Raklap zárolva és plombálva a szállításhoz." or "Raklap plomba felnyitva, rakomány hozzáférhető."
     TriggerEvent("nyx:core:client:notify", msg, "info")
+end)
+
+RegisterNetEvent("nyx:logistics:client:palletBreached", function(data)
+    if not data or not data.palletId then return end
+    local pallet = Nyx.Logistics.ClientPalletState[data.palletId]
+    if pallet then
+        pallet.is_sealed = false
+        pallet.is_tampered = true
+    end
+
+    local ped = PlayerPedId()
+    local pCoords = GetEntityCoords(ped)
+    if data.coords then
+        local dist = #(pCoords - vector3(data.coords.x, data.coords.y, data.coords.z))
+        if dist <= 30.0 then
+            PlaySoundFrontend(-1, "Wood_Snap", "HUD_AWARDS", true)
+            if dist <= 8.0 then
+                ShakeGameplayCam("SMALL_EXPLOSION_SHAKE", 0.15)
+            end
+        end
+    end
 end)
 
 -- 5. Third-Eye (LALT) Raycast Integration on Freight Pallets
@@ -274,8 +298,8 @@ CreateThread(function()
                     end
                 },
                 {
-                    label = "Plomba Feltörése",
-                    icon = "fa-solid fa-lock-open",
+                    label = "Plomba Kifeszítése (Feszítővas)",
+                    icon = "fa-solid fa-screwdriver-wrench",
                     canInteract = function(entity)
                         local palletId = Entity(entity).state.palletId
                         local p = palletId and Nyx.Logistics.ClientPalletState[palletId]
@@ -283,8 +307,68 @@ CreateThread(function()
                     end,
                     action = function(entity)
                         local palletId = Entity(entity).state.palletId
-                        if palletId then
-                            exports['nyx_core']:TriggerRPCAwait("logistics:unsealPallet", palletId)
+                        if not palletId then return end
+
+                        local ped = PlayerPedId()
+                        local dict = "melee@crowbar@streamed_core"
+                        RequestAnimDict(dict)
+                        local timeout = 0
+                        while not HasAnimDictLoaded(dict) and timeout < 20 do
+                            Wait(50)
+                            timeout = timeout + 1
+                        end
+
+                        TaskPlayAnim(ped, dict, "attack_heavy", 8.0, -8.0, 3000, 49, 0, false, false, false)
+                        TriggerEvent("nyx:core:client:notify", "Biztonsági acélpánt feszítése...", "info")
+                        Wait(3000)
+                        ClearPedTasks(ped)
+
+                        local pCoords = GetEntityCoords(ped)
+                        local res = exports['nyx_core']:TriggerRPCAwait("logistics:breachPallet", {
+                            palletId = palletId,
+                            toolItem = "tool_crowbar",
+                            coords = { x = pCoords.x, y = pCoords.y, z = pCoords.z }
+                        })
+
+                        if res and res.success then
+                            TriggerEvent("nyx:core:client:notify", "A raklap plomba sikeresen felfeszítve! Acélpántok elpattantak.", "success")
+                        else
+                            TriggerEvent("nyx:core:client:notify", "Felfeszítés meghiúsult: " .. tostring(res and res.error or "Hiba"), "error")
+                        end
+                    end
+                },
+                {
+                    label = "Bűnügyi Helyszínelés / Nyomelemzés",
+                    icon = "fa-solid fa-fingerprint",
+                    canInteract = function(entity)
+                        local palletId = Entity(entity).state.palletId
+                        local p = palletId and Nyx.Logistics.ClientPalletState[palletId]
+                        return (p and (p.is_tampered == true or p.is_sealed == false))
+                    end,
+                    action = function(entity)
+                        local palletId = Entity(entity).state.palletId
+                        if not palletId then return end
+
+                        local res = exports['nyx_core']:TriggerRPCAwait("logistics:inspectPalletForensics", palletId)
+                        if res and res.success and res.data then
+                            local f = res.data
+                            local tamperedText = f.isTampered and "^1ERŐSZAKOSAN FELTÖRVE^7" or "^2ÉP^7"
+                            local sealText = f.sealSerial or "NINCS"
+                            local markers = f.evidenceMarkers or {}
+                            TriggerEvent("chat:addMessage", {
+                                color = { 0, 180, 255 },
+                                multiline = true,
+                                args = { "Bűnügyi Helyszínelés", string.format("Raklap: %s | Állapot: %s | Plomba: %s | Rögzített nyomok: %d",
+                                    f.palletId, tamperedText, sealText, #markers) }
+                            })
+                            for _, ev in ipairs(markers) do
+                                TriggerEvent("chat:addMessage", {
+                                    color = { 255, 200, 50 },
+                                    args = { "Nyomjelző", string.format("Típus: %s | Hash: %s", string.upper(ev.type or "ISMERETLEN"), string.sub(ev.hash or "", 1, 16)) }
+                                })
+                            end
+                        else
+                            TriggerEvent("nyx:core:client:notify", "Nem található vizsgálati eredmény ezen a raklapon.", "info")
                         end
                     end
                 }
@@ -303,3 +387,90 @@ AddEventHandler("onResourceStop", function(resourceName)
         end
     end
 end)
+
+-- 7. Commands for Pallet Breach and Forensic Inspection
+RegisterCommand("breachpallet", function(source, args)
+    local ped = PlayerPedId()
+    local pCoords = GetEntityCoords(ped)
+    local closestPalletId = nil
+    local closestDist = 5.0
+
+    for id, p in pairs(Nyx.Logistics.ClientPalletState) do
+        if p.coords then
+            local d = #(pCoords - vector3(p.coords.x, p.coords.y, p.coords.z))
+            if d < closestDist then
+                closestDist = d
+                closestPalletId = id
+            end
+        end
+    end
+
+    if not closestPalletId then
+        TriggerEvent("nyx:core:client:notify", "Nincs leplombált raklap a közeledben (5m)!", "error")
+        return
+    end
+
+    local dict = "melee@crowbar@streamed_core"
+    RequestAnimDict(dict)
+    local timeout = 0
+    while not HasAnimDictLoaded(dict) and timeout < 20 do
+        Wait(50)
+        timeout = timeout + 1
+    end
+
+    TaskPlayAnim(ped, dict, "attack_heavy", 8.0, -8.0, 3000, 49, 0, false, false, false)
+    TriggerEvent("nyx:core:client:notify", "Biztonsági acélpánt feszítése feszítővassal...", "info")
+    Wait(3000)
+    ClearPedTasks(ped)
+
+    local res = exports['nyx_core']:TriggerRPCAwait("logistics:breachPallet", {
+        palletId = closestPalletId,
+        toolItem = "tool_crowbar",
+        coords = { x = pCoords.x, y = pCoords.y, z = pCoords.z }
+    })
+
+    if res and res.success then
+        TriggerEvent("nyx:core:client:notify", "A raklap plomba sikeresen feltörve!", "success")
+    else
+        TriggerEvent("nyx:core:client:notify", "Feltörés meghiúsult: " .. tostring(res and res.error or "Hiba"), "error")
+    end
+end, false)
+
+RegisterCommand("inspectpallet", function(source, args)
+    local ped = PlayerPedId()
+    local pCoords = GetEntityCoords(ped)
+    local closestPalletId = nil
+    local closestDist = 5.0
+
+    for id, p in pairs(Nyx.Logistics.ClientPalletState) do
+        if p.coords then
+            local d = #(pCoords - vector3(p.coords.x, p.coords.y, p.coords.z))
+            if d < closestDist then
+                closestDist = d
+                closestPalletId = id
+            end
+        end
+    end
+
+    if not closestPalletId then
+        TriggerEvent("nyx:core:client:notify", "Nincs raklap a közeledben (5m)!", "error")
+        return
+    end
+
+    local res = exports['nyx_core']:TriggerRPCAwait("logistics:inspectPalletForensics", closestPalletId)
+    if res and res.success and res.data then
+        local f = res.data
+        local tamperedText = f.isTampered and "^1ERŐSZAKOSAN FELTÖRVE^7" or "^2ÉP^7"
+        local sealText = f.sealSerial or "NINCS"
+        local markers = f.evidenceMarkers or {}
+        TriggerEvent("chat:addMessage", {
+            color = { 0, 180, 255 },
+            multiline = true,
+            args = { "Helyszínelés", string.format("Raklap: %s | Állapot: %s | Plomba kód: %s | Nyomok száma: %d",
+                f.palletId, tamperedText, sealText, #markers) }
+        })
+    else
+        TriggerEvent("nyx:core:client:notify", "Nem található raklap adat.", "error")
+    end
+end, false)
+

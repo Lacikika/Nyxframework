@@ -17,7 +17,8 @@ shared_scripts {
     'shared/jury.lua',
     'shared/warrants.lua',
     'shared/courtroom_ui.lua',
-    'shared/penal_labor.lua'
+    'shared/penal_labor.lua',
+    'shared/acid_etch.lua'
 }
 
 server_scripts {
@@ -28,6 +29,7 @@ server_scripts {
     'server/jury.lua',
     'server/execution.lua',
     'server/penal_labor.lua',
+    'server/acid_etch.lua',
     'server/main.lua',
     'server/exports.lua'
 }
@@ -36,6 +38,7 @@ client_scripts {
     'client/forensics.lua',
     'client/courtroom.lua',
     'client/penal_labor.lua',
+    'client/acid_etch.lua',
     'client/main.lua',
     'client/exports.lua'
 }

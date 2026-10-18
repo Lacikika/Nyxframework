@@ -19,6 +19,10 @@ exports("RegisterFingerprintEvent", function(src, surfaceDesc, coords)
     return Nyx.Judiciary.RegisterFingerprintEvent(src, surfaceDesc, coords)
 end)
 
+exports("RegisterToolmarkEvent", function(src, toolName, surfaceDesc, coords, toolSerial)
+    return Nyx.Judiciary.RegisterToolmarkEvent(src, toolName, surfaceDesc, coords, toolSerial)
+end)
+
 -- Evidence Collection & Verification
 exports("CollectEvidence", function(src, evidenceId, useGloves)
     return Nyx.Judiciary.CollectEvidence(src, evidenceId, useGloves)
@@ -217,4 +221,30 @@ end)
 exports("GetPenalLaborLogs", function(citizenId, limit)
     return Nyx.Judiciary.GetPenalLaborLogs(citizenId, limit)
 end)
+
+-- Forensic Chemical Acid-Etching & Cold-Case Analysis
+exports("AcidEtchWeapon", function(src, weaponSlot, kitSlot, invId)
+    if Nyx.AcidEtch and Nyx.AcidEtch.ExecuteEtch then
+        return Nyx.AcidEtch.ExecuteEtch(src, weaponSlot, kitSlot, invId)
+    end
+    return false, "SYSTEM_UNAVAILABLE"
+end)
+
+exports("GetAcidEtchRecord", function(serialOrUuid)
+    if not serialOrUuid then return nil end
+    local row = MySQL.Sync.fetchAll([[
+        SELECT * FROM `nyx_judiciary_acid_etch_audits`
+        WHERE `weapon_uuid` = ? OR `original_serial` = ? OR `restored_serial` = ?
+        ORDER BY `created_at` DESC LIMIT 1
+    ]], { serialOrUuid, serialOrUuid, serialOrUuid })
+    return row and row[1] or nil
+end)
+
+exports("CrossReferenceEtchedSerialWithCasings", function(serial)
+    if Nyx.AcidEtch and Nyx.AcidEtch.FindBallisticsMatches then
+        return Nyx.AcidEtch.FindBallisticsMatches(serial)
+    end
+    return {}
+end)
+
 

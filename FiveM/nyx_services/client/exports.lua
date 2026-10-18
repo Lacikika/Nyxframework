@@ -27,3 +27,11 @@ end)
 exports("IsHarvestingCrop", function()
     return Nyx.Services and Nyx.Services.IsHarvesting and Nyx.Services.IsHarvesting() or false
 end)
+
+exports("GetNearestTransformer", function(maxDist)
+    return Nyx.Services and Nyx.Services.GetNearestTransformer and Nyx.Services.GetNearestTransformer(maxDist)
+end)
+
+exports("IsSabotaging", function()
+    return isSabotaging or false
+end)

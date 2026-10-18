@@ -177,3 +177,34 @@ end)
 exports("RecordFoodAudit", function(action, sourceId, targetInvId, itemId, quantity, durability, isSpoiled, citizenId, notes)
     return Nyx.Services.RecordFoodAudit(action, sourceId, targetInvId, itemId, quantity, durability, isSpoiled, citizenId, notes)
 end)
+
+-- Substation Sabotage & Security Locks
+exports("SabotageSubstation", function(src, substationId, toolName)
+    return Nyx.Services.SabotageSubstation(src, substationId, toolName)
+end)
+
+exports("GetSabotageStatus", function(substationId)
+    return Nyx.Services.GetSabotageStatus(substationId)
+end)
+
+exports("GetSabotageLogs", function(substationId, limit)
+    return Nyx.Services.GetSabotageLogs(substationId, limit)
+end)
+
+exports("IsSubstationSabotaged", function(substationId)
+    local s = Nyx.Services.GetSubstation(substationId)
+    return s and s.isSabotaged or false
+end)
+
+exports("EvaluateDoorlockState", function(propertyType, isLocked, isPowered, hasBackupGen)
+    return Nyx.Sabotage.EvaluateDoorlockState(propertyType, isLocked, isPowered, hasBackupGen)
+end)
+
+exports("EvaluateWarehouseLockState", function(isLocked, isPowered, hasBackupGen)
+    return Nyx.Sabotage.EvaluateWarehouseLockState(isLocked, isPowered, hasBackupGen)
+end)
+
+exports("EvaluateAlarmStatus", function(hasAlarm, isPowered, hasBackupGen, isDoorBreached)
+    return Nyx.Sabotage.EvaluateAlarmStatus(hasAlarm, isPowered, hasBackupGen, isDoorBreached)
+end)
+

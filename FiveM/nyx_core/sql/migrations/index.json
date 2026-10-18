@@ -45,5 +45,8 @@
   "044_vehicle_keys_rfid_and_lockpicking_forensics.sql",
   "045_penal_labor_processing_and_sentence_reductions.sql",
   "046_agricultural_extraction_milling_and_perishable_food_logistics.sql",
-  "047_press_subscriptions_and_whistleblower_escrow.sql"
+  "047_press_subscriptions_and_whistleblower_escrow.sql",
+  "048_substation_sabotage_and_blackout_raids.sql",
+  "049_sealed_pallet_breaching_and_forensic_contamination.sql",
+  "050_weapon_serial_grinding_and_acid_etch_forensics.sql"
 ]

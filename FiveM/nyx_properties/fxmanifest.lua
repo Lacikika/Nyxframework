@@ -16,6 +16,7 @@ description 'Authoritative Real Estate, Progressive Millage Taxes, Land Maintena
 version '1.1.0'
 
 shared_scripts {
+    '@nyx_services/shared/sabotage.lua',
     'config.lua',
     'shared/taxation.lua',
     'shared/inactivity.lua',

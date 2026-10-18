@@ -24,6 +24,7 @@ local function syncGlobalGridState()
             breakerTripped = s.breakerTripped,
             failureReason = s.failureReason,
             peakLoadMw = s.peakLoadMw,
+            isSabotaged = s.isSabotaged or false,
             coords = { x = s.coords.x, y = s.coords.y, z = s.coords.z },
             radius = s.radius
         }
@@ -41,6 +42,7 @@ local function syncGlobalGridState()
     GlobalState.blackoutZones = blackouts
     GlobalState.substations = summary
 end
+Nyx.Services.SyncGlobalGridState = syncGlobalGridState
 
 -- Check and dispatch emergency logistics hauling contracts when reserves hit critical
 local function checkEmergencyLogisticsContracts(s)
@@ -187,6 +189,9 @@ function Nyx.Services.HydrateSubstationRecord(subId, dbRow, cfgSub)
         peakLoadMw = peakMw,
         breakerTripped = breakerTripped,
         totalBlackoutsCount = totalBlackouts,
+        isSabotaged = (dbRow and tonumber(dbRow.is_sabotaged) == 1) or false,
+        lastSabotagedAt = dbRow and dbRow.last_sabotaged_at,
+        sabotageCooldownUntil = dbRow and dbRow.sabotage_cooldown_until,
         coords = vecCoords,
         radius = radius,
         transformerCoords = tCoords,
@@ -345,6 +350,7 @@ local function evaluateSubstationState(s, triggerAuditLog)
     elseif not shouldBlackout and s.isBlackout then
         s.isBlackout = false
         s.breakerTripped = false
+        s.isSabotaged = false
         local prevReason = s.failureReason
         s.failureReason = nil
         s.blackoutStartedAt = nil
@@ -355,7 +361,8 @@ local function evaluateSubstationState(s, triggerAuditLog)
             SET `is_blackout` = 0,
                 `failure_reason` = NULL,
                 `blackout_started_at` = NULL,
-                `breaker_tripped` = 0
+                `breaker_tripped` = 0,
+                `is_sabotaged` = 0
             WHERE `substation_id` = ?
         ]], { s.id })
 
@@ -384,6 +391,7 @@ local function evaluateSubstationState(s, triggerAuditLog)
             s.id, s.fuelLevel, s.conditionHealth))
     end
 end
+Nyx.Services.EvaluateSubstationState = evaluateSubstationState
 
 -- 3. Background Power Grid Consumption Tick (Runs every 60 seconds)
 function Nyx.Services.PowerGridTick()
@@ -605,6 +613,15 @@ function Nyx.Services.RepairSubstation(src, substationId)
     if s.failureReason == "mechanical_breakdown" and s.fuelLevel > (Config.PowerGrid.BlackoutFuelThreshold or 0.00) then
         s.breakerTripped = false
         s.failureReason = nil
+    end
+
+    -- If failure was sabotage and condition health is repaired above threshold, clear sabotage
+    if s.isSabotaged and s.conditionHealth > (Config.PowerGrid.BlackoutHealthThreshold or 10.00) then
+        s.isSabotaged = false
+        if s.failureReason == "sabotage" and s.fuelLevel > (Config.PowerGrid.BlackoutFuelThreshold or 0.00) then
+            s.breakerTripped = false
+            s.failureReason = nil
+        end
     end
 
     evaluateSubstationState(s, true)

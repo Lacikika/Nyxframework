@@ -18,12 +18,14 @@ shared_scripts {
     'config.lua',
     'shared/trauma.lua',
     'shared/medical.lua',
-    'shared/agriculture.lua'
+    'shared/agriculture.lua',
+    'shared/sabotage.lua'
 }
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/powergrid.lua',
+    'server/sabotage.lua',
     'server/billing.lua',
     'server/medical.lua',
     'server/trauma.lua',
@@ -36,6 +38,7 @@ server_scripts {
 client_scripts {
     'client/blackout.lua',
     'client/substations.lua',
+    'client/sabotage.lua',
     'client/repair_stations.lua',
     'client/trauma.lua',
     'client/agriculture.lua',

@@ -99,6 +99,23 @@ CreateThread(function()
             },
             distance = 3.0
         })
+
+        if sub.transformerCoords then
+            exports['nyx_interact']:AddTargetCoords("substation_transformer_" .. subId, sub.transformerCoords, 3.0, {
+                options = {
+                    {
+                        icon = "fa-solid fa-bolt-lightning",
+                        label = "Sabotage Transformer (" .. (sub.label or "Substation") .. ")",
+                        event = "nyx:services:client:sabotageTransformer",
+                        args = { subId = subId },
+                        canInteract = function(entity, dist)
+                            return dist <= 3.0
+                        end
+                    }
+                },
+                distance = 3.0
+            })
+        end
     end
 end)
 

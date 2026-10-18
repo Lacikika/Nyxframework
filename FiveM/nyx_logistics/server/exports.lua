@@ -81,6 +81,29 @@ exports("UnsealPallet", function(src, palletId)
     return Nyx.Logistics.UnsealPallet(src, palletId)
 end)
 
+exports("BreachPallet", function(src, palletId, toolItem)
+    return Nyx.Logistics.BreachPallet(src, palletId, toolItem)
+end)
+
+exports("InspectPalletForensics", function(src, palletId)
+    return Nyx.Logistics.InspectPalletForensics(src, palletId)
+end)
+
+exports("GetPalletForensics", function(palletId)
+    local pallet = Nyx.Logistics.Pallets and Nyx.Logistics.Pallets[palletId]
+    if not pallet then return nil end
+    return {
+        palletId = pallet.id,
+        isSealed = pallet.is_sealed,
+        isTampered = pallet.is_tampered,
+        sealSerial = pallet.seal_serial,
+        tamperTool = pallet.tamper_tool,
+        breachedAt = pallet.breached_at,
+        breachedBy = pallet.breached_by_citizen_id,
+        evidenceMarkers = pallet.forensic_evidence_ids or {}
+    }
+end)
+
 exports("GetPallet", function(palletId)
     return Nyx.Logistics.GetPallet(palletId)
 end)

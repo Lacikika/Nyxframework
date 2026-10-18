@@ -292,6 +292,57 @@ function Nyx.Judiciary.RegisterFingerprintEvent(src, surfaceDesc, coords)
     return dropId, hash
 end
 
+-- 3b. Register Microscopic Toolmark / Striation Evidence
+function Nyx.Judiciary.RegisterToolmarkEvent(src, toolName, surfaceDesc, coords, toolSerial)
+    local player = Nyx.GetPlayer(src)
+    if not player then return end
+
+    local toolId = toolName or "tool_crowbar"
+    local serial = toolSerial or "CRW-UNKNOWN"
+    local salt = generateSalt()
+    local dropId = generateUUID()
+
+    -- Deterministic Toolmark Striation Formula: SHA-256(TOOLMARK || ToolSerial || CitizenID || Coords || Salt)
+    local rawString = string.format("TOOLMARK:%s:%s:%.2f,%.2f,%.2f:%s",
+        serial,
+        player.citizenId,
+        coords.x, coords.y, coords.z,
+        salt
+    )
+    local hash = sha256(rawString)
+
+    local evidenceData = {
+        evidenceId = dropId,
+        type = "toolmark",
+        hash = hash,
+        originCitizenId = player.citizenId,
+        coords = vector3(coords.x, coords.y, coords.z),
+        metadata = {
+            toolName = toolId,
+            toolSerial = serial,
+            surface = surfaceDesc or "pallet_metal_banding",
+            salt = salt,
+            originCitizenId = player.citizenId,
+            coords = { x = coords.x, y = coords.y, z = coords.z }
+        },
+        expiresAt = os.time() + (Config.Forensics and Config.Forensics.TransientDecaySeconds or 3600)
+    }
+
+    Nyx.Judiciary.ActiveEvidence[dropId] = evidenceData
+
+    TriggerClientEvent("nyx:judiciary:client:evidenceCreated", -1, {
+        evidenceId = dropId,
+        type = "toolmark",
+        coords = { x = coords.x, y = coords.y, z = coords.z }
+    })
+
+    if Config.Debug then
+        print(string.format("^2[Nyx:Judiciary]^7 Toolmark drop registered: %s (Tool: %s, Serial: %s)^7", dropId, toolId, serial))
+    end
+
+    return dropId, hash
+end
+
 -- 4. Register Forensic Swab Event (GSR or DNA)
 function Nyx.Judiciary.RegisterSwabEvent(src, targetCitId, swabType, coords, isGSRPositive)
     local officer = Nyx.GetPlayer(src)
@@ -969,6 +1020,15 @@ function Nyx.Judiciary.VerifyChainOfCustody(evidenceId)
             camLoc, snap, coords.x or 0.0, coords.y or 0.0, coords.z or 0.0, salt
         )
         recomputedRootHash = sha256(raw)
+    elseif evidence.type == "toolmark" then
+        local toolSerial = meta.toolSerial or "CRW-UNKNOWN"
+        local originCitId = meta.originCitizenId or meta.citizenId or "UNKNOWN"
+        local coords = meta.coords or { x = 0.0, y = 0.0, z = 0.0 }
+        local salt = meta.salt or ""
+        local raw = string.format("TOOLMARK:%s:%s:%.2f,%.2f,%.2f:%s",
+            toolSerial, originCitId, coords.x or 0.0, coords.y or 0.0, coords.z or 0.0, salt
+        )
+        recomputedRootHash = sha256(raw)
     end
 
     if recomputedRootHash and recomputedRootHash ~= evidence.evidence_hash then
@@ -1123,6 +1183,14 @@ function Nyx.Judiciary.VerifyEvidence(evidenceIdOrHash)
         local salt = meta.salt or ""
         reconstructedRaw = string.format("PHOTO:%s:%s:%.2f,%.2f,%.2f:%s",
             camLoc, snap, coords.x or 0.0, coords.y or 0.0, coords.z or 0.0, salt
+        )
+    elseif row.type == "toolmark" then
+        local toolSerial = meta.toolSerial or "CRW-UNKNOWN"
+        local originCitId = meta.originCitizenId or meta.citizenId or "UNKNOWN"
+        local coords = meta.coords or { x = 0.0, y = 0.0, z = 0.0 }
+        local salt = meta.salt or ""
+        reconstructedRaw = string.format("TOOLMARK:%s:%s:%.2f,%.2f,%.2f:%s",
+            toolSerial, originCitId, coords.x or 0.0, coords.y or 0.0, coords.z or 0.0, salt
         )
     end
 

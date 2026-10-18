@@ -210,10 +210,25 @@ Nyx.RPC.Register("logistics:enterWarehouse", function(src, warehouseId)
     end
 
     if wh.isLocked then
-        -- Check faction access
-        local playerFaction = player:getFaction()
-        if not playerFaction or (wh.owner and playerFaction ~= wh.owner) then
-            return { success = false, error = "WAREHOUSE_LOCKED" }
+        -- Check if sector power is offline (magnetic locks fail open during localized blackouts)
+        local isPowered = true
+        if exports['nyx_services'] and exports['nyx_services'].IsCoordsPowered then
+            isPowered = exports['nyx_services']:IsCoordsPowered(wh.exteriorCoords)
+        end
+
+        local effectiveLocked, lockStateDesc, isBreached = true, "ONLINE", false
+        if exports['nyx_services'] and exports['nyx_services'].EvaluateWarehouseLockState then
+            effectiveLocked, lockStateDesc, isBreached = exports['nyx_services']:EvaluateWarehouseLockState(wh.isLocked, isPowered, wh.hasBackupGenerator)
+        else
+            effectiveLocked = wh.isLocked
+        end
+
+        if effectiveLocked then
+            -- Check faction access
+            local playerFaction = player:getFaction()
+            if not playerFaction or (wh.owner and playerFaction ~= wh.owner) then
+                return { success = false, error = "WAREHOUSE_LOCKED" }
+            end
         end
     end
 

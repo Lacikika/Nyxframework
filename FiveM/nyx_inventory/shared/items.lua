@@ -484,6 +484,76 @@ Nyx.Items.Registry = {
         type = 'tool',
         description = 'Military-grade handheld transceiver with frequency encryption.'
     },
+    ['wire_cutters'] = {
+        name = 'wire_cutters',
+        label = 'Insulated Wire Cutters',
+        weight = 800,
+        stackable = false,
+        maxSlots = 1,
+        type = 'tool',
+        decayRate = 0.05,
+        description = 'High-voltage rated insulated wire and cable cutters capable of severing industrial conduits.'
+    },
+    ['thermite_charge'] = {
+        name = 'thermite_charge',
+        label = 'Thermite Incendiary Charge',
+        weight = 1500,
+        stackable = true,
+        maxStack = 5,
+        type = 'utility',
+        decayRate = 0.00,
+        description = 'Pyrotechnic chemical incendiary compound capable of melting through reinforced steel and electrical transformers.'
+    },
+    ['tool_crowbar'] = {
+        name = 'tool_crowbar',
+        label = 'Heavy Forged Crowbar',
+        weight = 2500,
+        stackable = false,
+        maxSlots = 1,
+        type = 'tool',
+        decayRate = 0.04,
+        description = 'Hardened high-carbon steel wrecking bar used for prying open sealed freight pallets, crates, and security bandings.'
+    },
+    ['tool_angle_grinder'] = {
+        name = 'tool_angle_grinder',
+        label = 'High-Speed Cordless Angle Grinder',
+        weight = 3200,
+        stackable = false,
+        maxSlots = 1,
+        type = 'tool',
+        decayRate = 0.03,
+        description = 'Industrial cordless rotary angle grinder equipped with a metal cutting and abrading arbor.'
+    },
+    ['grinding_disk'] = {
+        name = 'grinding_disk',
+        label = 'Abrasive Metal Grinding Disk (4.5in)',
+        weight = 200,
+        stackable = true,
+        maxStack = 10,
+        type = 'utility',
+        decayRate = 0.00,
+        description = 'Reinforced aluminum-oxide abrasive grinding disk for grinding down welds and firearm serial stamps.'
+    },
+    ['acid_etch_kit'] = {
+        name = 'acid_etch_kit',
+        label = 'Forensic Acid-Etch Chemical Kit',
+        weight = 1200,
+        stackable = true,
+        maxStack = 5,
+        type = 'tool',
+        decayRate = 0.00,
+        description = 'Forensic metallurgical restoration kit containing Fry\'s reagent (acidic cupric chloride) and nitric etching acid.'
+    },
+    ['tamper_seal'] = {
+        name = 'tamper_seal',
+        label = 'Serialized Tamper Seal',
+        weight = 50,
+        stackable = true,
+        maxStack = 20,
+        type = 'utility',
+        decayRate = 0.00,
+        description = 'Heavy-duty numbered bolt & steel cable seal with tamper-evident indicator for securing freight pallets.'
+    },
     ['id_card'] = {
         name = 'id_card',
         label = 'Civil Identity Card',
@@ -699,6 +769,20 @@ function Nyx.Items.CreateDefaultMetadata(name, extra)
         elseif item.name == 'bulk_flour' or item.name == 'bulk_cornmeal' then
             meta.milledAt = os.time()
             meta.facility = (type(extra) == "table" and extra.facility) or "fac_grapeseed_mill"
+        elseif item.name == 'tool_crowbar' then
+            meta.toolSerial = (type(extra) == "table" and extra.toolSerial) or string.format("CRW-%06d", math.random(100000, 999999))
+            meta.striations = (type(extra) == "table" and extra.striations) or string.format("STR-%04d", math.random(1000, 9999))
+        elseif item.name == 'tool_angle_grinder' then
+            meta.toolSerial = (type(extra) == "table" and extra.toolSerial) or string.format("GRD-%06d", math.random(100000, 999999))
+            meta.striations = (type(extra) == "table" and extra.striations) or string.format("STR-GRD-%04d", math.random(1000, 9999))
+            meta.grinderModel = "DeWalt Industrial 20V Max"
+        elseif item.name == 'acid_etch_kit' then
+            meta.lotNumber = (type(extra) == "table" and extra.lotNumber) or string.format("ETCH-LOT-%05d", math.random(10000, 99999))
+            meta.reagentGrade = "Analytical Reagent (AR) 99.8%"
+            meta.usesRemaining = (type(extra) == "table" and extra.usesRemaining) or 5
+        elseif item.name == 'tamper_seal' then
+            meta.sealSerial = (type(extra) == "table" and extra.sealSerial) or string.format("SEAL-%07d", math.random(1000000, 9999999))
+            meta.sealedAt = os.time()
         end
     end
 

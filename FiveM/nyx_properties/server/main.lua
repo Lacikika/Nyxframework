@@ -109,6 +109,9 @@ MySQL.ready(function()
                 interior = json.decode(r.interior_coords),
                 routingBucket = r.routing_bucket,
                 isLocked = (r.is_locked == 1),
+                hasAlarm = (tonumber(r.has_alarm) == 1 or r.has_alarm == nil),
+                hasBackupGenerator = (tonumber(r.has_backup_generator) == 1),
+                alarmStatus = r.alarm_status or "armed",
                 stashId = r.stash_inventory_id,
                 meterId = r.utility_meter_id,
                 linkedSubstation = r.linked_substation_id
@@ -268,9 +271,53 @@ exports['nyx_core']:RegisterRPC("properties:enterProperty", function(src, proper
         return { success = false, error = "TOO_FAR_FROM_ENTRANCE" }
     end
 
-    -- Check access permission
-    if prop.isLocked and (not hasKey or tier < 2) then
+    -- Check sector electrical power status
+    local isPowered, blackoutSubId = true, nil
+    if exports['nyx_services'] and exports['nyx_services'].IsCoordsPowered then
+        isPowered, blackoutSubId = exports['nyx_services']:IsCoordsPowered(prop.entrance)
+    end
+
+    local effectiveLocked, lockStateDesc, isBreached = false, "ONLINE", false
+    if Nyx.Sabotage and Nyx.Sabotage.EvaluateDoorlockState then
+        effectiveLocked, lockStateDesc, isBreached = Nyx.Sabotage.EvaluateDoorlockState(prop.type, prop.isLocked, isPowered, prop.hasBackupGenerator)
+    elseif exports['nyx_services'] and exports['nyx_services'].EvaluateDoorlockState then
+        effectiveLocked, lockStateDesc, isBreached = exports['nyx_services']:EvaluateDoorlockState(prop.type, prop.isLocked, isPowered, prop.hasBackupGenerator)
+    else
+        effectiveLocked = prop.isLocked
+    end
+
+    -- If effectiveLocked is true and player does not have a key, deny entry
+    if effectiveLocked and (not hasKey or tier < 2) then
         return { success = false, error = "DOOR_LOCKED" }
+    end
+
+    -- If entered via blackout breach (locks bypassed due to outage without valid key)
+    if isBreached and prop.isLocked and (not hasKey or tier < 2) then
+        MySQL.prepare([[
+            INSERT INTO `nyx_property_audit`
+                (`property_id`, `action`, `actor_citizen_id`, `notes`)
+            VALUES (?, 'BLACKOUT_BREACH', ?, ?)
+        ]], { propertyId, player.citizenId, string.format("Blackout Raid: Magnetic lock de-energized (Substation: %s)", tostring(blackoutSubId or "grid_failure")) })
+
+        -- Evaluate Alarm Status during breach
+        local alarmStatus, alertPolice = "none", false
+        if Nyx.Sabotage and Nyx.Sabotage.EvaluateAlarmStatus then
+            alarmStatus, alertPolice = Nyx.Sabotage.EvaluateAlarmStatus(prop.hasAlarm, isPowered, prop.hasBackupGenerator, true)
+        elseif exports['nyx_services'] and exports['nyx_services'].EvaluateAlarmStatus then
+            alarmStatus, alertPolice = exports['nyx_services']:EvaluateAlarmStatus(prop.hasAlarm, isPowered, prop.hasBackupGenerator, true)
+        end
+
+        if alertPolice and exports['nyx_mdt'] and exports['nyx_mdt'].CreateCall then
+            exports['nyx_mdt']:CreateCall(
+                "10-31",
+                "Ingatlan Riasztás (Áramszünet Alatti Behatolás)",
+                string.format("Riasztó behatolást érzékelt! Ingatlan: %s (%s) - Mágneszárak nyitva!", prop.label, prop.code),
+                "Automatizált Tartalék Riasztórendszer",
+                prop.entrance,
+                prop.zoneId or "Los Santos",
+                "high"
+            )
+        end
     end
 
     -- Set OneSync Virtual Routing Bucket
@@ -282,8 +329,8 @@ exports['nyx_core']:RegisterRPC("properties:enterProperty", function(src, proper
         SetEntityHeading(ped, prop.interior.h)
     end
 
-    -- Record utility consumption trigger (lights turned on in property)
-    if exports['nyx_services'] and exports['nyx_services'].RecordConsumption then
+    -- Record utility consumption trigger (lights turned on in property only if energized)
+    if isPowered and exports['nyx_services'] and exports['nyx_services'].RecordConsumption then
         exports['nyx_services']:RecordConsumption(prop.meterId, 0.25, 0.05)
     end
 
@@ -291,7 +338,9 @@ exports['nyx_core']:RegisterRPC("properties:enterProperty", function(src, proper
         success = true,
         interiorCoords = prop.interior,
         routingBucket = prop.routingBucket,
-        stashId = prop.stashId
+        stashId = prop.stashId,
+        isPowered = isPowered,
+        blackoutBreached = isBreached
     }
 end)
 
