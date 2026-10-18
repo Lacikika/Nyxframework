@@ -37,3 +37,25 @@ end)
 exports("GetPlayerVehicles", function(citizenId)
     return Nyx.Vehicles.GetPlayerVehicles(citizenId)
 end)
+
+exports("GetVehicleWear", function(vinOrNetId)
+    return Nyx.Vehicles.GetWear(vinOrNetId)
+end)
+
+exports("GetVehicleMileage", function(vinOrNetId)
+    local wear = Nyx.Vehicles.GetWear(vinOrNetId)
+    return wear and wear.mileage or 0.0
+end)
+
+exports("ResetTrip", function(vinOrNetId)
+    return Nyx.Vehicles.ResetTrip(vinOrNetId)
+end)
+
+exports("ServiceVehicle", function(src, vinOrNetId, serviceType, notes)
+    return Nyx.Vehicles.ServiceVehicle(src, vinOrNetId, serviceType, notes)
+end)
+
+exports("UpdateVehicleWear", function(vinOrNetId, deltaKm, wearDeltas)
+    return Nyx.Vehicles.UpdateWear(vinOrNetId, deltaKm, wearDeltas)
+end)
+

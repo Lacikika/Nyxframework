@@ -37,6 +37,10 @@ RegisterNetEvent("nyx:vehicles:client:applyVehicleState", function(data)
 
         currentFuel = tonumber(data.fuelLevel) or 65.0
         SetVehicleFuelLevel(veh, currentFuel)
+
+        if data.wear then
+            TriggerEvent("nyx:vehicles:client:onWearApplied", data.wear)
+        end
     end
 end)
 

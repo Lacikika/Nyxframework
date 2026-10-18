@@ -84,3 +84,43 @@ Config.Garages = {
         spawnPoint = vector4(-125.0, 6525.0, 31.8, 45.0)
     }
 }
+
+-- Vehicle Mileage & Component Wear System
+Config.Wear = {
+    SyncIntervalSeconds = 15,          -- Telemetry push interval in seconds
+    MaxSpeedKmhSanity = 450.0,         -- Maximum plausibility threshold to prevent teleport spoofing
+    
+    -- Consumption & Degradation Rates
+    OilDegradationPerKm = 0.04,        -- Oil quality drops ~4% per 100 km under normal driving
+    OilRpmMultiplier = 2.5,            -- Multiplier when redlining (>0.85 engine RPM)
+    BrakeWearPerBrakeSecond = 0.006,   -- Brake pad loss per second of active braking
+    BrakeHardStopMultiplier = 1.8,     -- Multiplier for emergency/hard braking (>80 km/h)
+    TransmissionWearPerShift = 0.002,  -- Wear on transmission gears per gear shift
+    TransmissionBurnoutPenalty = 0.015,-- Instant wear on aggressive burnouts
+    SuspensionWearPerKm = 0.025,       -- Normal road suspension wear per km
+    SuspensionOffroadMultiplier = 3.5, -- Extra wear multiplier on dirt/gravel/offroad surfaces
+
+    -- Warning & Failure Thresholds (Percentages 0.0 - 100.0)
+    WarningThreshold = 20.0,           -- Triggers HUD check engine / maintenance warning
+    CriticalThreshold = 10.0,          -- Triggers severe mechanical degradation symptoms
+
+    -- Physical Degradation Penalties
+    Degradation = {
+        EnableEngineSmokeOnCriticalOil = true,
+        EngineDamageRateCriticalOil = 0.75,     -- Damage per tick applied to engine health when oil <= 5.0%
+        ReducedBrakeForceMultiplier = 0.45,     -- Brake multiplier when brake pads <= 10.0%
+        TransmissionSlipChance = 0.15,          -- Chance per second for gear slipping when transmission <= 15.0%
+        SuspensionInstability = true            -- Adds slight body wobble / instability when suspension <= 15.0%
+    },
+
+    -- Maintenance & Servicing
+    ServiceCosts = {
+        oil_change = 150.00,
+        brake_replacement = 350.00,
+        transmission_overhaul = 850.00,
+        suspension_tune = 400.00,
+        full_inspection = 100.00
+    },
+    ServiceRequiredItem = "tool_repairkit" -- Required item if performing manual field repairs
+}
+

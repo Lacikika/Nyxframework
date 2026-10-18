@@ -9,7 +9,8 @@ Nyx.Vehicles = Nyx.Vehicles or {}
 Nyx.Vehicles.DirtyDamage = {}
 
 -- 1. Update vehicle condition in memory and queue debounced persistence
-function Nyx.Vehicles.UpdateState(vin, conditionData, fuelLevel, coords)
+function Nyx.Vehicles.UpdateState(identifier, conditionData, fuelLevel, coords)
+    local vin = (Nyx.Vehicles.ResolveVIN and Nyx.Vehicles.ResolveVIN(identifier)) or (Nyx.Vehicles.ByPlate[identifier] or identifier)
     local active = Nyx.Vehicles.Active[vin]
     if active then
         if conditionData then active.condition = conditionData end

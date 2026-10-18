@@ -121,6 +121,12 @@ function Nyx.Vehicles.SpawnVehicle(src, vin, targetCoords, targetHeading)
         exports['nyx_inventory']:GetInventory(gloveboxId, 'glovebox')
     end
 
+    -- Load wear and mileage persistence
+    local wear = nil
+    if Nyx.Vehicles.LoadWear then
+        wear = Nyx.Vehicles.LoadWear(row.vin, row.plate)
+    end
+
     -- Update memory tracking
     local activeData = {
         entity = vehEntity,
@@ -133,6 +139,7 @@ function Nyx.Vehicles.SpawnVehicle(src, vin, targetCoords, targetHeading)
         factionId = row.faction_id,
         fuelLevel = tonumber(row.fuel_level) or 65.0,
         condition = condition,
+        wear = wear,
         lockState = lockState,
         routingBucket = playerBucket
     }
@@ -149,13 +156,14 @@ function Nyx.Vehicles.SpawnVehicle(src, vin, targetCoords, targetHeading)
         WHERE `vin` = ?
     ]], { row.vin })
 
-    -- Synchronize physical condition to spawner client
+    -- Synchronize physical condition and wear to spawner client
     TriggerClientEvent("nyx:vehicles:client:applyVehicleState", src, {
         netId = netId,
         condition = condition,
         fuelLevel = activeData.fuelLevel,
         plate = row.plate,
-        lockState = lockState
+        lockState = lockState,
+        wear = wear
     })
 
     if Config.Debug then
@@ -182,6 +190,30 @@ function Nyx.Vehicles.DespawnVehicle(src, vin, garageId)
     end
 
     local assignedGarage = garageId or "legion_square"
+    local wear = Nyx.Vehicles.WearCache and Nyx.Vehicles.WearCache[vin]
+    if wear then
+        MySQL.prepare.await([[
+            UPDATE `nyx_vehicles_wear`
+            SET `mileage` = ?,
+                `trip_odometer` = ?,
+                `oil_quality` = ?,
+                `brake_pad_wear` = ?,
+                `transmission_wear` = ?,
+                `suspension_wear` = ?
+            WHERE `vin` = ?
+        ]], {
+            wear.mileage,
+            wear.tripOdometer,
+            wear.oilQuality,
+            wear.brakePadWear,
+            wear.transmissionWear,
+            wear.suspensionWear,
+            vin
+        })
+        if Nyx.Vehicles.DirtyWear then
+            Nyx.Vehicles.DirtyWear[vin] = nil
+        end
+    end
 
     MySQL.prepare.await([[
         UPDATE `nyx_vehicles_owned`
@@ -213,11 +245,18 @@ end
 -- 3. Query all vehicles owned by a citizen
 function Nyx.Vehicles.GetPlayerVehicles(citizenId)
     local rows = MySQL.query.await([[
-        SELECT `vin`, `plate`, `model_name`, `model_hash`, `garage_id`, `storage_state`,
-               `fuel_level`, `lock_state`, `condition_data`, `created_at`
-        FROM `nyx_vehicles_owned`
-        WHERE `owner_citizen_id` = ?
-        ORDER BY `created_at` DESC
+        SELECT v.`vin`, v.`plate`, v.`model_name`, v.`model_hash`, v.`garage_id`, v.`storage_state`,
+               v.`fuel_level`, v.`lock_state`, v.`condition_data`, v.`created_at`,
+               COALESCE(w.`mileage`, 0.00) AS `mileage`,
+               COALESCE(w.`trip_odometer`, 0.00) AS `trip_odometer`,
+               COALESCE(w.`oil_quality`, 100.00) AS `oil_quality`,
+               COALESCE(w.`brake_pad_wear`, 100.00) AS `brake_pad_wear`,
+               COALESCE(w.`transmission_wear`, 100.00) AS `transmission_wear`,
+               COALESCE(w.`suspension_wear`, 100.00) AS `suspension_wear`
+        FROM `nyx_vehicles_owned` v
+        LEFT JOIN `nyx_vehicles_wear` w ON v.`vin` = w.`vin`
+        WHERE v.`owner_citizen_id` = ?
+        ORDER BY v.`created_at` DESC
     ]], { citizenId })
 
     return rows or {}

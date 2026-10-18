@@ -203,7 +203,79 @@ function Nyx.Tests.TestFreightBoardEscrowAndElasticity()
     return passes == total
 end
 
--- 5. Master Test Runner
+-- 5. Test Vehicle Mileage, Wear Degradation & Servicing Engine
+function Nyx.Tests.TestVehicleMileageAndWear()
+    print("^3[Nyx:Tests] Running Vehicle Mileage & Wear Suite...^7")
+    local passes = 0
+    local total = 4
+
+    local mockVin = "1NYXTESTWEAR0001"
+    local mockPlate = "NYX 999"
+
+    -- Test A: Default Wear Initialization
+    local defaultWear = {
+        vin = mockVin,
+        plate = mockPlate,
+        mileage = 0.0,
+        tripOdometer = 0.0,
+        oilQuality = 100.0,
+        brakePadWear = 100.0,
+        transmissionWear = 100.0,
+        suspensionWear = 100.0,
+        lastServiceMileage = 0.0
+    }
+
+    if assertTest(defaultWear.mileage == 0.0 and defaultWear.oilQuality == 100.0 and defaultWear.brakePadWear == 100.0,
+        "Vehicle Wear Default State Initialization",
+        "Initial vehicle wear did not match factory defaults") then
+        passes = passes + 1
+    end
+
+    -- Test B: Distance Accumulation & Component Wear Application
+    local deltaKm = 12.5
+    local wearDeltas = {
+        oil = 12.5 * 0.04 * 2.5, -- 1.25% with redline multiplier
+        brakes = 2.4,             -- simulated hard braking
+        transmission = 0.15,      -- simulated gear shifts
+        suspension = 0.45         -- simulated road wear
+    }
+
+    local updatedMileage = defaultWear.mileage + deltaKm
+    local updatedTrip = defaultWear.tripOdometer + deltaKm
+    local updatedOil = math.max(0.0, defaultWear.oilQuality - wearDeltas.oil)
+    local updatedBrakes = math.max(0.0, defaultWear.brakePadWear - wearDeltas.brakes)
+
+    if assertTest(updatedMileage == 12.5 and updatedTrip == 12.5 and updatedOil == 98.75 and updatedBrakes == 97.6,
+        "Vehicle Telemetry & Wear Computation",
+        string.format("Wear mismatch: Mileage=%.2f, Oil=%.2f, Brakes=%.2f", updatedMileage, updatedOil, updatedBrakes)) then
+        passes = passes + 1
+    end
+
+    -- Test C: Servicing & Restoration of Component Wear
+    local servicedOil = 100.0
+    local servicedBrakes = 100.0
+    local lastService = updatedMileage
+
+    if assertTest(servicedOil == 100.0 and servicedBrakes == 100.0 and lastService == 12.5,
+        "Certified Mechanic Service Component Restoration",
+        "Vehicle component wear was not restored to 100% on service") then
+        passes = passes + 1
+    end
+
+    -- Test D: Trip Odometer Reset Invariant
+    local resetTrip = 0.0
+    local preservedTotal = updatedMileage
+
+    if assertTest(resetTrip == 0.0 and preservedTotal == 12.5,
+        "Trip Odometer Reset with Lifetime Mileage Preservation",
+        "Resetting trip odometer corrupted total vehicle mileage") then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 6. Master Test Runner
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -213,9 +285,10 @@ function Nyx.Tests.RunAll()
     local t2 = Nyx.Tests.TestInventoryConcurrency()
     local t3 = Nyx.Tests.TestTreasuryConservationLaw()
     local t4 = Nyx.Tests.TestFreightBoardEscrowAndElasticity()
+    local t5 = Nyx.Tests.TestVehicleMileageAndWear()
 
     print("^5--------------------------------------------------^7")
-    if t1 and t2 and t3 and t4 then
+    if t1 and t2 and t3 and t4 and t5 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

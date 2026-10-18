@@ -20,6 +20,7 @@ shared_scripts {
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/damage.lua',
+    'server/wear.lua',
     'server/keys.lua',
     'server/spawner.lua',
     'server/main.lua',
@@ -30,6 +31,7 @@ client_scripts {
     'client/keys.lua',
     'client/storage.lua',
     'client/sync.lua',
+    'client/wear.lua',
     'client/main.lua',
     'client/exports.lua'
 }
