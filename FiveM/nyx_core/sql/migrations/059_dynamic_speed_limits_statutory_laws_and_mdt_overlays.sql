@@ -12,9 +12,13 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- 1. Extend Parliament Laws Table with Subsystem Target & Description
 -- ----------------------------------------------------------------------------
 ALTER TABLE `nyx_parliament_laws`
+  MODIFY COLUMN `law_id` VARCHAR(64) NOT NULL,
   MODIFY COLUMN `category` ENUM('penal_infraction', 'penal_misdemeanor', 'penal_felony', 'fiscal_policy', 'zoning', 'speed_limit') NOT NULL,
   ADD COLUMN IF NOT EXISTS `subsystem_target` ENUM('mdt', 'treasury', 'vehicles', 'properties', 'general') NOT NULL DEFAULT 'general' AFTER `category`,
   ADD COLUMN IF NOT EXISTS `description` VARCHAR(255) NULL DEFAULT NULL AFTER `title`;
+
+ALTER TABLE `nyx_parliament_amendment_audits`
+  MODIFY COLUMN `law_id` VARCHAR(64) NOT NULL;
 
 -- ----------------------------------------------------------------------------
 -- 2. Seed Dynamic Speed Limits, Tax Caps, and Statutory Offenses
