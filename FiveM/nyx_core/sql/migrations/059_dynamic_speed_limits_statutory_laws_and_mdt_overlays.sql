@@ -17,7 +17,7 @@ ALTER TABLE `nyx_parliament_laws`
   ADD COLUMN IF NOT EXISTS `subsystem_target` ENUM('mdt', 'treasury', 'vehicles', 'properties', 'general') NOT NULL DEFAULT 'general' AFTER `category`,
   ADD COLUMN IF NOT EXISTS `description` VARCHAR(255) NULL DEFAULT NULL AFTER `title`;
 
-ALTER TABLE `nyx_parliament_amendment_audits`
+ALTER TABLE `nyx_parliament_amendment_audit`
   MODIFY COLUMN `law_id` VARCHAR(64) NOT NULL;
 
 -- ----------------------------------------------------------------------------
