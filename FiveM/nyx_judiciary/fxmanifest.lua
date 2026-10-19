@@ -18,7 +18,8 @@ shared_scripts {
     'shared/warrants.lua',
     'shared/courtroom_ui.lua',
     'shared/penal_labor.lua',
-    'shared/acid_etch.lua'
+    'shared/acid_etch.lua',
+    'shared/bail_bonds.lua'
 }
 
 server_scripts {
@@ -30,6 +31,7 @@ server_scripts {
     'server/execution.lua',
     'server/penal_labor.lua',
     'server/acid_etch.lua',
+    'server/bail.lua',
     'server/main.lua',
     'server/exports.lua'
 }
@@ -39,6 +41,7 @@ client_scripts {
     'client/courtroom.lua',
     'client/penal_labor.lua',
     'client/acid_etch.lua',
+    'client/bail.lua',
     'client/main.lua',
     'client/exports.lua'
 }

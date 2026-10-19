@@ -32,4 +32,4 @@ CREATE TABLE IF NOT EXISTS `nyx_phone_settings` (
 
 -- 3. Extend nyx_characters with Phone Number if not present
 ALTER TABLE `nyx_characters`
-    ADD COLUMN IF NOT EXISTS `phone_number` VARCHAR(32) NULL DEFAULT NULL AFTER `date_of_birth`;
+    ADD COLUMN IF NOT EXISTS `phone_number` VARCHAR(32) NULL DEFAULT NULL AFTER `dob`;

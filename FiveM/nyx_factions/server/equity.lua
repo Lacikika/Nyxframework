@@ -68,7 +68,9 @@ function Nyx.Factions.HydrateEquityOfferings()
 end
 
 CreateThread(function()
-    Wait(500)
+    while not (exports['nyx_core'] and exports['nyx_core'].IsDatabaseReady and exports['nyx_core']:IsDatabaseReady()) do
+        Wait(50)
+    end
     Nyx.Factions.HydrateEquityOfferings()
 end)
 

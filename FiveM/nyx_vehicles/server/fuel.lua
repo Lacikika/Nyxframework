@@ -79,7 +79,12 @@ local function hydrateGasStations()
 end
 
 MySQL.ready(function()
-    hydrateGasStations()
+    CreateThread(function()
+        while not (exports['nyx_core'] and exports['nyx_core'].IsDatabaseReady and exports['nyx_core']:IsDatabaseReady()) do
+            Wait(50)
+        end
+        hydrateGasStations()
+    end)
 end)
 
 -- ----------------------------------------------------------------------------

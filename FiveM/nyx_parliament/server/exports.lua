@@ -76,7 +76,7 @@ exports("HydrateLaws", function()
 end)
 
 exports("GetOverview", function(src)
-    return exports['nyx_core']:TriggerRPCAwait and exports['nyx_core']:TriggerRPCAwait("parliament:getOverview")
+    return Nyx.Parliament.GetOverview(src)
 end)
 
 exports("GetAmendmentAuditLogs", function(filterLawId)

@@ -223,20 +223,6 @@ CreateThread(function()
             return { success = true, logs = logs }
         end)
 
-        -- 9. Preview dividends
-        exports['nyx_core']:RegisterRPC("factions:previewDividends", function(src, factionId, netProfit, rate)
-            local ok, res = Nyx.Factions.PreviewDividends(factionId, netProfit, rate)
-            return { success = ok, data = res, error = (not ok and res or nil) }
-        end)
-
-        -- 10. Execute dividend disbursement
-        exports['nyx_core']:RegisterRPC("factions:distributeDividends", function(src, factionId, netProfit, rate)
-            local player = Nyx.GetPlayer(src)
-            if not player then return { success = false, error = "UNAUTHENTICATED" } end
-
-            local ok, res = Nyx.Factions.DistributeDividends(factionId, netProfit, rate, player.citizenId)
-            return { success = ok, data = res, error = (not ok and res or nil) }
-        end)
 
         -- 11. Query commercial fleet
         exports['nyx_core']:RegisterRPC("factions:getFleet", function(src, factionId)

@@ -84,7 +84,12 @@ end
 
 -- Hook hydration into startup
 MySQL.ready(function()
-    Nyx.Properties.HydrateCommercialLeases()
+    CreateThread(function()
+        while not (exports['nyx_core'] and exports['nyx_core'].IsDatabaseReady and exports['nyx_core']:IsDatabaseReady()) do
+            Wait(50)
+        end
+        Nyx.Properties.HydrateCommercialLeases()
+    end)
 end)
 
 -- ----------------------------------------------------------------------------

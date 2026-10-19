@@ -247,4 +247,19 @@ exports("CrossReferenceEtchedSerialWithCasings", function(serial)
     return {}
 end)
 
+-- Pre-Trial Judicial Bail Bonds & Escrow Exports
+exports("GetActiveBailBond", function(bondId)
+    return Nyx.Judiciary.GetActiveBailBond(bondId)
+end)
 
+exports("PostBailBond", function(src, docketId, bondType, guarantorCitizenId)
+    return Nyx.Judiciary.PostBail(src, docketId, bondType, guarantorCitizenId)
+end)
+
+exports("ExonerateBailBond", function(docketId, reason)
+    return Nyx.Judiciary.ExonerateBail(docketId, reason)
+end)
+
+exports("ForfeitBailBond", function(docketId, reason)
+    return Nyx.Judiciary.ForfeitBail(docketId, reason)
+end)

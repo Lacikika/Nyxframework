@@ -40,8 +40,8 @@ Nyx.RPC.Register("parliament:getLawBook", function(src, categoryFilter)
     return results
 end)
 
--- RPC: Comprehensive Governance Overview for Master UI
-Nyx.RPC.Register("parliament:getOverview", function(src)
+-- Function: Comprehensive Governance Overview for Master UI
+function Nyx.Parliament.GetOverview(src)
     local player = exports['nyx_core']:GetPlayer(src)
     local citId = player and player.citizenId or "CIT_UNKNOWN"
     local charName = player and player.charName or "Citizen"
@@ -182,6 +182,11 @@ Nyx.RPC.Register("parliament:getOverview", function(src)
         booths = booths,
         termAudits = termAudits
     }
+end
+
+-- RPC: Comprehensive Governance Overview for Master UI
+Nyx.RPC.Register("parliament:getOverview", function(src)
+    return Nyx.Parliament.GetOverview(src)
 end)
 
 -- RPC: Query Legislative Amendment Audit History

@@ -45,6 +45,9 @@ CreateThread(function()
     while GetResourceState("oxmysql") ~= "started" do
         Wait(50)
     end
+    while not (exports['nyx_core'] and exports['nyx_core'].IsDatabaseReady and exports['nyx_core']:IsDatabaseReady()) do
+        Wait(50)
+    end
 
     local rows = MySQL.query.await([[
         SELECT * FROM `nyx_judiciary_bail_bonds`
@@ -564,43 +567,49 @@ function Nyx.Judiciary.GetDefendantBail(citizenId)
 end
 
 -- 9. RPC Route Bindings
-Nyx.RPC.Register("judiciary:getBailSchedule", function(src, docketId)
-    local docket = MySQL.single.await("SELECT * FROM `nyx_judiciary_dockets` WHERE `docket_id` = ?", { docketId })
-    if not docket then return nil, "DOCKET_NOT_FOUND" end
-    local scheduleAmount = tonumber(docket.bail_schedule_amount)
-    if not scheduleAmount or scheduleAmount <= 0.0 then
-        scheduleAmount = Nyx.BailBonds.CalculateBailSchedule(docket.case_type, 0, 1.0)
+CreateThread(function()
+    while not exports['nyx_core'] or not exports['nyx_core'].RegisterRPC do
+        Wait(50)
     end
-    local cashBreakdown = Nyx.BailBonds.CalculateBailPaymentBreakdown(scheduleAmount, "cash")
-    local suretyBreakdown = Nyx.BailBonds.CalculateBailPaymentBreakdown(scheduleAmount, "surety")
-    return {
-        docketId = docketId,
-        caseType = docket.case_type,
-        bailStatus = docket.bail_status,
-        bailAmount = scheduleAmount,
-        cash = cashBreakdown,
-        surety = suretyBreakdown
-    }
-end)
 
-Nyx.RPC.Register("judiciary:postBail", function(src, docketId, bondType, guarantorCitizenId)
-    return Nyx.Judiciary.PostBail(src, docketId, bondType, guarantorCitizenId)
-end)
+    exports['nyx_core']:RegisterRPC("judiciary:getBailSchedule", function(src, docketId)
+        local docket = MySQL.single.await("SELECT * FROM `nyx_judiciary_dockets` WHERE `docket_id` = ?", { docketId })
+        if not docket then return nil, "DOCKET_NOT_FOUND" end
+        local scheduleAmount = tonumber(docket.bail_schedule_amount)
+        if not scheduleAmount or scheduleAmount <= 0.0 then
+            scheduleAmount = Nyx.BailBonds.CalculateBailSchedule(docket.case_type, 0, 1.0)
+        end
+        local cashBreakdown = Nyx.BailBonds.CalculateBailPaymentBreakdown(scheduleAmount, "cash")
+        local suretyBreakdown = Nyx.BailBonds.CalculateBailPaymentBreakdown(scheduleAmount, "surety")
+        return {
+            docketId = docketId,
+            caseType = docket.case_type,
+            bailStatus = docket.bail_status,
+            bailAmount = scheduleAmount,
+            cash = cashBreakdown,
+            surety = suretyBreakdown
+        }
+    end)
 
-Nyx.RPC.Register("judiciary:checkinCourtAppearance", function(src, docketId)
-    return Nyx.Judiciary.VerifyCourtAppearance(src, docketId)
-end)
+    exports['nyx_core']:RegisterRPC("judiciary:postBail", function(src, docketId, bondType, guarantorCitizenId)
+        return Nyx.Judiciary.PostBail(src, docketId, bondType, guarantorCitizenId)
+    end)
 
-Nyx.RPC.Register("judiciary:getDefendantBailStatus", function(src, targetCitizenId)
-    local citId = targetCitizenId
-    if not citId then
-        local player = exports['nyx_core']:GetPlayer(src)
-        citId = player and player.citizenId
-    end
-    if not citId then return nil, "UNAUTHENTICATED" end
-    return Nyx.Judiciary.GetDefendantBail(citId)
-end)
+    exports['nyx_core']:RegisterRPC("judiciary:checkinCourtAppearance", function(src, docketId)
+        return Nyx.Judiciary.VerifyCourtAppearance(src, docketId)
+    end)
 
-Nyx.RPC.Register("judiciary:claimFugitiveBounty", function(src, bondId, fugitiveCitizenId)
-    return Nyx.Judiciary.ClaimFugitiveBounty(src, bondId, fugitiveCitizenId)
+    exports['nyx_core']:RegisterRPC("judiciary:getDefendantBailStatus", function(src, targetCitizenId)
+        local citId = targetCitizenId
+        if not citId then
+            local player = exports['nyx_core']:GetPlayer(src)
+            citId = player and player.citizenId
+        end
+        if not citId then return nil, "UNAUTHENTICATED" end
+        return Nyx.Judiciary.GetDefendantBail(citId)
+    end)
+
+    exports['nyx_core']:RegisterRPC("judiciary:claimFugitiveBounty", function(src, bondId, fugitiveCitizenId)
+        return Nyx.Judiciary.ClaimFugitiveBounty(src, bondId, fugitiveCitizenId)
+    end)
 end)

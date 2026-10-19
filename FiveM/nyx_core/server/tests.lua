@@ -12399,7 +12399,137 @@ function Nyx.Tests.TestIndustrialRefiningAndFunctionalPartsManufacturing()
     return passes == total
 end
 
--- 45. Master Test Runner (Suite 1 - Suite 59)
+-- 60. Test Pre-Trial Judicial Bail Bonds, Surety Escrow & Fugitive Recovery Warrants
+function Nyx.Tests.TestJudicialBailBondsSuretyEscrowAndFugitiveRecovery()
+    print("^3[Nyx:Tests] Running Judicial Bail Bonds & Fugitive Recovery Suite...^7")
+    local passes = 0
+    local total = 7
+
+    local Bail = Nyx.BailBonds
+    if not Bail then
+        print("^1[Nyx:Test:FAIL]^7 Nyx.BailBonds domain engine not loaded in environment")
+        return false
+    end
+
+    -- Sub-test A: Deterministic Statutory Bail Schedule Recommendations
+    local misdBail = Bail.CalculateBailSchedule("criminal_misdemeanor", 0, 1.0)
+    local misdRepeat = Bail.CalculateBailSchedule("criminal_misdemeanor", 2, 1.0)
+    local felonyBail = Bail.CalculateBailSchedule("criminal_felony", 1, 1.5)
+    local civilBail = Bail.CalculateBailSchedule("civil", 0, 1.0)
+
+    local testA_ok = (misdBail == 2500.00) and
+                     (misdRepeat == 5000.00) and
+                     (felonyBail == 112500.00) and
+                     (civilBail == 0.00)
+
+    if assertTest(testA_ok == true,
+        "Deterministic Bail Schedule Calculations & Compound FTA Multipliers",
+        string.format("Bail schedule mismatch: misd=%.2f, repeat=%.2f, fel=%.2f, civil=%.2f",
+            misdBail, misdRepeat, felonyBail, civilBail)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Defendant Legal Eligibility & Remand Discretion
+    local eligibleDocket = { case_type = "criminal_misdemeanor", status = "filed", bail_status = "eligible" }
+    local remandDocket = { case_type = "criminal_felony", status = "filed", bail_status = "remand_no_bail" }
+    local closedDocket = { case_type = "criminal_felony", status = "concluded", bail_status = "eligible" }
+
+    local okEligible = Bail.EvaluateBailEligibility(eligibleDocket, nil)
+    local okRemand, reasonRemand = Bail.EvaluateBailEligibility(remandDocket, nil)
+    local okClosed, reasonClosed = Bail.EvaluateBailEligibility(closedDocket, nil)
+
+    local testB_ok = (okEligible == true) and
+                     (okRemand == false and reasonRemand == "REMAND_NO_BAIL") and
+                     (okClosed == false and reasonClosed == "CASE_NOT_ACTIVE")
+
+    if assertTest(testB_ok == true,
+        "Judicial Bail Eligibility Evaluation & Capital Offense Remand Interlocks",
+        string.format("Eligibility check failed: elig=%s, remand=%s (%s), closed=%s (%s)",
+            tostring(okEligible), tostring(okRemand), tostring(reasonRemand), tostring(okClosed), tostring(reasonClosed))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Cash vs Commercial Surety Upfront Deposit & Fee Breakdowns
+    local cashBreakdown = Bail.CalculateBailPaymentBreakdown(50000.00, "cash")
+    local suretyBreakdown = Bail.CalculateBailPaymentBreakdown(50000.00, "surety")
+
+    local testC_ok = (cashBreakdown.requiredUpfrontDeposit == 50000.00 and cashBreakdown.clerkAdminFee == 2500.00 and cashBreakdown.exonerationRefund == 47500.00) and
+                     (suretyBreakdown.requiredUpfrontDeposit == 5000.00 and suretyBreakdown.suretyPremiumPaid == 5000.00 and suretyBreakdown.exonerationRefund == 0.00)
+
+    if assertTest(testC_ok == true,
+        "Cash Deposit vs Commercial Surety 10% Premium Financial Mathematical Modeling",
+        string.format("Financial breakdown failed: cashDeposit=%.2f, refund=%.2f, suretyDeposit=%.2f",
+            cashBreakdown.requiredUpfrontDeposit, cashBreakdown.exonerationRefund, suretyBreakdown.requiredUpfrontDeposit)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Bail Forfeiture Seizure & Licensed Bounty Hunter 15% Rewards
+    local forfAmt, bountyAmt = Bail.CalculateForfeitureAndBounty(100000.00)
+    local testD_ok = (forfAmt == 100000.00 and bountyAmt == 15000.00)
+
+    if assertTest(testD_ok == true,
+        "FTA Bail Forfeiture & 15% Fugitive Recovery Bounty Reward Computation",
+        string.format("Forfeiture failed: forfeited=%.2f, bounty=%.2f", forfAmt, bountyAmt)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Release Condition Compliance State Machine
+    local conds = { "no_weapons", "curfew_2200", "stay_in_county" }
+    local center = { x = 200.0, y = -1000.0, z = 25.0 }
+    local cleanInv = { "id_card", "phone", "donut" }
+    local dirtyInv = { "id_card", "phone", "weapon_combatpistol" }
+
+    local okClean, vClean = Bail.EvaluateReleaseConditionCompliance(conds, cleanInv, 14, { x = 220.0, y = -1010.0, z = 25.0 }, center)
+    local okDirty, vDirty = Bail.EvaluateReleaseConditionCompliance(conds, dirtyInv, 23, { x = 5000.0, y = 5000.0, z = 25.0 }, center)
+
+    local testE_ok = (okClean == true and #vClean == 0) and
+                     (okDirty == false and #vDirty == 3)
+
+    if assertTest(testE_ok == true,
+        "Pre-Trial Release Condition Compliance (Curfew, Weapons, Boundary Geofences)",
+        string.format("Conditions failed: cleanOk=%s (#v=%d), dirtyOk=%s (#v=%d)",
+            tostring(okClean), #vClean, tostring(okDirty), #vDirty)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Spatial Courtroom Check-In Euclidean Verification
+    local courtPos = { x = 240.5, y = -1075.2, z = 29.2 }
+    local nearPos = { x = 241.0, y = -1076.0, z = 29.2 }
+    local farPos = { x = 300.0, y = -1200.0, z = 29.2 }
+
+    local isNear, distNear = Bail.EvaluateCourtAppearance(nearPos, courtPos, 3.5)
+    local isFar, distFar = Bail.EvaluateCourtAppearance(farPos, courtPos, 3.5)
+
+    local testF_ok = (isNear == true and distNear <= 3.5) and
+                     (isFar == false and distFar > 3.5)
+
+    if assertTest(testF_ok == true,
+        "Spatial Courtroom Appearance Check-In Raycasting & 3.5m Proximity Interlocks",
+        string.format("Appearance check failed: isNear=%s (dist=%.2f), isFar=%s (dist=%.2f)",
+            tostring(isNear), distNear, tostring(isFar), distFar)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Presentation Diagnostics & Status Badge Formatters
+    local badgePosted = Bail.FormatStatusBadge("posted", "cash")
+    local badgeExonerated = Bail.FormatStatusBadge("exonerated", "cash")
+    local badgeForfeited = Bail.FormatStatusBadge("forfeited", "surety")
+
+    local testG_ok = (badgePosted.class == "badge-warning" and badgePosted.active == true) and
+                     (badgeExonerated.class == "badge-success" and badgeExonerated.active == false) and
+                     (badgeForfeited.class == "badge-danger" and badgeForfeited.active == false)
+
+    if assertTest(testG_ok == true,
+        "Presentation Diagnostics & UI Status Badge Formatting Consistency",
+        string.format("Badge formatting failed: posted=%s, exonerated=%s, forfeited=%s",
+            badgePosted.class, badgeExonerated.class, badgeForfeited.class)) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
+-- 45. Master Test Runner (Suite 1 - Suite 60)
 function Nyx.Tests.RunAll()
     print("^5==================================================^7")
     print("^5   NYXFRAMEWORK IN-ENGINE INTEGRATION HARNESS    ^7")
@@ -12464,6 +12594,7 @@ function Nyx.Tests.RunAll()
     local t57 = Nyx.Tests.TestPointOfSalePhysicalStockingAndEmptyShelfDisplays()
     local t58 = Nyx.Tests.TestPharmaceuticalRefiningAndPlayerChemicalLabs()
     local t59 = Nyx.Tests.TestIndustrialRefiningAndFunctionalPartsManufacturing()
+    local t60 = Nyx.Tests.TestJudicialBailBondsSuretyEscrowAndFugitiveRecovery()
 
     print("^5--------------------------------------------------^7")
     local suites1to50Passed = false
@@ -12471,7 +12602,7 @@ function Nyx.Tests.RunAll()
         suites1to50Passed = true
     end
 
-    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 and t56 and t57 and t58 and t59 then
+    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 and t56 and t57 and t58 and t59 and t60 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

@@ -53,3 +53,18 @@ end)
 exports("GetCachedPenalOverview", function()
     return exports['nyx_judiciary']:GetCachedPenalOverview()
 end)
+
+-- Pre-Trial Judicial Bail Bonds Client Exports
+exports("GetMyBailStatus", function()
+    if Nyx.Judiciary and Nyx.Judiciary.GetMyBailStatus then
+        return Nyx.Judiciary.GetMyBailStatus()
+    end
+    return nil
+end)
+
+exports("IsNearBailKiosk", function(maxDist)
+    if Nyx.Judiciary and Nyx.Judiciary.IsNearBailKiosk then
+        return Nyx.Judiciary.IsNearBailKiosk(maxDist)
+    end
+    return false, nil, 999.0
+end)

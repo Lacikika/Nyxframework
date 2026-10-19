@@ -320,7 +320,9 @@ CreateThread(function()
     while GetResourceState("oxmysql") ~= "started" do
         Wait(100)
     end
-    Wait(500)
+    while not (exports['nyx_core'] and exports['nyx_core'].IsDatabaseReady and exports['nyx_core']:IsDatabaseReady()) do
+        Wait(50)
+    end
     Nyx.Laundering.HydrateRegisters()
 
     while true do

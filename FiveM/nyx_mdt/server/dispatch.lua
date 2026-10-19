@@ -199,6 +199,9 @@ CreateThread(function()
     while GetResourceState("oxmysql") ~= "started" do
         Wait(50)
     end
+    while not (exports['nyx_core'] and exports['nyx_core'].IsDatabaseReady and exports['nyx_core']:IsDatabaseReady()) do
+        Wait(50)
+    end
     Nyx.MDT.HydrateRadarZones()
 end)
 

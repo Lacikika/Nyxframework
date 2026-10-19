@@ -132,11 +132,58 @@ Build, refine, and optimize resources for the FiveM server project (Nyxframework
 - [x] **Feature: Industrial Refining Plants, Forestry Timber Harvesting & Functional Parts Manufacturing (`nyx_logistics`, `nyx_services` & `nyx_inventory`)**
   - **Implementation:** Heavy industrial processing and refining plants (`fac_paleto_sawmill`, `fac_elysian_foundry`, `fac_davis_textile`), finite forestry timber and raw cotton harvest nodes (`node_paleto_forest_timber`, `node_chiliad_redwood`, `node_san_chianski_cotton`), pure Lua 5.4 industrial transformation blueprints (timber milling, structural sheet metal rolling, copper wire drawing, cotton textile carding, circuit substrate resin bonding, and weapon components machining), regional electrical power grid interlocks, immutable refining audit ledger (`nyx_logistics_refining_audits`), and Third-Eye spatial interaction targets across canonical industrial facilities.
 
-- [ ] **Feature: Pre-Trial Judicial Bail Bonds, Surety Escrow & Fugitive Recovery Warrants (`nyx_judiciary`, `nyx_treasury` & `nyx_mdt`)**
+- [x] **Feature: Pre-Trial Judicial Bail Bonds, Surety Escrow & Fugitive Recovery Warrants (`nyx_judiciary`, `nyx_treasury` & `nyx_mdt`)**
   - **Implementation:** Pre-trial release bail schedule engine (misdemeanor standard schedules vs felony judicial discretion), cash and commercial surety bond escrow (`gov:escrow:bail`), release condition monitoring, appearance verification at courtroom terminals, automated 95%/5% exoneration distributions upon verdict, 100% forfeiture to `gov:city:master` on Failure to Appear (FTA), and automated felony fugitive warrants with 15% recovery bounties.
 
 ## Completed Tasks Log
 <!-- Completed iterations will be appended here with timestamp and summary -->
+- **[2026-10-19] Hotfix: Resolve FXServer Boot Errors, Migration 040 DOB Mismatch, Parliament Syntax Error & Cold-Boot Schema Race Conditions**
+  - **Migration 040 Schema Correction**:
+    - Fixed `AFTER date_of_birth` to `AFTER dob` (matching `nyx_characters` schema) in `FiveM/nyx_core/sql/migrations/040_citizen_os_smartphone_framework.sql` and `FiveM/nyx_ui/sql/migrations/040_citizen_os_smartphone_framework.sql`.
+    - Resolves fatal migration error that halted schema migrations at Step 40 and caused subsequent tables (041-065) to fail creation.
+    - Updated `FiveM/nyx_mdt/server/records.lua` to alias `dob AS date_of_birth` on citizen profile queries.
+  - **Syntax & RPC Reference Fixes**:
+    - Fixed Lua syntax error in `FiveM/nyx_parliament/server/exports.lua` (`Nyx.Parliament.Overview and` lacking invocation parens) and exported `Nyx.Parliament.GetOverview(src)` in `server/main.lua`.
+    - Fixed nil `Nyx.RPC` indexing on startup in `FiveM/nyx_services/server/beds.lua` by registering RPC endpoints via `exports['nyx_core']:RegisterRPC` inside a readiness thread.
+    - Removed duplicate RPC route warnings for `factions:previewDividends` and `factions:distributeDividends` in `FiveM/nyx_factions/server/main.lua`.
+  - **Cold-Boot Migration Race Prevention**:
+    - Wrapped startup table hydration loops across 12 background querying resources with `while not (exports['nyx_core'] and exports['nyx_core'].IsDatabaseReady and exports['nyx_core']:IsDatabaseReady()) do Wait(50) end`.
+    - Eliminates table-not-found query crashes during server boot across `nyx_services`, `nyx_factions`, `nyx_logistics`, `nyx_mdt`, `nyx_vehicles`, `nyx_properties`, `nyx_press`, `nyx_treasury`, and `nyx_judiciary`.
+
+- **[2026-10-19] Feature: Pre-Trial Judicial Bail Bonds, Surety Escrow & Fugitive Recovery Warrants (`nyx_judiciary`, `nyx_treasury` & `nyx_mdt`)**
+  - **Database Migration (`065_judicial_bail_bonds_surety_escrow_and_fugitive_recovery.sql`)**:
+    - Created migration file and registered Step 65 in `FiveM/nyx_core/sql/migrations/index.json`.
+    - Mirrored migration to `FiveM/nyx_judiciary/sql/migrations/065_judicial_bail_bonds_surety_escrow_and_fugitive_recovery.sql`.
+    - Created `nyx_judiciary_bail_bonds` table (`bond_id` PK, `bond_uuid` UNIQUE, `docket_id`, `defendant_citizen_id`, `poster_citizen_id`, `bond_type` ENUM('cash', 'surety', 'recognizance'), `bail_amount`, `collateral_amount`, `bondsman_fee`, `clerk_admin_fee`, `status` ENUM('posted', 'exonerated', 'forfeited', 'revoked'), `escrow_account_id`, `treasury_tx_uuid`, `conditions` JSON, `court_appearance_verified`, `bounty_claimed`, `bounty_hunter_citizen_id`, `posted_at`, `resolved_at`, `notes`) with lookup indexes.
+    - Created `nyx_judiciary_bail_audits` immutable judicial audit ledger (`audit_id` PK, `audit_uuid` UNIQUE, `bond_id`, `docket_id`, `citizen_id`, `action`, `amount`, `treasury_tx_uuid`, `notes`, `created_at`).
+    - Extended `nyx_judiciary_dockets` with `bail_schedule_amount`, `bail_status`, and `bail_bond_id`.
+    - Seeded municipal bail escrow pool account `gov:escrow:bail` in `nyx_treasury_accounts`.
+  - **Shared Pure Lua 5.4 Domain Engine (`FiveM/nyx_judiciary/shared/bail_bonds.lua`)**:
+    - Defined statutory ratios: 5% clerk admin fee, 10% commercial surety premium, 15% fugitive recovery bounty, [$500, $1,000,000] bail clamping bounds.
+    - Implemented `CalculateBailSchedule(caseType, priorFTAs, offenseGravityMultiplier)`: compounding 50% penalties for prior FTAs and gravity scaling.
+    - Implemented `EvaluateBailEligibility(docket, defendantRecord)`: capital offence remand checks and active case validations.
+    - Implemented `CalculateBailPaymentBreakdown(bailAmount, bondType)`: cash 100% deposit vs surety 10% non-refundable premium calculations.
+    - Implemented `CalculateForfeitureAndBounty(bailAmount)`: 100% forfeiture to general fund and 15% recovery bounty computation.
+    - Implemented `EvaluateReleaseConditionCompliance(conditions, inventoryItems, currentHour, playerCoords, centerCoords)`: enforces curfew, weapons prohibition, and county boundary geofences.
+    - Implemented `EvaluateCourtAppearance(playerCoords, courtroomCoords, maxDist)`: 3D Euclidean proximity validation (within 3.5m).
+    - Implemented `FormatStatusBadge(status, bondType)`: presentation formatters with status badges and localized labels.
+  - **Authoritative Server Subsystem & RPCs (`FiveM/nyx_judiciary/server/bail.lua`)**:
+    - Bootloader cache hydration (`Nyx.Judiciary.ActiveBailBonds`) with `IsDatabaseReady` wait guards.
+    - Implemented `SetBailSchedule`, `PostBail`, `VerifyCourtAppearance`, `ExonerateBail`, `ForfeitBail`, and `ClaimFugitiveBounty` with double-entry treasury transfers (`nyx_treasury`), automated felony warrant issuance, and audit logging.
+    - Registered RPC endpoints: `judiciary:getBailSchedule`, `judiciary:postBail`, `judiciary:checkinCourtAppearance`, `judiciary:getDefendantBailStatus`, `judiciary:claimFugitiveBounty`.
+    - Exported public server helpers in `server/exports.lua`: `GetActiveBailBond`, `PostBailBond`, `ExonerateBailBond`, and `ForfeitBailBond`.
+  - **Client Subsystems & Spatial Interaction (`FiveM/nyx_judiciary/client/bail.lua`)**:
+    - Interactive bail kiosk proximity queries and courtroom appearance check-in.
+    - Map blips for Central Courthouse, Mission Row Jail, and Bolingbroke Penitentiary kiosks.
+    - Third-Eye spatial interaction targets (`nyx_interact`) across canonical terminals.
+    - Player commands: `/bailstatus [citizenId]`, `/postbail <docketId> [cash|surety]`, and `/bailcheckin <docketId>`.
+    - Exported client helpers in `client/exports.lua`: `GetMyBailStatus` and `IsNearBailKiosk`.
+  - **Manifest Declarations**:
+    - Declared `shared/bail_bonds.lua`, `server/bail.lua`, and `client/bail.lua` in `FiveM/nyx_judiciary/fxmanifest.lua`.
+  - **Verification & Test Coverage**:
+    - Added in-engine integration test Test 60 (`Nyx.Tests.TestJudicialBailBondsSuretyEscrowAndFugitiveRecovery`) in `FiveM/nyx_core/server/tests.lua` (7 sub-tests) and wired into `RunAll()`.
+    - Dedicated pytest suite `tests/test_judicial_bail_bonds_surety_escrow_and_fugitive_recovery.py` (9/9 tests passing).
+    - Full test suite: 560/560 tests passing; `scripts/validator.py` clean across all 14 resources, 292 Lua files, and 65 migrations.
 - **[2026-10-18] Feature: Industrial Refining Plants, Forestry Timber Harvesting & Functional Parts Manufacturing (`nyx_logistics`, `nyx_services` & `nyx_inventory`)**
   - **Database Migration (`064_industrial_refining_and_functional_parts_manufacturing.sql`)**:
     - Created migration file and registered Step 64 in `FiveM/nyx_core/sql/migrations/index.json`.

@@ -22,7 +22,7 @@ exports['nyx_core']:RegisterRPC("mdt:searchCitizen", function(src, query)
 
     -- Find citizen profile
     local citizen = MySQL.single.await([[
-        SELECT `char_id`, `citizen_id`, `first_name`, `last_name`, `gender`, `date_of_birth`
+        SELECT `char_id`, `citizen_id`, `first_name`, `last_name`, `gender`, `dob` AS `date_of_birth`
         FROM `nyx_characters`
         WHERE `citizen_id` = ? OR CONCAT(`first_name`, ' ', `last_name`) LIKE ?
         LIMIT 1

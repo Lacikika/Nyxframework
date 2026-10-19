@@ -501,6 +501,9 @@ CreateThread(function()
     while GetResourceState("oxmysql") ~= "started" do
         Wait(50)
     end
+    while not (exports['nyx_core'] and exports['nyx_core'].IsDatabaseReady and exports['nyx_core']:IsDatabaseReady()) do
+        Wait(50)
+    end
     Nyx.Services.LoadHospitalBeds()
 end)
 
@@ -508,52 +511,58 @@ end)
 -- RPC Bridge Registration
 -- ============================================================================
 
-Nyx.RPC.Register("services:getHospitalBeds", function(src, hospitalId)
-    local results = {}
-    for _, bed in pairs(Nyx.Services.HospitalBeds) do
-        if not hospitalId or bed.hospital_id == hospitalId then
-            table.insert(results, Nyx.HospitalBeds.FormatBedSummary(bed))
-        end
-    end
-    return results
-end)
-
-Nyx.RPC.Register("services:getBedDetails", function(src, bedId)
-    local bed = Nyx.Services.HospitalBeds[bedId]
-    if not bed then return nil, "BED_NOT_FOUND" end
-    return Nyx.HospitalBeds.FormatBedSummary(bed)
-end)
-
-Nyx.RPC.Register("services:admitPatientToBed", function(src, bedId, targetSrc)
-    local patientSrc = targetSrc or src
-    return Nyx.Services.AdmitPatientToBed(bedId, patientSrc)
-end)
-
-Nyx.RPC.Register("services:dischargePatientFromBed", function(src, bedId)
-    return Nyx.Services.DischargePatientFromBed(bedId, "VOLUNTARY_DISCHARGE")
-end)
-
-Nyx.RPC.Register("services:sanitizeBed", function(src, bedId, itemKey)
-    return Nyx.Services.SanitizeBed(src, bedId, itemKey)
-end)
-
-Nyx.RPC.Register("services:administerBedTreatment", function(src, bedId, treatmentItem)
-    return Nyx.Services.AdministerBedTreatment(bedId, treatmentItem)
-end)
-
-Nyx.RPC.Register("services:getBedTelemetry", function(src, bedId)
-    local bed = Nyx.Services.HospitalBeds[bedId]
-    if not bed then return nil, "BED_NOT_FOUND" end
-
-    local patientSrc = nil
-    for s, bId in pairs(Nyx.Services.OccupiedBedSources) do
-        if bId == bedId then
-            patientSrc = s
-            break
-        end
+CreateThread(function()
+    while not exports['nyx_core'] or not exports['nyx_core'].RegisterRPC do
+        Wait(50)
     end
 
-    local isPowered = Nyx.Services.IsBedPowered(bedId)
-    local state = patientSrc and Nyx.Services.GetPlayerTrauma(patientSrc) or nil
-    return Nyx.HospitalBeds.EvaluateVitalsTelemetry(state, bed, isPowered)
+    exports['nyx_core']:RegisterRPC("services:getHospitalBeds", function(src, hospitalId)
+        local results = {}
+        for _, bed in pairs(Nyx.Services.HospitalBeds) do
+            if not hospitalId or bed.hospital_id == hospitalId then
+                table.insert(results, Nyx.HospitalBeds.FormatBedSummary(bed))
+            end
+        end
+        return results
+    end)
+
+    exports['nyx_core']:RegisterRPC("services:getBedDetails", function(src, bedId)
+        local bed = Nyx.Services.HospitalBeds[bedId]
+        if not bed then return nil, "BED_NOT_FOUND" end
+        return Nyx.HospitalBeds.FormatBedSummary(bed)
+    end)
+
+    exports['nyx_core']:RegisterRPC("services:admitPatientToBed", function(src, bedId, targetSrc)
+        local patientSrc = targetSrc or src
+        return Nyx.Services.AdmitPatientToBed(bedId, patientSrc)
+    end)
+
+    exports['nyx_core']:RegisterRPC("services:dischargePatientFromBed", function(src, bedId)
+        return Nyx.Services.DischargePatientFromBed(bedId, "VOLUNTARY_DISCHARGE")
+    end)
+
+    exports['nyx_core']:RegisterRPC("services:sanitizeBed", function(src, bedId, itemKey)
+        return Nyx.Services.SanitizeBed(src, bedId, itemKey)
+    end)
+
+    exports['nyx_core']:RegisterRPC("services:administerBedTreatment", function(src, bedId, treatmentItem)
+        return Nyx.Services.AdministerBedTreatment(bedId, treatmentItem)
+    end)
+
+    exports['nyx_core']:RegisterRPC("services:getBedTelemetry", function(src, bedId)
+        local bed = Nyx.Services.HospitalBeds[bedId]
+        if not bed then return nil, "BED_NOT_FOUND" end
+
+        local patientSrc = nil
+        for s, bId in pairs(Nyx.Services.OccupiedBedSources) do
+            if bId == bedId then
+                patientSrc = s
+                break
+            end
+        end
+
+        local isPowered = Nyx.Services.IsBedPowered(bedId)
+        local state = patientSrc and Nyx.Services.GetPlayerTrauma(patientSrc) or nil
+        return Nyx.HospitalBeds.EvaluateVitalsTelemetry(state, bed, isPowered)
+    end)
 end)
