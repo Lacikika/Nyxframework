@@ -12,6 +12,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- 1. Extend Parliament Laws Table with Subsystem Target & Description
 -- ----------------------------------------------------------------------------
 ALTER TABLE `nyx_parliament_laws`
+  MODIFY COLUMN `category` ENUM('penal_infraction', 'penal_misdemeanor', 'penal_felony', 'fiscal_policy', 'zoning', 'speed_limit') NOT NULL,
   ADD COLUMN IF NOT EXISTS `subsystem_target` ENUM('mdt', 'treasury', 'vehicles', 'properties', 'general') NOT NULL DEFAULT 'general' AFTER `category`,
   ADD COLUMN IF NOT EXISTS `description` VARCHAR(255) NULL DEFAULT NULL AFTER `title`;
 
@@ -61,7 +62,7 @@ CREATE TABLE IF NOT EXISTS `nyx_mdt_dispatch_warnings` (
   INDEX `idx_warning_category` (`category`),
   INDEX `idx_warning_plate` (`target_plate`),
   INDEX `idx_warning_created` (`created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------------------------------------------------------
 -- 4. Traffic Radar / ANPR Sensor Monitoring Zones Table
@@ -74,7 +75,7 @@ CREATE TABLE IF NOT EXISTS `nyx_mdt_traffic_radar_zones` (
   `radius` DECIMAL(8, 2) NOT NULL DEFAULT 120.00,
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `nyx_mdt_traffic_radar_zones`
   (`zone_id`, `zone_name`, `zone_type`, `coords`, `radius`, `is_active`)
@@ -102,6 +103,6 @@ CREATE TABLE IF NOT EXISTS `nyx_mdt_statutory_overrides` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX `idx_override_law` (`law_id`),
   INDEX `idx_override_session` (`enacted_session_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 1;
