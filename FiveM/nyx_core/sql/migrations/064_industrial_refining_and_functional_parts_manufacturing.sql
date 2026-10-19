@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS `nyx_logistics_refining_audits` (
   INDEX `idx_refining_audit_facility` (`facility_id`),
   INDEX `idx_refining_audit_citizen` (`citizen_id`),
   INDEX `idx_refining_audit_created` (`created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 2. Seed Forestry and Agricultural Natural Resource Extraction Nodes in nyx_logistics_nodes
 INSERT INTO `nyx_logistics_nodes`
@@ -39,6 +39,9 @@ ON DUPLICATE KEY UPDATE
   `coords` = VALUES(`coords`);
 
 -- 3. Register Industrial Processing & Refining Facilities in nyx_logistics_facilities
+ALTER TABLE `nyx_logistics_facilities`
+  MODIFY COLUMN `type` ENUM('refinery', 'smelter', 'assembly', 'chemical', 'sawmill', 'foundry', 'textile', 'penal_workshop') NOT NULL;
+
 INSERT INTO `nyx_logistics_facilities`
   (`facility_id`, `type`, `coords`, `input_inventory_id`, `output_inventory_id`, `power_grid_id`, `power_status`, `pallet_dock_coords`, `pallet_dock_heading`, `output_mode`)
 VALUES
