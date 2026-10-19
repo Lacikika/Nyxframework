@@ -102,11 +102,11 @@ INSERT INTO `nyx_treasury_accounts` (`account_id`, `label`, `balance`, `type`) V
 ON DUPLICATE KEY UPDATE `balance` = VALUES(`balance`);
 
 -- Seed Stashes into nyx_inventories
-INSERT INTO `nyx_inventories` (`id`, `label`, `max_weight`, `max_slots`, `type`) VALUES
-('stash:corp_vanilla_unicorn', 'Vanilla Unicorn Warehouse Vault', 2000000, 120, 'permanent'),
-('stash:priv_carwash_strawberry', 'Strawberry Carwash Office Safe', 500000, 50, 'permanent'),
-('stash:syn_pacific_consulting', 'Pacific Consulting Executive Safe', 1000000, 80, 'permanent')
-ON DUPLICATE KEY UPDATE `label` = VALUES(`label`);
+INSERT INTO `nyx_inventories` (`id`, `type`, `max_weight`, `max_slots`) VALUES
+('stash:corp_vanilla_unicorn', 'permanent', 2000000, 120),
+('stash:priv_carwash_strawberry', 'permanent', 500000, 50),
+('stash:syn_pacific_consulting', 'permanent', 1000000, 80)
+ON DUPLICATE KEY UPDATE `max_weight` = VALUES(`max_weight`), `max_slots` = VALUES(`max_slots`);
 
 -- Seed Enterprises into nyx_factions_registry
 INSERT INTO `nyx_factions_registry`
