@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS `nyx_treasury_bank_vaults` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   INDEX `idx_tbv_active` (`is_active`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------------------------------------------------------
 -- 3. Armored Cash Transit Boxes Registry
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS `nyx_treasury_cash_transit_boxes` (
   INDEX `idx_box_status` (`status`),
   INDEX `idx_box_vault` (`destination_vault_id`),
   FOREIGN KEY (`destination_vault_id`) REFERENCES `nyx_treasury_bank_vaults`(`vault_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------------------------------------------------------
 -- 4. Immutable Armored Cash Transit Audit Trail
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS `nyx_treasury_cash_transit_audits` (
   INDEX `idx_tca_actor` (`actor_citizen_id`),
   INDEX `idx_tca_faction` (`faction_id`),
   INDEX `idx_tca_created` (`created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------------------------------------------------------
 -- 5. Seed Canonical Municipal Bank Vaults & Clearing Account

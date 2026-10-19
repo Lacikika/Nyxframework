@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS `nyx_factions_equity_offerings` (
   INDEX `idx_eqo_status` (`status`),
   INDEX `idx_eqo_expires` (`expires_at`),
   FOREIGN KEY (`faction_id`) REFERENCES `nyx_factions_registry`(`faction_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------------------------------------------------------
 -- 3. Consolidated Equity Shareholders & Investor Cap Table
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS `nyx_factions_equity_shareholders` (
   INDEX `idx_eqh_citizen` (`citizen_id`),
   INDEX `idx_eqh_faction` (`faction_id`),
   FOREIGN KEY (`faction_id`) REFERENCES `nyx_factions_registry`(`faction_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------------------------------------------------------
 -- 4. Immutable Equity Share Purchases & Capital Raising Transaction Ledger
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS `nyx_factions_equity_purchases` (
   INDEX `idx_eqp_offering` (`offering_id`),
   FOREIGN KEY (`faction_id`) REFERENCES `nyx_factions_registry`(`faction_id`) ON DELETE CASCADE,
   FOREIGN KEY (`offering_id`) REFERENCES `nyx_factions_equity_offerings`(`offering_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------------------------------------------------------
 -- 5. Immutable Dividend Run Audit Ledger
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS `nyx_factions_dividend_runs` (
   INDEX `idx_divrun_faction` (`faction_id`),
   INDEX `idx_divrun_created` (`created_at`),
   FOREIGN KEY (`faction_id`) REFERENCES `nyx_factions_registry`(`faction_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------------------------------------------------------
 -- 6. Seed Canonical Public Equity Offering for Vanilla Unicorn
