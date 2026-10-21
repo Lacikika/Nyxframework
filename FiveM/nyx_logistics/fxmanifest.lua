@@ -11,11 +11,13 @@ dependencies {
     'oxmysql',
     'nyx_core',
     'nyx_inventory',
-    'nyx_treasury'
+    'nyx_treasury',
+    'nyx_vehicles'
 }
 
 shared_scripts {
     '@nyx_core/shared/math.lua',
+    '@nyx_vehicles/shared/tolls_and_weighing.lua',
     'config.lua',
     'shared/zones.lua',
     'shared/nodes.lua',
