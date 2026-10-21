@@ -21,7 +21,8 @@ shared_scripts {
     'shared/registration.lua',
     'shared/diagnostics.lua',
     'shared/fuel.lua',
-    'shared/keys.lua'
+    'shared/keys.lua',
+    'shared/tolls_and_weighing.lua'
 }
 
 server_scripts {
@@ -33,6 +34,7 @@ server_scripts {
     'server/registration.lua',
     'server/diagnostics.lua',
     'server/fuel.lua',
+    'server/tolls_and_weighing.lua',
     'server/spawner.lua',
     'server/main.lua',
     'server/exports.lua'
@@ -47,6 +49,7 @@ client_scripts {
     'client/diagnostics.lua',
     'client/fuel.lua',
     'client/speedometer.lua',
+    'client/tolls_and_weighing.lua',
     'client/main.lua',
     'client/exports.lua'
 }

@@ -55,6 +55,14 @@ Config.Access = {
     }
 }
 
+-- Municipal Toll Gantries & Commercial Weigh Stations Configuration
+Config.TollsAndWeighing = {
+    ScalePadStabilizationSeconds = 3, -- Required seconds stationary on scale pad
+    BypassSpeedKmhThreshold = 25.0,   -- Speed threshold to trigger bypass alert
+    BaseFinePerExcessKg = 2.50,       -- Statutory fine per excess kg
+    BypassFineSurcharge = 500.00      -- Fine penalty surcharge for scale bypass
+}
+
 -- State Persistence & Debouncing
 Config.Persistence = {
     DamageFlushInterval = 30,    -- Debounced DB write batch interval in seconds
@@ -123,4 +131,3 @@ Config.Wear = {
     },
     ServiceRequiredItem = "tool_repairkit" -- Required item if performing manual field repairs
 }
-

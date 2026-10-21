@@ -140,4 +140,23 @@ exports("GetVehicleLockpickHistory", function(vin)
     return Nyx.Vehicles.GetLockpickHistory(vin)
 end)
 
+-- Toll Plazas, Transit Infrastructure & Commercial Weigh Stations
+exports("ProcessTollPass", function(src, plazaId, plate, vehicleClass)
+    return Nyx.Vehicles.ProcessTollPass(src, plazaId, plate, vehicleClass)
+end)
 
+exports("InspectWeighStation", function(src, plate, vehicleClass, didBypass)
+    return Nyx.Vehicles.InspectWeighStation(src, plate, vehicleClass, didBypass)
+end)
+
+exports("CalculateTollFee", function(vehicleClass, baseFee, commercialAxleMultiplier, statutoryTaxRate)
+    return Nyx.TollsAndWeighing.CalculateTollFee(vehicleClass, baseFee, commercialAxleMultiplier, statutoryTaxRate)
+end)
+
+exports("CalculateGVWR", function(vehicleClass, trunkCargoKg, loadedPalletsKg, customCurbWeight)
+    return Nyx.TollsAndWeighing.CalculateGVWR(vehicleClass, trunkCargoKg, loadedPalletsKg, customCurbWeight)
+end)
+
+exports("CalculateOverweightFine", function(grossWeightKg, maxAllowedKg, baseFinePerExcessKg)
+    return Nyx.TollsAndWeighing.CalculateOverweightFine(grossWeightKg, maxAllowedKg, baseFinePerExcessKg)
+end)

@@ -12400,6 +12400,50 @@ function Nyx.Tests.TestIndustrialRefiningAndFunctionalPartsManufacturing()
 end
 
 -- 60. Test Pre-Trial Judicial Bail Bonds, Surety Escrow & Fugitive Recovery Warrants
+function Nyx.Tests.TestMunicipalTollsAndWeighStations()
+    print("^3[Nyx:Tests] Running Municipal Toll Booths & Commercial Weigh Stations Suite...^7")
+    local passes = 0
+    local total = 5
+
+    local T = Nyx.TollsAndWeighing
+    if not T then
+        print("^1[Nyx:Test:FAIL]^7 Nyx.TollsAndWeighing shared module not loaded in environment")
+        return false
+    end
+
+    -- Sub-test A: Toll Fee Calculation
+    local sedanToll = T.CalculateTollFee(1, 5.00, 1.50, 1.00)
+    local commToll = T.CalculateTollFee(20, 5.00, 1.50, 1.00)
+    local testA_ok = (sedanToll == 5.00) and (commToll == 13.13)
+    if assertTest(testA_ok == true, "Toll Fee Pure Math Calculation", "Expected $5.00 sedan, $13.13 commercial toll", string.format("Sedan: $%.2f, Comm: $%.2f", sedanToll, commToll)) then passes = passes + 1 end
+
+    -- Sub-test B: Gross Vehicle Weight Rating (GVWR)
+    local gvwrSedan = T.CalculateGVWR(1, 150.0, 0.0)
+    local gvwrCommercial = T.CalculateGVWR(20, 500.0, 15000.0)
+    local testB_ok = (gvwrSedan == 1750.0) and (gvwrCommercial == 27500.0)
+    if assertTest(testB_ok == true, "GVWR Gross Weight Calculation", "Expected 1750kg sedan, 27500kg loaded semi", string.format("Sedan: %.1fkg, Semi: %.1fkg", gvwrSedan, gvwrCommercial)) then passes = passes + 1 end
+
+    -- Sub-test C: Overweight Fine Calculation
+    local fineZero = T.CalculateOverweightFine(14000.0, 15000.0)
+    local fineExcess = T.CalculateOverweightFine(17000.0, 15000.0, 2.50)
+    local testC_ok = (fineZero == 0.00) and (fineExcess == 5250.00)
+    if assertTest(testC_ok == true, "Statutory Overweight Fine Calculation", "Expected $0 fine below limit, $5250.00 fine for 2000kg excess", string.format("Zero: $%.2f, Excess: $%.2f", fineZero, fineExcess)) then passes = passes + 1 end
+
+    -- Sub-test D: Inspection Outcomes
+    local statusPass = T.DetermineInspectionStatus(14000.0, 15000.0, true, false, false)
+    local statusOver = T.DetermineInspectionStatus(17000.0, 15000.0, true, false, false)
+    local statusBypass = T.DetermineInspectionStatus(14000.0, 15000.0, true, false, true)
+    local testD_ok = (statusPass == "PASS") and (statusOver == "OVERWEIGHT") and (statusBypass == "BYPASSED")
+    if assertTest(testD_ok == true, "Weigh Station Inspection Outcome Resolution", "Expected PASS, OVERWEIGHT, BYPASSED", string.format("P: %s, O: %s, B: %s", statusPass, statusOver, statusBypass)) then passes = passes + 1 end
+
+    -- Sub-test E: Rounding Cents
+    local rounded = T.RoundToCent(12.3456)
+    local testE_ok = (rounded == 12.35)
+    if assertTest(testE_ok == true, "Round to Cent Exact Conservation", "Expected 12.35", string.format("%.2f", rounded)) then passes = passes + 1 end
+
+    return passes == total
+end
+
 function Nyx.Tests.TestJudicialBailBondsSuretyEscrowAndFugitiveRecovery()
     print("^3[Nyx:Tests] Running Judicial Bail Bonds & Fugitive Recovery Suite...^7")
     local passes = 0
@@ -12595,6 +12639,7 @@ function Nyx.Tests.RunAll()
     local t58 = Nyx.Tests.TestPharmaceuticalRefiningAndPlayerChemicalLabs()
     local t59 = Nyx.Tests.TestIndustrialRefiningAndFunctionalPartsManufacturing()
     local t60 = Nyx.Tests.TestJudicialBailBondsSuretyEscrowAndFugitiveRecovery()
+    local t61 = Nyx.Tests.TestMunicipalTollsAndWeighStations()
 
     print("^5--------------------------------------------------^7")
     local suites1to50Passed = false
@@ -12602,7 +12647,7 @@ function Nyx.Tests.RunAll()
         suites1to50Passed = true
     end
 
-    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 and t56 and t57 and t58 and t59 and t60 then
+    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 and t56 and t57 and t58 and t59 and t60 and t61 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")
