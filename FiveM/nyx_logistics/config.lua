@@ -22,6 +22,13 @@ Config.PalletModel = "prop_boxpile_06a"
 Config.PalletMaxWeight = 1000000     -- 1,000 kg (1 metric ton) per freight pallet
 Config.PalletMaxSlots = 20           -- Heavy slot capacity
 
+-- Commercial Freight Weigh Stations & Toll Integration
+Config.WeighStations = {
+    MaxCommercialGrossWeightKg = 40000.0, -- Maximum 40 metric tons total GVWR for commercial haulers
+    ScalePadStabilizationSeconds = 3,     -- Required stationary time on scale pad
+    MandatoryFreightManifest = true       -- Requires active haul contract / manifest ID when passing scale
+}
+
 -- Automated Shortage Contracts
 Config.ShortageContractThreshold = 0.10  -- Generate freight contract when stock <= 10% of target capacity
 Config.DefaultFreightPayoutMultiplier = 0.35 -- Payout per delivered unit = 35% of item base price
@@ -52,5 +59,3 @@ Config.Warehouse = {
         "prop_boxpile_06a"
     }
 }
-
-
