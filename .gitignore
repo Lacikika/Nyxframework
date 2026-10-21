@@ -2,22 +2,45 @@
 #                      NYXFRAMEWORK .GITIGNORE
 # ==============================================================================
 
-# --- Strictly Protected Server Secrets & Licenses ---
+# --- Strictly Protected Server Secrets & Credentials ---
 FiveM/server.cfg
+FiveM/server.cfg.bkp
+*.cfg
+!FiveM/server.cfg.example
 *.env
-.env
+.env*
 *.key
 *.pem
+*.token
+*.cert
+*.secret
 
-# --- Autonomous Agent Loop Runtime & Stop Signals ---
+# --- Autonomous Agent Loop Runtime & Internal Task Tracking ---
 agent_loop.log
 *.log
 STOP_LOOP
+AGENT_TASK.md
+findings.md
+progress.md
+task_plan.md
 
-# --- Local Obsidian Workspace & Caches ---
+# --- Personal Notes & Scratch Files ---
+usefulelinks.md
+*scratch*
+*.local
+
+# --- Internal Host Scripts & Systemd Units ---
+fivem.service
+scripts/nyx-git-sync.service
+scripts/nyx-git-sync.sh
+scripts/nyx-git-sync.timer
+scripts/overnight_loop.ps1
+scripts/overnight_loop.sh
+scripts/post-receive
+
+# --- Local Workspace, Editor & OS Caches ---
 .obsidian/
-
-# --- Operating System & Editor Artifacts ---
+.pytest_cache/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -27,3 +50,10 @@ Thumbs.db
 *~
 .idea/
 .vscode/
+
+# --- Build Archives & Compressed Artifacts ---
+*.tar.gz
+*.zip
+*.tar
+*.gz
+*.7z

@@ -1,7 +1,0 @@
-[Unit]
-Description=Nyxframework Git Auto-Sync Poller
-After=network.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/nyx-git-sync.sh
