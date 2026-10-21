@@ -4,6 +4,55 @@
 
 ---
 
+## ⚡ Quick Launch (Automated — Recommended)
+
+If you have a GitHub Personal Access Token, one command does everything:
+
+```bash
+py scripts/github_launch.py --token ghp_XXXXXXXXXXXXXXXXXXXX
+```
+
+This will:
+1. Detect your GitHub username from the token
+2. Create the public `Nyxframework` repository via the GitHub API
+3. Add the `origin` remote and push `main`
+4. Set all recommended repository topics
+5. Enable branch protection rules on `main`
+
+**Options:**
+
+| Flag | Description |
+|---|---|
+| `--token <PAT>` | *(required)* GitHub Personal Access Token |
+| `--username <name>` | Override GitHub username (auto-detected if omitted) |
+| `--repo <name>` | Override repository name (default: `Nyxframework`) |
+| `--private` | Create as a private repo instead of public |
+| `--desc "..."` | Override the repository description |
+| `--dry-run` | Print what would happen without making any changes |
+
+**Generating a token:**  
+Go to [github.com/settings/tokens/new](https://github.com/settings/tokens/new) → select scopes: **`repo`** (required) + **`delete_repo`** (optional). Copy the `ghp_...` token and pass it as `--token`.
+
+> [!CAUTION]
+> Never commit your token. Pass it only on the command line or via an environment variable — it is not stored anywhere by this script.
+
+After the script completes, update the CI badge URL in `README.md` (replace `YOUR_USERNAME` with your real GitHub username) and commit:
+
+```bash
+# Edit README.md, then:
+git add README.md
+git commit -m "docs: update CI badge URL with real GitHub username"
+git push
+```
+
+---
+
+## Manual Steps (Fallback)
+
+The sections below describe the same process manually, in case you prefer full control.
+
+---
+
 ## Table of Contents
 
 1. [Create the GitHub Repository & Push `main`](#1-create-the-github-repository--push-main)
