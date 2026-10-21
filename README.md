@@ -2,7 +2,7 @@
 
 > **A complete, modular, zero-trust authoritative roleplay framework for FiveM — built from first principles.**
 
-[![CI](https://github.com/YOUR_USERNAME/Nyxframework/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/Nyxframework/actions/workflows/ci.yml)
+[![CI](https://github.com/Lacikika/Nyxframework/actions/workflows/ci.yml/badge.svg)](https://github.com/Lacikika/Nyxframework/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![FiveM: Cerulean](https://img.shields.io/badge/FiveM-Cerulean-orange)](https://docs.fivem.net/)
 [![Lua 5.4](https://img.shields.io/badge/Lua-5.4-blueviolet)](https://www.lua.org/)
