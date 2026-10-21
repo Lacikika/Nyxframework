@@ -49,6 +49,10 @@ exports("GetRPCRateLimitMetrics", function()
     return Nyx.RPC.GetRateLimitMetrics()
 end)
 
+exports("GenerateNonce", function()
+    return Nyx.RPC.GenerateNonce()
+end)
+
 -- Virtual Routing Bucket Controls
 exports("SetLimbo", function(src)
     Nyx.Buckets.SetLimbo(src)

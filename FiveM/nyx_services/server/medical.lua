@@ -12,9 +12,10 @@ Nyx.Services.Hospitals = {}
 
 -- Helper to safely generate nonces/UUIDs
 local function generateUuid()
-    if exports['nyx_core'] and exports['nyx_core'].GenerateNonce then
+    local ok, nonce = pcall(function()
         return exports['nyx_core']:GenerateNonce()
-    end
+    end)
+    if ok and nonce then return nonce end
     local template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
     return (string.gsub(template, '[xy]', function(c)
         local v = (c == 'x') and math.random(0, 0xf) or math.random(8, 0xb)

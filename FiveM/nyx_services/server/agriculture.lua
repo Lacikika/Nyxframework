@@ -464,11 +464,10 @@ function Nyx.Services.ProcessFoodFreshnessTick()
     -- Add retail store shelves
     monitoredStashes[#monitoredStashes + 1] = { id = "stash:store_vinewood_food", type = "stash" }
     monitoredStashes[#monitoredStashes + 1] = { id = "stash:store_davis_food", type = "stash" }
-
     for _, container in ipairs(monitoredStashes) do
         local inv = exports['nyx_inventory'] and exports['nyx_inventory']:GetInventory(container.id)
         if inv then
-            local snapshot = inv:getSnapshot()
+            local snapshot = (type(inv.getSnapshot) == "function" and inv:getSnapshot()) or inv
             if snapshot and snapshot.items then
                 for _, itm in ipairs(snapshot.items) do
                     local itemDef = exports['nyx_inventory']:GetItemDefinition(itm.item_id)
