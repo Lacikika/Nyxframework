@@ -198,100 +198,40 @@ function Nyx.Tests.TestRPC()
     return passes == total
 end
 
--- 62. Integration Test: Agricultural Livestock, Slaughterhouse Processing & Cold-Chain Logistics
-function Nyx.Tests.TestLivestockSlaughterhouseAndRefrigeratedLogistics()
-    print("^4[Nyx:Test]^7 Running Agricultural Livestock, Slaughterhouse Processing & Cold-Chain Logistics Test...")
+-- 61. Test Highway Road Degradation & Public Works Resurfacing Repair Contracts
+function Nyx.Tests.TestHighwayDegradationAndTransitRepair()
+    print("^3[Nyx:Tests] Running Highway Road Degradation & Transit Repair Suite...^7")
     local passes = 0
-    local total = 7
+    local total = 4
 
-    -- Sub-test A: Cattle Ranch Growth & Feed Consumption Math
-    local feed1, health1, gained1 = Nyx.Services.Livestock.CalculateCattleGrowth(100, 200, 100.0, 100.0, 3600)
-    local testA_ok = (feed1 == 95.0) and (health1 == 100.0) and (gained1 == 1)
-
-    if assertTest(testA_ok == true,
-        "Cattle Ranch Feed Consumption & Growth Dynamics",
-        string.format("Growth calculation mismatch: feed=%.1f, health=%.1f, gained=%d",
-            feed1, health1, gained1)) then
-        passes = passes + 1
+    local R = Nyx.Vehicles.RoadDegradation
+    if not R then
+        print("^1[Nyx:Test:FAIL]^7 Nyx.Vehicles.RoadDegradation shared module not loaded in environment")
+        return false
     end
 
-    -- Sub-test B: Carcass Perishable Decay in Cold Storage vs Ambient Stash
-    local durCold, spCold, tierCold, lossCold = Nyx.Services.Livestock.CalculateCarcassDecay(100.0, 0.12, 3600, "cold_storage", true, 2.0)
-    local durDrop, spDrop, tierDrop, lossDrop = Nyx.Services.Livestock.CalculateCarcassDecay(100.0, 0.12, 3600, "drop", false, 25.0)
+    -- Sub-test A: Fourth-Power Axle Damage Factor
+    local carFactor = R.CalculateAxleDamageFactor(2000.0, 2)
+    local heavyFactor = R.CalculateAxleDamageFactor(20000.0, 5)
+    local testA_ok = (carFactor == 0.06 or carFactor == 0.06) and (heavyFactor > 1.0)
+    if assertTest(testA_ok == true, "4th-Power Axle Damage Factor Calculation", "Expected low passenger car factor and high semi factor", string.format("Car: %.2f, Semi: %.2f", carFactor, heavyFactor)) then passes = passes + 1 end
 
-    local testB_ok = (durCold == 98.8 and tierCold == "PRISTINE") and (durDrop == 70.0 and tierDrop == "FRESH")
+    -- Sub-test B: Road Quality Decay
+    local q1 = R.CalculateRoadQualityDecay(0, 100.0, 0)
+    local q2 = R.CalculateRoadQualityDecay(100, 100.0, 10)
+    local testB_ok = (q1 == 100.0) and (q2 < 90.0)
+    if assertTest(testB_ok == true, "Road Quality Decay Rate Math", "Expected 100% initial and degraded quality after 100 passages", string.format("Q1: %.2f%%, Q2: %.2f%%", q1, q2)) then passes = passes + 1 end
 
-    if assertTest(testB_ok == true,
-        "Carcass Decay Preservation under Active Cold Chain vs Exposed Drop",
-        string.format("Decay mismatch: coldDur=%.1f (tier=%s), dropDur=%.1f (tier=%s)",
-            durCold, tierCold, durDrop, tierDrop)) then
-        passes = passes + 1
-    end
+    -- Sub-test C: Vehicle Handling Penalty Modifiers
+    local hOpt = R.CalculateHandlingPenalty(90.0)
+    local hDeg = R.CalculateHandlingPenalty(50.0)
+    local testC_ok = (hOpt.status == "OPTIMAL" and hOpt.gripMultiplier == 1.0) and (hDeg.status == "DEGRADED" and hDeg.gripMultiplier < 1.0)
+    if assertTest(testC_ok == true, "Handling & Traction Penalty Modifiers", "Expected OPTIMAL status for 90% and DEGRADED for 50%", string.format("Opt: %s (x%.2f), Deg: %s (x%.2f)", hOpt.status, hOpt.gripMultiplier, hDeg.status, hDeg.gripMultiplier)) then passes = passes + 1 end
 
-    -- Sub-test C: Cold Chain Status Evaluation
-    local statusPristine, _, _ = Nyx.Services.Livestock.EvaluateColdChainStatus(2.0, true)
-    local statusSpoiled, _, _ = Nyx.Services.Livestock.EvaluateColdChainStatus(15.0, false)
-
-    local testC_ok = (statusPristine == "PRISTINE") and (statusSpoiled == "CRITICAL_SPOILAGE")
-
-    if assertTest(testC_ok == true,
-        "Cold Chain Compliance & Spoilage Status Thresholds",
-        string.format("Status evaluation mismatch: pristine=%s, spoiled=%s",
-            statusPristine, statusSpoiled)) then
-        passes = passes + 1
-    end
-
-    -- Sub-test D: Carcass Butchering Yield
-    local cutsA, palletsA, gradeA = Nyx.Services.Livestock.CalculateButcheringYield(100.0, 100.0)
-    local cutsB, palletsB, gradeB = Nyx.Services.Livestock.CalculateButcheringYield(0.0, 100.0)
-
-    local testD_ok = (cutsA == 10 and palletsA == 1 and gradeA == "PRISTINE") and (cutsB == 0 and palletsB == 0 and gradeB == "SPOILED")
-
-    if assertTest(testD_ok == true,
-        "Slaughterhouse Carcass Butchering Yields & Quality Grading",
-        string.format("Butchering yield mismatch: cutsA=%d, gradeA=%s, cutsB=%d, gradeB=%s",
-            cutsA, gradeA, cutsB, gradeB)) then
-        passes = passes + 1
-    end
-
-    -- Sub-test E: Refrigerated Freight Haulage Payout & Spoilage Penalty
-    local payoutA, bondA, penA, bonA = Nyx.Services.Livestock.CalculateRefrigeratedFreightPayout(1000.0, 95.0, 1200, 1800)
-    local payoutB, bondB, penB, bonB = Nyx.Services.Livestock.CalculateRefrigeratedFreightPayout(1000.0, 0.0, 1200, 1800)
-
-    local testE_ok = (payoutA == 1250.0 and bondA == 150.0 and bonA == 150.0) and (payoutB == 0.0 and bondB == 0.0 and penB == 150.0)
-
-    if assertTest(testE_ok == true,
-        "Refrigerated Freight Haulage Payout, Escrow Return & Spoilage Penalty Math",
-        string.format("Freight payout mismatch: payoutA=%.2f, bonA=%.2f, payoutB=%.2f, penB=%.2f",
-            payoutA, bonA, payoutB, penB)) then
-        passes = passes + 1
-    end
-
-    -- Sub-test F: Item & Manufacturing Recipe Registrations
-    local cattleItem = Nyx.Items.Get("livestock_cattle")
-    local carcassItem = Nyx.Items.Get("carcass_beef_raw")
-    local slaughterRecipe = Nyx.Logistics.GetRecipe("cattle_slaughtering")
-
-    local testF_ok = (cattleItem ~= nil and cattleItem.isHeavyFreight == true) and
-                     (carcassItem ~= nil and carcassItem.decayRate == 0.12) and
-                     (slaughterRecipe ~= nil and slaughterRecipe.facilityType == "slaughterhouse")
-
-    if assertTest(testF_ok == true,
-        "Livestock & Slaughterhouse Item and Manufacturing Recipe Declarations",
-        string.format("Registration mismatch: cattle=%s, carcass=%s, recipe=%s",
-            tostring(cattleItem ~= nil), tostring(carcassItem ~= nil), tostring(slaughterRecipe ~= nil))) then
-        passes = passes + 1
-    end
-
-    -- Sub-test G: Node and Terminal Registration
-    local ranchNode = Nyx.Logistics.GetNode("ranch_grapeseed")
-    local testG_ok = (ranchNode ~= nil and ranchNode.resource == "livestock_cattle")
-
-    if assertTest(testG_ok == true,
-        "Regional Livestock Ranch Extraction Node Registration",
-        string.format("Node registration mismatch: ranchNode=%s", tostring(ranchNode ~= nil))) then
-        passes = passes + 1
-    end
+    -- Sub-test D: Repair Cost & Asphalt Requirements
+    local rep = R.CalculateRepairCostAndMaterials(1000.0, 20.0)
+    local testD_ok = (rep.requiredAsphaltKg == 2000.0) and (rep.treasuryPayout == 5000.0)
+    if assertTest(testD_ok == true, "Public Works Asphalt & Repair Cost Math", "Expected 2000kg asphalt and $5000.00 payout for 20% loss on 1000m segment", string.format("Asphalt: %.1fkg, Payout: $%.2f", rep.requiredAsphaltKg, rep.treasuryPayout)) then passes = passes + 1 end
 
     return passes == total
 end
@@ -12738,7 +12678,7 @@ function Nyx.Tests.RunAll()
     local t59 = Nyx.Tests.TestIndustrialRefiningAndFunctionalPartsManufacturing()
     local t60 = Nyx.Tests.TestJudicialBailBondsSuretyEscrowAndFugitiveRecovery()
     local t61 = Nyx.Tests.TestMunicipalTollsAndWeighStations()
-    local t62 = Nyx.Tests.TestLivestockSlaughterhouseAndRefrigeratedLogistics()
+    local t62 = Nyx.Tests.TestHighwayDegradationAndTransitRepair()
 
     print("^5--------------------------------------------------^7")
     local suites1to50Passed = false

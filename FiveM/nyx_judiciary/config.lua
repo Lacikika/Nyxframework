@@ -119,6 +119,7 @@ Config.Forensics = {
     -- Certified Laboratory Analytical Tests
     LabAnalysisTypes = {
         ['ballistics_match'] = { label = 'Ballistics Striation & Rifling Comparison', fee = 250.00 },
+        ['nibin_crossref'] = { label = 'National Integrated Ballistic Information Network (NIBIN) Cross-Reference', fee = 300.00 },
         ['dna_profile'] = { label = 'Short Tandem Repeat (STR) DNA Profile', fee = 400.00 },
         ['gsr_spectrometry'] = { label = 'Scanning Electron Microscopy (GSR-SEM)', fee = 150.00 },
         ['fingerprint_afis'] = { label = 'Automated Fingerprint Identification (AFIS)', fee = 200.00 },
