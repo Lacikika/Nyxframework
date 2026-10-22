@@ -198,6 +198,44 @@ function Nyx.Tests.TestRPC()
     return passes == total
 end
 
+-- 61. Test Highway Road Degradation & Public Works Resurfacing Repair Contracts
+function Nyx.Tests.TestHighwayDegradationAndTransitRepair()
+    print("^3[Nyx:Tests] Running Highway Road Degradation & Transit Repair Suite...^7")
+    local passes = 0
+    local total = 4
+
+    local R = Nyx.Vehicles.RoadDegradation
+    if not R then
+        print("^1[Nyx:Test:FAIL]^7 Nyx.Vehicles.RoadDegradation shared module not loaded in environment")
+        return false
+    end
+
+    -- Sub-test A: Fourth-Power Axle Damage Factor
+    local carFactor = R.CalculateAxleDamageFactor(2000.0, 2)
+    local heavyFactor = R.CalculateAxleDamageFactor(20000.0, 5)
+    local testA_ok = (carFactor == 0.06 or carFactor == 0.06) and (heavyFactor > 1.0)
+    if assertTest(testA_ok == true, "4th-Power Axle Damage Factor Calculation", "Expected low passenger car factor and high semi factor", string.format("Car: %.2f, Semi: %.2f", carFactor, heavyFactor)) then passes = passes + 1 end
+
+    -- Sub-test B: Road Quality Decay
+    local q1 = R.CalculateRoadQualityDecay(0, 100.0, 0)
+    local q2 = R.CalculateRoadQualityDecay(100, 100.0, 10)
+    local testB_ok = (q1 == 100.0) and (q2 < 90.0)
+    if assertTest(testB_ok == true, "Road Quality Decay Rate Math", "Expected 100% initial and degraded quality after 100 passages", string.format("Q1: %.2f%%, Q2: %.2f%%", q1, q2)) then passes = passes + 1 end
+
+    -- Sub-test C: Vehicle Handling Penalty Modifiers
+    local hOpt = R.CalculateHandlingPenalty(90.0)
+    local hDeg = R.CalculateHandlingPenalty(50.0)
+    local testC_ok = (hOpt.status == "OPTIMAL" and hOpt.gripMultiplier == 1.0) and (hDeg.status == "DEGRADED" and hDeg.gripMultiplier < 1.0)
+    if assertTest(testC_ok == true, "Handling & Traction Penalty Modifiers", "Expected OPTIMAL status for 90% and DEGRADED for 50%", string.format("Opt: %s (x%.2f), Deg: %s (x%.2f)", hOpt.status, hOpt.gripMultiplier, hDeg.status, hDeg.gripMultiplier)) then passes = passes + 1 end
+
+    -- Sub-test D: Repair Cost & Asphalt Requirements
+    local rep = R.CalculateRepairCostAndMaterials(1000.0, 20.0)
+    local testD_ok = (rep.requiredAsphaltKg == 2000.0) and (rep.treasuryPayout == 5000.0)
+    if assertTest(testD_ok == true, "Public Works Asphalt & Repair Cost Math", "Expected 2000kg asphalt and $5000.00 payout for 20% loss on 1000m segment", string.format("Asphalt: %.1fkg, Payout: $%.2f", rep.requiredAsphaltKg, rep.treasuryPayout)) then passes = passes + 1 end
+
+    return passes == total
+end
+
 
 -- 2. Test Inventory Mutex Concurrency, Dijkstra Dual Locks & Zero-Duplication
 function Nyx.Tests.TestInventoryConcurrency()
@@ -12640,6 +12678,7 @@ function Nyx.Tests.RunAll()
     local t59 = Nyx.Tests.TestIndustrialRefiningAndFunctionalPartsManufacturing()
     local t60 = Nyx.Tests.TestJudicialBailBondsSuretyEscrowAndFugitiveRecovery()
     local t61 = Nyx.Tests.TestMunicipalTollsAndWeighStations()
+    local t62 = Nyx.Tests.TestHighwayDegradationAndTransitRepair()
 
     print("^5--------------------------------------------------^7")
     local suites1to50Passed = false
@@ -12647,7 +12686,7 @@ function Nyx.Tests.RunAll()
         suites1to50Passed = true
     end
 
-    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 and t56 and t57 and t58 and t59 and t60 and t61 then
+    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 and t56 and t57 and t58 and t59 and t60 and t61 and t62 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")
