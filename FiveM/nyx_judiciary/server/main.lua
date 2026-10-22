@@ -591,6 +591,27 @@ CreateThread(function()
             local ok, res = Nyx.Judiciary.ConcludeTrial(docketId, verdict)
             return { success = ok, result = res, error = (not ok and res or nil) }
         end)
+
+        -- Forensic Ballistics & NIBIN Integration RPCs
+        exports['nyx_core']:RegisterRPC("judiciary:registerNIBINEntry", function(src, payload)
+            if not payload or not payload.evidenceId then
+                return { success = false, error = "INVALID_PAYLOAD" }
+            end
+            local ok, res = Nyx.Judiciary.Ballistics.RegisterNIBINEntry(src, payload.evidenceId, payload.docketId)
+            return { success = ok, result = res, error = (not ok and res or nil) }
+        end)
+
+        exports['nyx_core']:RegisterRPC("judiciary:queryNIBINRecords", function(src, payload)
+            payload = payload or {}
+            local rows = Nyx.Judiciary.Ballistics.QueryNIBINRecords(payload.caliber, payload.matchStatus)
+            return { success = true, records = rows }
+        end)
+
+        exports['nyx_core']:RegisterRPC("judiciary:getRiflingProfile", function(src, weaponSerial)
+            if not weaponSerial then return { success = false, error = "INVALID_SERIAL" } end
+            local profile = Nyx.Judiciary.Ballistics.GetOrCreateRiflingProfile(weaponSerial, "weapon_pistol")
+            return { success = true, profile = profile }
+        end)
     end
 
     -- 2. Evidence Sweeper Background Task (every 60s)
@@ -705,10 +726,14 @@ end)
 
 
 -- Network Event Bridges for Client Action Hooks
-RegisterNetEvent("nyx:judiciary:server:weaponFired", function(weaponHash, coords)
+RegisterNetEvent("nyx:judiciary:server:weaponFired", function(weaponHash, coords, ejectionAngleDeg)
     local src = source
     if not coords or type(coords) ~= "vector3" and type(coords) ~= "table" then return end
-    Nyx.Judiciary.RegisterBallisticEvent(src, weaponHash, coords)
+    if Nyx.Judiciary.Ballistics and Nyx.Judiciary.Ballistics.RegisterDischargeEvent then
+        Nyx.Judiciary.Ballistics.RegisterDischargeEvent(src, weaponHash, coords, ejectionAngleDeg)
+    else
+        Nyx.Judiciary.RegisterBallisticEvent(src, weaponHash, coords)
+    end
 end)
 
 RegisterNetEvent("nyx:judiciary:server:traumaOccurred", function(victimSrc, damageType, coords)
