@@ -177,3 +177,24 @@ end)
 exports("CalculateAxleDamageFactor", function(grossWeightKg, axleCount)
     return Nyx.Vehicles.RoadDegradation.CalculateAxleDamageFactor(grossWeightKg, axleCount)
 end)
+
+-- Commercial Transit Permits & Overweight Surcharges
+exports("IssueTransitPermit", function(src, plate, permitType, requestedMaxWeightKg)
+    return Nyx.Vehicles.IssueTransitPermit(src, plate, permitType, requestedMaxWeightKg)
+end)
+
+exports("GetActiveTransitPermit", function(plate)
+    return Nyx.Vehicles.GetActiveTransitPermit(plate)
+end)
+
+exports("LogPermitViolation", function(plate, driverIdentifier, measuredWeightKg, permittedWeightKg, violationType, assessedFine)
+    return Nyx.Vehicles.LogPermitViolation(plate, driverIdentifier, measuredWeightKg, permittedWeightKg, violationType, assessedFine)
+end)
+
+exports("CalculatePermitFee", function(permitType, requestedMaxWeightKg, statutoryTaxRate)
+    return Nyx.TransitPermits.CalculatePermitFee(permitType, requestedMaxWeightKg, statutoryTaxRate)
+end)
+
+exports("EvaluatePermitValidity", function(permitRecord, measuredWeightKg, currentTimestampEpoch)
+    return Nyx.TransitPermits.EvaluatePermitValidity(permitRecord, measuredWeightKg, currentTimestampEpoch)
+end)
