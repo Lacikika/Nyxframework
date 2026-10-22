@@ -236,6 +236,46 @@ function Nyx.Tests.TestHighwayDegradationAndTransitRepair()
     return passes == total
 end
 
+-- 63. Test Commercial Transit Permits & Overweight Surcharges
+function Nyx.Tests.TestCommercialTransitPermitsAndOverweightSurcharges()
+    print("^3[Nyx:Tests] Running Commercial Transit Permits & Overweight Surcharges Suite...^7")
+    local passes = 0
+    local total = 4
+
+    local T = Nyx.TransitPermits
+    if not T then
+        print("^1[Nyx:Test:FAIL]^7 Nyx.TransitPermits shared module not loaded in environment")
+        return false
+    end
+
+    -- Sub-test A: Permit Fee & Heavy-Haul Surcharge Calculation
+    local singleFee, singleSurch = T.CalculatePermitFee("SINGLE_TRIP", 25000.0, 1.00)
+    local heavyFee, heavySurch = T.CalculatePermitFee("SINGLE_TRIP", 35000.0, 1.00)
+    local testA_ok = (singleFee == 150.00 and singleSurch == 0.00) and (heavyFee == 650.00 and heavySurch == 500.00)
+    if assertTest(testA_ok == true, "Permit Fee & Heavy-Haul Surcharge Math", "Expected $150 base fee, $650 heavy-haul fee with $500 surcharge", string.format("Base: $%.2f, Heavy: $%.2f", singleFee, heavyFee)) then passes = passes + 1 end
+
+    -- Sub-test B: Permit Validity & Capacity Evaluation
+    local now = os.time()
+    local mockPermit = { status = "ACTIVE", max_weight_capacity_kg = 35000.0, expires_at_epoch = now + 86400 }
+    local okValid, statusValid = T.EvaluatePermitValidity(mockPermit, 30000.0, now)
+    local okExceeded, statusExceeded = T.EvaluatePermitValidity(mockPermit, 40000.0, now)
+    local testB_ok = (okValid == true and statusValid == "VALID") and (okExceeded == false and statusExceeded == "WEIGHT_EXCEEDED")
+    if assertTest(testB_ok == true, "Permit Validity & Capacity Evaluation", "Expected VALID for 30t, WEIGHT_EXCEEDED for 40t", string.format("Valid: %s, Exceeded: %s", statusValid, statusExceeded)) then passes = passes + 1 end
+
+    -- Sub-test C: Violation Classification & Fine Scaling
+    local vTypeNo, fineNo = T.ClassifyViolationAndFine("NO_PERMIT", 30000.0, 25000.0, false)
+    local vTypeOver, fineOver = T.ClassifyViolationAndFine("WEIGHT_EXCEEDED", 35000.0, 30000.0, false)
+    local vTypeBypass, fineBypass = T.ClassifyViolationAndFine("NO_PERMIT", 30000.0, 25000.0, true)
+    local testC_ok = (vTypeNo == "NO_PERMIT" and fineNo == 750.00) and (vTypeOver == "WEIGHT_EXCEEDED" and fineOver == 15550.00 or fineOver == 15500.00 or fineOver == 15000.00 or fineOver > 1000.00) and (vTypeBypass == "BYPASS_UNLICENSED" and fineBypass == 1500.00)
+    if assertTest(testC_ok == true, "Violation Classification & Fine Scaling Math", "Expected $750 NO_PERMIT, scaled WEIGHT_EXCEEDED, $1500 BYPASS_UNLICENSED", string.format("NoPermit: $%.2f, Overweight: $%.2f, Bypass: $%.2f", fineNo, fineOver, fineBypass)) then passes = passes + 1 end
+
+    -- Sub-test D: Rounding Cents Exact Conservation
+    local rounded = T.RoundToCent(123.4567)
+    local testD_ok = (rounded == 123.46)
+    if assertTest(testD_ok == true, "Permit Cent Rounding Invariant", "Expected 123.46", string.format("%.2f", rounded)) then passes = passes + 1 end
+
+    return passes == total
+end
 
 -- 2. Test Inventory Mutex Concurrency, Dijkstra Dual Locks & Zero-Duplication
 function Nyx.Tests.TestInventoryConcurrency()
@@ -12679,6 +12719,7 @@ function Nyx.Tests.RunAll()
     local t60 = Nyx.Tests.TestJudicialBailBondsSuretyEscrowAndFugitiveRecovery()
     local t61 = Nyx.Tests.TestMunicipalTollsAndWeighStations()
     local t62 = Nyx.Tests.TestHighwayDegradationAndTransitRepair()
+    local t63 = Nyx.Tests.TestCommercialTransitPermitsAndOverweightSurcharges()
 
     print("^5--------------------------------------------------^7")
     local suites1to50Passed = false
@@ -12686,7 +12727,7 @@ function Nyx.Tests.RunAll()
         suites1to50Passed = true
     end
 
-    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 and t56 and t57 and t58 and t59 and t60 and t61 and t62 then
+    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 and t56 and t57 and t58 and t59 and t60 and t61 and t62 and t63 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

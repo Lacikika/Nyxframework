@@ -23,7 +23,8 @@ shared_scripts {
     'shared/fuel.lua',
     'shared/keys.lua',
     'shared/tolls_and_weighing.lua',
-    'shared/road_degradation.lua'
+    'shared/road_degradation.lua',
+    'shared/transit_permits.lua'
 }
 
 server_scripts {
@@ -37,6 +38,7 @@ server_scripts {
     'server/fuel.lua',
     'server/tolls_and_weighing.lua',
     'server/road_degradation.lua',
+    'server/transit_permits.lua',
     'server/spawner.lua',
     'server/main.lua',
     'server/exports.lua'
@@ -53,6 +55,7 @@ client_scripts {
     'client/speedometer.lua',
     'client/tolls_and_weighing.lua',
     'client/road_degradation.lua',
+    'client/transit_permits.lua',
     'client/main.lua',
     'client/exports.lua'
 }
