@@ -198,6 +198,104 @@ function Nyx.Tests.TestRPC()
     return passes == total
 end
 
+-- 62. Integration Test: Agricultural Livestock, Slaughterhouse Processing & Cold-Chain Logistics
+function Nyx.Tests.TestLivestockSlaughterhouseAndRefrigeratedLogistics()
+    print("^4[Nyx:Test]^7 Running Agricultural Livestock, Slaughterhouse Processing & Cold-Chain Logistics Test...")
+    local passes = 0
+    local total = 7
+
+    -- Sub-test A: Cattle Ranch Growth & Feed Consumption Math
+    local feed1, health1, gained1 = Nyx.Services.Livestock.CalculateCattleGrowth(100, 200, 100.0, 100.0, 3600)
+    local testA_ok = (feed1 == 95.0) and (health1 == 100.0) and (gained1 == 1)
+
+    if assertTest(testA_ok == true,
+        "Cattle Ranch Feed Consumption & Growth Dynamics",
+        string.format("Growth calculation mismatch: feed=%.1f, health=%.1f, gained=%d",
+            feed1, health1, gained1)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test B: Carcass Perishable Decay in Cold Storage vs Ambient Stash
+    local durCold, spCold, tierCold, lossCold = Nyx.Services.Livestock.CalculateCarcassDecay(100.0, 0.12, 3600, "cold_storage", true, 2.0)
+    local durDrop, spDrop, tierDrop, lossDrop = Nyx.Services.Livestock.CalculateCarcassDecay(100.0, 0.12, 3600, "drop", false, 25.0)
+
+    local testB_ok = (durCold == 98.8 and tierCold == "PRISTINE") and (durDrop == 70.0 and tierDrop == "FRESH")
+
+    if assertTest(testB_ok == true,
+        "Carcass Decay Preservation under Active Cold Chain vs Exposed Drop",
+        string.format("Decay mismatch: coldDur=%.1f (tier=%s), dropDur=%.1f (tier=%s)",
+            durCold, tierCold, durDrop, tierDrop)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test C: Cold Chain Status Evaluation
+    local statusPristine, _, _ = Nyx.Services.Livestock.EvaluateColdChainStatus(2.0, true)
+    local statusSpoiled, _, _ = Nyx.Services.Livestock.EvaluateColdChainStatus(15.0, false)
+
+    local testC_ok = (statusPristine == "PRISTINE") and (statusSpoiled == "CRITICAL_SPOILAGE")
+
+    if assertTest(testC_ok == true,
+        "Cold Chain Compliance & Spoilage Status Thresholds",
+        string.format("Status evaluation mismatch: pristine=%s, spoiled=%s",
+            statusPristine, statusSpoiled)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test D: Carcass Butchering Yield
+    local cutsA, palletsA, gradeA = Nyx.Services.Livestock.CalculateButcheringYield(100.0, 100.0)
+    local cutsB, palletsB, gradeB = Nyx.Services.Livestock.CalculateButcheringYield(0.0, 100.0)
+
+    local testD_ok = (cutsA == 10 and palletsA == 1 and gradeA == "PRISTINE") and (cutsB == 0 and palletsB == 0 and gradeB == "SPOILED")
+
+    if assertTest(testD_ok == true,
+        "Slaughterhouse Carcass Butchering Yields & Quality Grading",
+        string.format("Butchering yield mismatch: cutsA=%d, gradeA=%s, cutsB=%d, gradeB=%s",
+            cutsA, gradeA, cutsB, gradeB)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test E: Refrigerated Freight Haulage Payout & Spoilage Penalty
+    local payoutA, bondA, penA, bonA = Nyx.Services.Livestock.CalculateRefrigeratedFreightPayout(1000.0, 95.0, 1200, 1800)
+    local payoutB, bondB, penB, bonB = Nyx.Services.Livestock.CalculateRefrigeratedFreightPayout(1000.0, 0.0, 1200, 1800)
+
+    local testE_ok = (payoutA == 1250.0 and bondA == 150.0 and bonA == 150.0) and (payoutB == 0.0 and bondB == 0.0 and penB == 150.0)
+
+    if assertTest(testE_ok == true,
+        "Refrigerated Freight Haulage Payout, Escrow Return & Spoilage Penalty Math",
+        string.format("Freight payout mismatch: payoutA=%.2f, bonA=%.2f, payoutB=%.2f, penB=%.2f",
+            payoutA, bonA, payoutB, penB)) then
+        passes = passes + 1
+    end
+
+    -- Sub-test F: Item & Manufacturing Recipe Registrations
+    local cattleItem = Nyx.Items.Get("livestock_cattle")
+    local carcassItem = Nyx.Items.Get("carcass_beef_raw")
+    local slaughterRecipe = Nyx.Logistics.GetRecipe("cattle_slaughtering")
+
+    local testF_ok = (cattleItem ~= nil and cattleItem.isHeavyFreight == true) and
+                     (carcassItem ~= nil and carcassItem.decayRate == 0.12) and
+                     (slaughterRecipe ~= nil and slaughterRecipe.facilityType == "slaughterhouse")
+
+    if assertTest(testF_ok == true,
+        "Livestock & Slaughterhouse Item and Manufacturing Recipe Declarations",
+        string.format("Registration mismatch: cattle=%s, carcass=%s, recipe=%s",
+            tostring(cattleItem ~= nil), tostring(carcassItem ~= nil), tostring(slaughterRecipe ~= nil))) then
+        passes = passes + 1
+    end
+
+    -- Sub-test G: Node and Terminal Registration
+    local ranchNode = Nyx.Logistics.GetNode("ranch_grapeseed")
+    local testG_ok = (ranchNode ~= nil and ranchNode.resource == "livestock_cattle")
+
+    if assertTest(testG_ok == true,
+        "Regional Livestock Ranch Extraction Node Registration",
+        string.format("Node registration mismatch: ranchNode=%s", tostring(ranchNode ~= nil))) then
+        passes = passes + 1
+    end
+
+    return passes == total
+end
+
 
 -- 2. Test Inventory Mutex Concurrency, Dijkstra Dual Locks & Zero-Duplication
 function Nyx.Tests.TestInventoryConcurrency()
@@ -12640,6 +12738,7 @@ function Nyx.Tests.RunAll()
     local t59 = Nyx.Tests.TestIndustrialRefiningAndFunctionalPartsManufacturing()
     local t60 = Nyx.Tests.TestJudicialBailBondsSuretyEscrowAndFugitiveRecovery()
     local t61 = Nyx.Tests.TestMunicipalTollsAndWeighStations()
+    local t62 = Nyx.Tests.TestLivestockSlaughterhouseAndRefrigeratedLogistics()
 
     print("^5--------------------------------------------------^7")
     local suites1to50Passed = false
@@ -12647,7 +12746,7 @@ function Nyx.Tests.RunAll()
         suites1to50Passed = true
     end
 
-    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 and t56 and t57 and t58 and t59 and t60 and t61 then
+    if suites1to50Passed and t51 and t52 and t53 and t54 and t55 and t56 and t57 and t58 and t59 and t60 and t61 and t62 then
         print("^2>>> ALL NYXFRAMEWORK INTEGRATION TESTS PASSED! <<<^7")
     else
         print("^1>>> SOME NYXFRAMEWORK TESTS FAILED! CHECK LOGS. <<<^7")

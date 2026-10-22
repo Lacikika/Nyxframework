@@ -165,6 +165,32 @@ Nyx.Logistics.Nodes.Registry = {
             dict = 'amb@world_human_gardener_plant@male@base',
             name = 'base'
         }
+    },
+    ['ranch_grapeseed'] = {
+        id = 'ranch_grapeseed',
+        label = 'O\'Neil Grapeseed Livestock Ranch',
+        resource = 'livestock_cattle',
+        maxReserve = 200,
+        regenRatePerHour = 20,
+        requiredTool = nil,
+        coords = vector3(2440.5, 4980.2, 45.0),
+        anim = {
+            dict = 'amb@world_human_gardener_plant@male@base',
+            name = 'base'
+        }
+    },
+    ['ranch_paleto'] = {
+        id = 'ranch_paleto',
+        label = 'Paleto Bay Coastal Cattle Ranch',
+        resource = 'livestock_cattle',
+        maxReserve = 150,
+        regenRatePerHour = 15,
+        requiredTool = nil,
+        coords = vector3(-380.2, 6180.4, 31.0),
+        anim = {
+            dict = 'amb@world_human_gardener_plant@male@base',
+            name = 'base'
+        }
     }
 }
 
