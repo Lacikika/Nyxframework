@@ -263,3 +263,20 @@ end)
 exports("ForfeitBailBond", function(docketId, reason)
     return Nyx.Judiciary.ForfeitBail(docketId, reason)
 end)
+
+-- Forensic Ballistics & NIBIN Integration Exports
+exports("GetOrCreateRiflingProfile", function(weaponSerial, weaponModel)
+    return Nyx.Judiciary.Ballistics.GetOrCreateRiflingProfile(weaponSerial, weaponModel)
+end)
+
+exports("RegisterDischargeEvent", function(src, weaponHash, coords, ejectionAngleDeg)
+    return Nyx.Judiciary.Ballistics.RegisterDischargeEvent(src, weaponHash, coords, ejectionAngleDeg)
+end)
+
+exports("RegisterNIBINEntry", function(src, evidenceId, crimeSceneDocketId)
+    return Nyx.Judiciary.Ballistics.RegisterNIBINEntry(src, evidenceId, crimeSceneDocketId)
+end)
+
+exports("QueryNIBINRecords", function(filterCaliber, matchStatusOnly)
+    return Nyx.Judiciary.Ballistics.QueryNIBINRecords(filterCaliber, matchStatusOnly)
+end)
