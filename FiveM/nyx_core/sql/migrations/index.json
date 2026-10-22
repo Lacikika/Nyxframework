@@ -65,6 +65,6 @@
   "064_industrial_refining_and_functional_parts_manufacturing.sql",
   "065_judicial_bail_bonds_surety_escrow_and_fugitive_recovery.sql",
   "066_municipal_toll_booths_and_commercial_weigh_stations.sql",
-  "067_highway_degradation_and_transit_repair.sql",
-  "068_commercial_transit_permits_and_overweight_surcharges.sql"
+  "068_commercial_transit_permits_and_overweight_surcharges.sql",
+  "067_campaign_finance_and_citizen_os_polling.sql"
 ]

@@ -22,7 +22,8 @@ shared_scripts {
     'shared/taxation.lua',
     'shared/commercial_leases.lua',
     'shared/inactivity.lua',
-    'shared/portal_ui.lua'
+    'shared/portal_ui.lua',
+    'shared/building_permits.lua'
 }
 
 server_scripts {
@@ -34,6 +35,7 @@ server_scripts {
     'server/leases.lua',
     'server/inactivity.lua',
     'server/billing.lua',
+    'server/building_permits.lua',
     'server/exports.lua'
 }
 
@@ -45,6 +47,7 @@ client_scripts {
     'client/inactivity.lua',
     'client/interact.lua',
     'client/portal_ui.lua',
+    'client/building_permits.lua',
     'client/exports.lua'
 }
 
