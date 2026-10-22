@@ -19,12 +19,14 @@ shared_scripts {
     'shared/courtroom_ui.lua',
     'shared/penal_labor.lua',
     'shared/acid_etch.lua',
-    'shared/bail_bonds.lua'
+    'shared/bail_bonds.lua',
+    'shared/ballistics.lua'
 }
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/evidence.lua',
+    'server/ballistics.lua',
     'server/dockets.lua',
     'server/warrants.lua',
     'server/jury.lua',
