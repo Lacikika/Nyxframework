@@ -589,6 +589,75 @@ Nyx.Items.Registry = {
             attachRot = { x = 0.0, y = 0.0, z = 0.0 }
         }
     },
+    ['livestock_cattle'] = {
+        name = 'livestock_cattle',
+        label = 'Live Cattle Head',
+        weight = 100000,
+        stackable = false,
+        maxSlots = 1,
+        type = 'freight',
+        isHeavyFreight = true,
+        decayRate = 0.00,
+        description = 'Live cattle livestock head harvested from regional ranches for transit and slaughterhouse processing.',
+        client = {
+            model = `a_c_cow`,
+            animDict = 'anim@heists@box_carry@',
+            anim = 'idle'
+        }
+    },
+    ['carcass_beef_raw'] = {
+        name = 'carcass_beef_raw',
+        label = 'Whole Raw Beef Carcass',
+        weight = 45000,
+        stackable = false,
+        maxSlots = 1,
+        type = 'food',
+        isHeavyFreight = true,
+        decayRate = 0.12,
+        description = 'Whole dressed beef carcass. Highly perishable; requires refrigerated storage or rapid butchering.',
+        client = {
+            model = `prop_box_wood02a`
+        }
+    },
+    ['packaged_meat_cuts'] = {
+        name = 'packaged_meat_cuts',
+        label = 'Vacuum-Packed Premium Beef Cuts',
+        weight = 1000,
+        stackable = true,
+        maxStack = 20,
+        type = 'food',
+        decayRate = 0.05,
+        nutrition = 50,
+        description = 'Butchered and vacuum-sealed choice beef cuts for restaurants, supermarkets, and civil pantries.'
+    },
+    ['pallet_refrigerated_beef'] = {
+        name = 'pallet_refrigerated_beef',
+        label = 'Chilled Beef Freight Pallet',
+        weight = 80000,
+        stackable = false,
+        maxSlots = 1,
+        type = 'freight',
+        isHeavyFreight = true,
+        decayRate = 0.01,
+        description = 'Cold-chain insured freight pallet of chilled beef cuts. Requires refrigerated freight transport.',
+        client = {
+            model = `prop_boxpile_06a`,
+            animDict = 'anim@heists@box_carry@',
+            anim = 'idle',
+            attachOffset = { x = 0.0, y = 0.48, z = -0.20 },
+            attachRot = { x = 0.0, y = 0.0, z = 0.0 }
+        }
+    },
+    ['livestock_feed_sack'] = {
+        name = 'livestock_feed_sack',
+        label = 'Nutritional Livestock Feed Sack (25kg)',
+        weight = 25000,
+        stackable = true,
+        maxStack = 10,
+        type = 'freight',
+        decayRate = 0.00,
+        description = 'Enriched grain and cornmeal livestock feed sack for cattle ranch husbandry.'
+    },
 
     -- Tools & Valuables
     ['tool_lockpick'] = {

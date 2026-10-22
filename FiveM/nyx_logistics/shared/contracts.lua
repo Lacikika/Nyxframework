@@ -80,6 +80,13 @@ Nyx.Logistics.FreightConfig = {
             coords = vector3(2438.0, 4964.0, 46.0),
             model = `prop_terminal_01`,
             heading = 180.0
+        },
+        {
+            id = "terminal_cypress_slaughterhouse",
+            name = "Cypress Flats Slaughterhouse & Cold Logistics",
+            coords = vector3(960.5, -2180.2, 30.5),
+            model = `prop_terminal_01`,
+            heading = 90.0
         }
     }
 }
