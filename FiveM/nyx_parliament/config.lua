@@ -18,6 +18,12 @@ Config.VotingWindowHours = 72            -- Hours allowed for active voting
 Config.MaxCandidatesPerSession = 10      -- Max candidate ceiling per election session
 Config.EnforceBoothProximity = false     -- When true, requires physical presence at a booth to cast ballot
 
+-- Statutory Campaign Finance & Citizen OS Polling
+Config.StatutoryDonationCap = 5000.00    -- Max statutory donation cap per donor per election cycle ($)
+Config.PACRegistrationFee = 1000.00      -- Collateral fee to register a Political Action Committee ($)
+Config.PACAuditFineMultiplier = 1.5      -- Statutory fine multiplier for over-cap PAC contributions (150%)
+Config.MobilePollDurationHours = 72      -- Default duration for Citizen OS mobile opinion surveys (hours)
+
 -- Elective Municipal Offices
 Config.Offices = {
     ['mayor'] = {
