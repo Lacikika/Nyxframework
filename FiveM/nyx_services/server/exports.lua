@@ -302,3 +302,23 @@ exports("SterilizeChemicalLab", function(src, labId)
     return Nyx.Services.StartLabSterilization(src, labId)
 end)
 
+-- Municipal Water Utility & Hydrant Pressure
+exports("GetWaterReservoirs", function()
+    return Nyx.Services.WaterReservoirs or {}
+end)
+
+exports("GetFireHydrants", function()
+    return Nyx.Services.FireHydrants or {}
+end)
+
+exports("ContaminateWaterReservoir", function(reservoirId, contaminantType, grams, citizenId)
+    return Nyx.Services.ContaminateReservoir(reservoirId, contaminantType, grams, citizenId)
+end)
+
+exports("PurifyWaterReservoir", function(reservoirId, treatmentKg, chemicalEfficiency, citizenId)
+    return Nyx.Services.PurifyReservoir(reservoirId, treatmentKg, chemicalEfficiency, citizenId)
+end)
+
+exports("DraftFromFireHydrant", function(hydrantId, requestedLiters)
+    return Nyx.Services.DraftFromHydrant(hydrantId, requestedLiters)
+end)
