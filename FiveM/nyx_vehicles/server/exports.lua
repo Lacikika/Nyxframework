@@ -160,3 +160,20 @@ end)
 exports("CalculateOverweightFine", function(grossWeightKg, maxAllowedKg, baseFinePerExcessKg)
     return Nyx.TollsAndWeighing.CalculateOverweightFine(grossWeightKg, maxAllowedKg, baseFinePerExcessKg)
 end)
+
+-- Highway Degradation & Transit Repairs
+exports("RecordHighwayTransitPass", function(segmentId, grossWeightKg, axleCount)
+    return Nyx.Vehicles.RoadDegradationServer.RecordTransitPass(segmentId, grossWeightKg, axleCount)
+end)
+
+exports("GetHighwaySegmentCondition", function(segmentId)
+    return Nyx.Vehicles.RoadDegradationServer.GetSegmentCondition(segmentId)
+end)
+
+exports("SubmitRoadRepairBatch", function(segmentId, asphaltKg, factionId)
+    return Nyx.Vehicles.RoadDegradationServer.SubmitRoadRepair(segmentId, asphaltKg, factionId)
+end)
+
+exports("CalculateAxleDamageFactor", function(grossWeightKg, axleCount)
+    return Nyx.Vehicles.RoadDegradation.CalculateAxleDamageFactor(grossWeightKg, axleCount)
+end)
