@@ -6634,6 +6634,13 @@ window.addEventListener('message', (event) => {
         setPlacementActive(false);
     }
 
+    // Highway Road Condition Telemetry
+    else if (action === 'updateHighwayRoadCondition' || action === 'HIGHWAY_ROAD_UPDATE') {
+        if (packet.data) {
+            NyxState.highwayRoadCondition = packet.data;
+        }
+    }
+
     // HUD Telemetry
     else if (action === 'HUD_UPDATE' || action === 'UPDATE_STATUS') {
         updateHudStatus(packet.payload);
