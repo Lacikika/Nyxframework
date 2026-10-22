@@ -31,6 +31,71 @@ Nyx.Logistics.Recipes.Registry = {
             }
         }
     },
+    ['cattle_slaughtering'] = {
+        key = 'cattle_slaughtering',
+        label = 'Livestock Cattle Slaughtering & Dressing',
+        facilityType = 'slaughterhouse',
+        processingTime = 30,
+        powerRequirementKw = 15,
+        inputs = {
+            { item = 'livestock_cattle', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'carcass_beef_raw',
+                amount = 2,
+                metadata = {
+                    durability = 100.0,
+                    isSpoiled = false
+                }
+            }
+        }
+    },
+    ['carcass_butchering'] = {
+        key = 'carcass_butchering',
+        label = 'Cold-Chain Carcass Butchering & Palletizing',
+        facilityType = 'slaughterhouse',
+        processingTime = 25,
+        powerRequirementKw = 20,
+        inputs = {
+            { item = 'carcass_beef_raw', amount = 1 }
+        },
+        outputs = {
+            {
+                item = 'packaged_meat_cuts',
+                amount = 10,
+                metadata = {
+                    durability = 100.0,
+                    isSpoiled = false,
+                    nutrition = 50
+                }
+            },
+            {
+                item = 'pallet_refrigerated_beef',
+                amount = 1,
+                metadata = {
+                    durability = 100.0,
+                    temperatureC = 2.0
+                }
+            }
+        }
+    },
+    ['livestock_feed_mixing'] = {
+        key = 'livestock_feed_mixing',
+        label = 'Industrial Livestock Feed Compounding',
+        facilityType = 'refinery',
+        processingTime = 20,
+        powerRequirementKw = 10,
+        inputs = {
+            { item = 'bulk_cornmeal', amount = 2 }
+        },
+        outputs = {
+            {
+                item = 'livestock_feed_sack',
+                amount = 1
+            }
+        }
+    },
     ['first_aid_pack'] = {
         key = 'first_aid_pack',
         label = 'Trauma First Aid Kit',
